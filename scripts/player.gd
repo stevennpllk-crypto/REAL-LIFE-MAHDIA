@@ -8,6 +8,7 @@ class_name MahdiaPlayer
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var move_vector := Vector2.ZERO
 var running := false
+var jump_requested := false
 var camera_pivot: Node3D
 var camera: Camera3D
 
@@ -18,6 +19,7 @@ func _ready() -> void:
 	_add_action("move_right", KEY_D)
 	_add_action("run", KEY_SHIFT)
 	_add_action("jump", KEY_SPACE)
+	_add_action("interact", KEY_E)
 	var capsule := CapsuleMesh.new()
 	capsule.radius = 0.38
 	capsule.height = 1.75
@@ -71,6 +73,9 @@ func set_mobile_move(value: Vector2) -> void:
 func set_mobile_run(value: bool) -> void:
 	running = value
 
+func request_jump() -> void:
+	jump_requested = true
+
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= gravity * delta
@@ -87,6 +92,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, walk_speed * 5.0 * delta)
 		velocity.z = move_toward(velocity.z, 0.0, walk_speed * 5.0 * delta)
-	if Input.is_action_just_pressed("jump") and is_on_floor():
+	if (Input.is_action_just_pressed("jump") or jump_requested) and is_on_floor():
 		velocity.y = jump_velocity
+	jump_requested = false
 	move_and_slide()
