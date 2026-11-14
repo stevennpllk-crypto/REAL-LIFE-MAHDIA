@@ -1,8 +1,9 @@
 extends CanvasLayer
 class_name MahdiaMobileControls
 
+# Touch controls are created explicitly for Android/iOS.  The previous layout
+# relied on a Control with a zero size, which made the joystick invisible.
 var target: CharacterBody3D
-var stick_center := Vector2(112, 0)
 var stick_touch := -1
 var stick_value := Vector2.ZERO
 var stick_base: Control
@@ -12,46 +13,62 @@ var interact_button: Button
 
 func setup(player: CharacterBody3D) -> void:
 	target = player
-	if not OS.has_feature("mobile"):
+	var platform := OS.get_name()
+	if not OS.has_feature("mobile") and platform != "Android" and platform != "iOS":
 		return
+
 	var root := Control.new()
+	root.name = "TouchControls"
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(root)
+
 	stick_base = Control.new()
-	stick_base.position = Vector2(24, -184)
+	stick_base.name = "MovementJoystick"
+	stick_base.anchor_left = 0.0
+	stick_base.anchor_right = 0.0
 	stick_base.anchor_top = 1.0
 	stick_base.anchor_bottom = 1.0
-	stick_base.custom_minimum_size = Vector2(176, 160)
+	stick_base.offset_left = 20.0
+	stick_base.offset_top = -204.0
+	stick_base.offset_right = 204.0
+	stick_base.offset_bottom = -20.0
 	stick_base.mouse_filter = Control.MOUSE_FILTER_STOP
 	stick_base.draw.connect(_draw_stick)
 	stick_base.gui_input.connect(_on_stick_input)
 	root.add_child(stick_base)
-	run_button = _make_button(root, "جري", Vector2(-190, -150))
-	jump_button = _make_button(root, "قفز", Vector2(-100, -150))
-	interact_button = _make_button(root, "تفاعل", Vector2(-100, -76))
-	interact_button.pressed.connect(func(): target.call("request_interact"))
+
+	run_button = _make_button(root, "جري", Vector2(-218, -112))
+	jump_button = _make_button(root, "قفز", Vector2(-112, -112))
+	interact_button = _make_button(root, "تفاعل", Vector2(-112, -194))
+
 	run_button.button_down.connect(func(): target.set_mobile_run(true))
 	run_button.button_up.connect(func(): target.set_mobile_run(false))
 	jump_button.pressed.connect(func(): target.request_jump())
+	interact_button.pressed.connect(func(): target.request_interact())
 
 func _make_button(parent: Control, caption: String, offset: Vector2) -> Button:
 	var button := Button.new()
 	button.text = caption
+	button.custom_minimum_size = Vector2(96, 72)
 	button.anchor_left = 1.0
 	button.anchor_right = 1.0
 	button.anchor_top = 1.0
 	button.anchor_bottom = 1.0
 	button.offset_left = offset.x
-	button.offset_right = offset.x + 82
+	button.offset_right = offset.x + 96.0
 	button.offset_top = offset.y
-	button.offset_bottom = offset.y + 66
+	button.offset_bottom = offset.y + 72.0
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override("font_size", 20)
 	parent.add_child(button)
 	return button
 
 func _draw_stick() -> void:
-	stick_base.draw_circle(Vector2(88, 80), 68, Color(0.05, 0.08, 0.12, 0.35))
-	stick_base.draw_circle(Vector2(88, 80) + stick_value * 42.0, 27, Color(0.8, 0.88, 1.0, 0.72))
+	var center := stick_base.size * 0.5
+	stick_base.draw_circle(center, 70.0, Color(0.04, 0.07, 0.12, 0.48))
+	stick_base.draw_arc(center, 70.0, 0.0, TAU, 48, Color(0.82, 0.88, 0.98, 0.8), 3.0)
+	stick_base.draw_circle(center + stick_value * 43.0, 29.0, Color(0.78, 0.87, 1.0, 0.88))
 
 func _on_stick_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
@@ -67,6 +84,7 @@ func _on_stick_input(event: InputEvent) -> void:
 		_update_stick(event.position)
 
 func _update_stick(local_position: Vector2) -> void:
-	stick_value = ((local_position - Vector2(88, 80)) / 54.0).limit_length(1.0)
+	var center := stick_base.size * 0.5
+	stick_value = ((local_position - center) / 54.0).limit_length(1.0)
 	target.set_mobile_move(stick_value)
 	stick_base.queue_redraw()
