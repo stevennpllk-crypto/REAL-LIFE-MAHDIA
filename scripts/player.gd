@@ -9,6 +9,7 @@ var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var move_vector := Vector2.ZERO
 var running := false
 var jump_requested := false
+var interact_requested := false
 var camera_pivot: Node3D
 var camera: Camera3D
 
@@ -75,6 +76,9 @@ func set_mobile_run(value: bool) -> void:
 
 func request_jump() -> void:
 	jump_requested = true
+
+func request_interact() -> void:
+	interact_requested = true
 
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
