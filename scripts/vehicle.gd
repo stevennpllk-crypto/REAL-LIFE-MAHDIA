@@ -36,6 +36,12 @@ func _physics_process(delta: float) -> void:
 		return
 	var throttle := Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
 	var steering := Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
+	# Reuse the on-screen joystick while the player is driving.
+	if driver != null and "move_vector" in driver:
+		var touch_input: Vector2 = driver.get("move_vector")
+		if touch_input.length() > 0.05:
+			throttle = -touch_input.y
+			steering = touch_input.x
 	speed = move_toward(speed, throttle * max_speed, acceleration * delta)
 	rotation.y -= steering * turn_speed * delta * clampf(absf(speed) / 5.0, 0.0, 1.0)
 	velocity = -global_transform.basis.z * speed
