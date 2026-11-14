@@ -54,8 +54,18 @@ jobs:
           EOF
           cat "$HOME/.config/godot/editor_settings-4.tres"
 
-      - name: Validate and import project
-        run: godot --headless --editor --path . --quit
+      - name: Validate Android toolchain and import project
+        run: |
+          set -euxo pipefail
+          test -x "$ANDROID_HOME/platform-tools/adb"
+          test -d "$ANDROID_HOME/platforms/android-34"
+          test -d "$ANDROID_HOME/build-tools/34.0.0"
+          test -d "$ANDROID_HOME/cmdline-tools/latest"
+          test -d "$ANDROID_HOME/cmake/3.10.2.4988404"
+          test -d "$ANDROID_HOME/ndk/23.2.8568313"
+          "$ANDROID_HOME/platform-tools/adb" start-server
+          "$ANDROID_HOME/platform-tools/adb" version
+          godot --headless --editor --path . --quit
 
       - name: Export Android APK
         run: |
