@@ -7,6 +7,7 @@ const VEHICLE_SCRIPT = preload("res://scripts/vehicle.gd")
 const WORLD_SYSTEMS = preload("res://scripts/world_systems.gd")
 const NETWORK_SCRIPT = preload("res://scripts/multiplayer_manager.gd")
 const SAVE_SCRIPT = preload("res://scripts/save_manager.gd")
+const LIFE_SCRIPT = preload("res://scripts/life_manager.gd")
 
 var player: CharacterBody3D
 var sun: DirectionalLight3D
@@ -16,6 +17,7 @@ var vehicle: CharacterBody3D
 var world_systems: Node
 var network_manager: Node
 var save_manager: Node
+var life_manager: Node
 
 func _ready() -> void:
 	randomize()
@@ -136,6 +138,10 @@ func _setup_systems() -> void:
 	save_manager = Node.new()
 	save_manager.set_script(SAVE_SCRIPT)
 	add_child(save_manager)
+	life_manager = Node.new()
+	life_manager.set_script(LIFE_SCRIPT)
+	add_child(life_manager)
+	life_manager.setup(player, save_manager)
 
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
@@ -157,11 +163,14 @@ func _build_hud() -> void:
 	controls.setup(player)
 
 func _process(_delta: float) -> void:
-	if Input.is_action_just_pressed("interact") and is_instance_valid(vehicle):
+	if (Input.is_action_just_pressed("interact") or player.interact_requested) and is_instance_valid(vehicle):
 		if vehicle.driver == player:
 			vehicle.exit_vehicle()
 		elif player.global_position.distance_to(vehicle.global_position) < 4.0:
 			vehicle.enter_vehicle(player)
+		else:
+			life_manager.try_interact()
+		player.interact_requested = false
 	if is_instance_valid(status_label):
 		var hour_value: float = world_systems.hour if is_instance_valid(world_systems) else 8.0
 		status_label.text = "MAHDIA • %02d:%02d • %s" % [int(hour_value), int(fposmod(hour_value * 60.0, 60.0)), world_systems.weather]
