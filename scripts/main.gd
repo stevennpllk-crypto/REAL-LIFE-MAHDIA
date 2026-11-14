@@ -9,6 +9,7 @@ const NETWORK_SCRIPT = preload("res://scripts/multiplayer_manager.gd")
 const SAVE_SCRIPT = preload("res://scripts/save_manager.gd")
 const LIFE_SCRIPT = preload("res://scripts/life_manager.gd")
 const PLANET_NAV_SCRIPT = preload("res://scripts/planet_navigation.gd")
+const TERRAIN_STREAMER_SCRIPT = preload("res://scripts/terrain_streamer.gd")
 
 var player: CharacterBody3D
 var sun: DirectionalLight3D
@@ -21,6 +22,7 @@ var network_manager: Node
 var save_manager: Node
 var life_manager: Node
 var planet_navigation: Node
+var terrain_streamer: Node3D
 
 func _ready() -> void:
 	randomize()
@@ -145,6 +147,10 @@ func _setup_systems() -> void:
 	planet_navigation.set_script(PLANET_NAV_SCRIPT)
 	add_child(planet_navigation)
 	planet_navigation.attach_player(player)
+	terrain_streamer = Node3D.new()
+	terrain_streamer.set_script(TERRAIN_STREAMER_SCRIPT)
+	add_child(terrain_streamer)
+	terrain_streamer.configure(player, planet_navigation)
 	life_manager = Node.new()
 	life_manager.set_script(LIFE_SCRIPT)
 	add_child(life_manager)
