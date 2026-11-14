@@ -1,8 +1,11 @@
 extends CharacterBody3D
 class_name MahdiaPlayer
 
-@export var walk_speed := 4.2
-@export var run_speed := 7.0
+@export var walk_speed := 2.6
+@export var run_speed := 4.8
+@export var acceleration := 8.0
+@export var deceleration := 13.0
+@export var input_deadzone := 0.14
 @export var jump_velocity := 4.5
 @export var mouse_sensitivity := 0.0025
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
@@ -143,7 +146,14 @@ func _rotate_camera(relative: Vector2) -> void:
 	camera.rotation.x = clampf(camera.rotation.x, deg_to_rad(-48), deg_to_rad(22))
 
 func set_mobile_move(value: Vector2) -> void:
-	move_vector = value.limit_length(1.0)
+	var magnitude := value.length()
+	if magnitude < input_deadzone:
+		move_vector = Vector2.ZERO
+		return
+	var strength := clampf((magnitude - input_deadzone) / (1.0 - input_deadzone), 0.0, 1.0)
+	# Gentle response near the center gives precise walking; full tilt still reaches full speed.
+	strength = pow(strength, 1.55)
+	move_vector = value.normalized() * strength
 
 func set_mobile_run(value: bool) -> void:
 	running = value
@@ -158,21 +168,28 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	if move_vector.length() > 0.05:
+	if move_vector.length() > 0.001:
 		input_dir = move_vector
+	var strength := clampf(input_dir.length(), 0.0, 1.0)
 	var basis := camera_pivot.global_transform.basis
-	var direction := (basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
-	direction.y = 0
+	var forward := -basis.z
+	var right := basis.x
+	forward.y = 0.0
+	right.y = 0.0
+	forward = forward.normalized()
+	right = right.normalized()
+	var direction := (right * input_dir.x - forward * input_dir.y)
+	direction.y = 0.0
 	direction = direction.normalized()
 	var speed := run_speed if (running or Input.is_action_pressed("run")) else walk_speed
-	var moving := direction.length() > 0.05
+	var target_speed := speed * strength
+	var moving := strength > 0.01
 	if moving:
-		velocity.x = direction.x * speed
-		velocity.z = direction.z * speed
-		rotation.y = lerp_angle(rotation.y, atan2(-direction.x, -direction.z), delta * 9.0)
-	else:
-		velocity.x = move_toward(velocity.x, 0.0, walk_speed * 5.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, walk_speed * 5.0 * delta)
+		rotation.y = lerp_angle(rotation.y, atan2(-direction.x, -direction.z), delta * 6.0)
+	var desired_velocity := direction * target_speed
+	var rate := acceleration if moving else deceleration
+	velocity.x = move_toward(velocity.x, desired_velocity.x, rate * delta)
+	velocity.z = move_toward(velocity.z, desired_velocity.z, rate * delta)
 	if (Input.is_action_just_pressed("jump") or jump_requested) and is_on_floor():
 		velocity.y = jump_velocity
 	jump_requested = false
