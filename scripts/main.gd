@@ -148,7 +148,7 @@ func _build_hud() -> void:
 	add_child(layer)
 	var panel := PanelContainer.new()
 	panel.position = Vector2(16, 14)
-	panel.custom_minimum_size = Vector2(270, 54)
+	panel.custom_minimum_size = Vector2(470, 62)
 	layer.add_child(panel)
 	status_label = Label.new()
 	status_label.text = "MAHDIA • 08:00 • Prototype"
@@ -173,4 +173,4 @@ func _process(_delta: float) -> void:
 		player.interact_requested = false
 	if is_instance_valid(status_label):
 		var hour_value: float = world_systems.hour if is_instance_valid(world_systems) else 8.0
-		status_label.text = "MAHDIA • %02d:%02d • %s" % [int(hour_value), int(fposmod(hour_value * 60.0, 60.0)), world_systems.weather]
+		status_label.text = "المهدية • %02d:%02d • %s • %d د.ت • طاقة %d%%" % [int(hour_value), int(fposmod(hour_value * 60.0, 60.0)), world_systems.weather, life_manager.money, int(life_manager.energy)]
