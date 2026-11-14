@@ -19,14 +19,14 @@ func _run_tests() -> void:
 	await process_frame
 
 	player.call("set_mobile_move", Vector2(0.05, 0.0))
-	_check((player.get("move_vector") as Vector2).length() == 0.0, "deadzone ignores tiny joystick drift")
+	_check(Vector2(player.get("move_vector")).length() == 0.0, "deadzone ignores tiny joystick drift")
 
 	player.call("set_mobile_move", Vector2(0.5, 0.0))
-	var half_strength: float = (player.get("move_vector") as Vector2).length()
+	var half_strength: float = Vector2(player.get("move_vector")).length()
 	_check(half_strength > 0.0 and half_strength < 0.5, "partial joystick tilt produces slow movement")
 
 	player.call("set_mobile_move", Vector2(1.0, 0.0))
-	var full_strength: float = (player.get("move_vector") as Vector2).length()
+	var full_strength: float = Vector2(player.get("move_vector")).length()
 	_check(is_equal_approx(full_strength, 1.0), "full joystick tilt reaches full input")
 
 	_check(half_strength < full_strength, "movement input scales progressively")
