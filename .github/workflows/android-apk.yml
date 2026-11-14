@@ -52,7 +52,6 @@ jobs:
           export/android/android_sdk_path = "$ANDROID_HOME"
           export/android/java_sdk_path = "$JAVA_HOME"
           EOF
-          cat "$HOME/.config/godot/editor_settings-4.tres"
 
       - name: Validate Android toolchain and import project
         run: |
@@ -79,6 +78,15 @@ jobs:
           test -s build/REAL_LIFE_MAHDIA-debug.apk
           file build/REAL_LIFE_MAHDIA-debug.apk
 
+      # Publish the APK immediately: emulator startup must never block delivery.
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: REAL-LIFE-MAHDIA-Android-APK
+          path: build/REAL_LIFE_MAHDIA-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Test APK on cloud Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -101,7 +109,6 @@ jobs:
               adb pull /sdcard/mahdia-emulator.png build/mahdia-emulator.png >/dev/null 2>&1 || true
             }
             trap capture_emulator_evidence EXIT
-
             adb wait-for-device
             echo "Waiting for Android boot and Package Manager..."
             package_ready=false
@@ -119,7 +126,6 @@ jobs:
               echo "Android Package Manager did not become ready"
               exit 1
             fi
-
             adb shell cmd package list packages >/dev/null
             adb install -r build/REAL_LIFE_MAHDIA-debug.apk
             adb shell monkey -p com.jassim.reallifemahdia 1
@@ -141,12 +147,3 @@ jobs:
             build/emulator-logcat.txt
           if-no-files-found: warn
           retention-days: 7
-
-      - name: Upload installable APK
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: REAL-LIFE-MAHDIA-Android-APK
-          path: build/REAL_LIFE_MAHDIA-debug.apk
-          if-no-files-found: error
-          retention-days: 14
