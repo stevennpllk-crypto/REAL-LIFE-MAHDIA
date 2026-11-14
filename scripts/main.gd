@@ -99,6 +99,15 @@ func _build_town() -> void:
 		_box(self, Vector3(5.0, 0.025, 0.16), Vector3(float(x), 0.11, 0), Color(0.92, 0.84, 0.58))
 	for z in range(-80, 81, 12):
 		_box(self, Vector3(0.16, 0.025, 5.0), Vector3(0, 0.12, float(z)), Color(0.92, 0.84, 0.58))
+	# Pedestrian crossings and raised curbs.
+	for i in range(7):
+		_box(self, Vector3(0.72, 0.035, 0.16), Vector3(-4.0 + float(i) * 1.3, 0.13, -5.1), Color(0.94, 0.92, 0.84))
+		_box(self, Vector3(0.72, 0.035, 0.16), Vector3(-4.0 + float(i) * 1.3, 0.13, 5.1), Color(0.94, 0.92, 0.84))
+	_box(self, Vector3(180, 0.28, 0.22), Vector3(0, 0.17, -4.55), Color(0.91, 0.88, 0.78))
+	_box(self, Vector3(180, 0.28, 0.22), Vector3(0, 0.17, 4.55), Color(0.91, 0.88, 0.78))
+	for bay in range(5):
+		var bx := -31.0 + float(bay) * 7.0
+		_box(self, Vector3(0.10, 0.025, 4.0), Vector3(bx, 0.13, 8.2), Color(0.86, 0.87, 0.82))
 
 	# Sidewalk strips.
 	for side in [-1.0, 1.0]:
@@ -159,6 +168,15 @@ func _create_building(origin: Vector3, size: Vector3, wall_color: Color, seed_va
 			_box(building, Vector3(1.25, 0.12, 0.65), Vector3(wx, y - 0.73, d * 0.78), Color(0.74, 0.72, 0.66))
 			_box(building, Vector3(0.08, 0.65, 0.08), Vector3(wx - 0.55, y - 0.35, d * 0.78), Color(0.55, 0.53, 0.48))
 			_box(building, Vector3(0.08, 0.65, 0.08), Vector3(wx + 0.55, y - 0.35, d * 0.78), Color(0.55, 0.53, 0.48))
+			_box(building, Vector3(1.55, 0.12, 0.72), Vector3(wx, y - 0.78, d * 0.78), Color(0.86, 0.83, 0.75))
+			_box(building, Vector3(1.45, 0.08, 0.08), Vector3(wx, y - 0.35, d * 0.98), Color(0.24, 0.29, 0.30))
+			_box(building, Vector3(0.08, 0.42, 0.08), Vector3(wx - 0.68, y - 0.56, d * 0.98), Color(0.24, 0.29, 0.30))
+			_box(building, Vector3(0.08, 0.42, 0.08), Vector3(wx + 0.68, y - 0.56, d * 0.98), Color(0.24, 0.29, 0.30))
+	if seed_value % 3 == 0:
+		_box(building, Vector3(w * 0.72, 0.18, 1.15), Vector3(0, 2.55, d * 0.78), Color(0.12, 0.43, 0.39))
+		_box(building, Vector3(w * 0.72, 0.42, 0.12), Vector3(0, 3.05, d * 0.51), Color(0.18, 0.31, 0.39))
+	else:
+		_box(building, Vector3(1.55, 0.16, 0.34), Vector3(0, 2.28, d * 0.68), Color(0.72, 0.42, 0.22))
 	var collision := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
 	shape.size = size
@@ -196,7 +214,7 @@ func _create_street_lamp(pos: Vector3) -> void:
 func _spawn_player() -> void:
 	player = CharacterBody3D.new()
 	player.set_script(PLAYER_SCRIPT)
-	player.position = Vector3(0, 1, 8)
+	player.position = Vector3(0, 0.03, 8)
 	player.name = "Player"
 	add_child(player)
 
