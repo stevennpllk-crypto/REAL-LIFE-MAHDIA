@@ -8,6 +8,7 @@ var stick_value := Vector2.ZERO
 var stick_base: Control
 var run_button: Button
 var jump_button: Button
+var interact_button: Button
 
 func setup(player: CharacterBody3D) -> void:
 	target = player
@@ -28,6 +29,8 @@ func setup(player: CharacterBody3D) -> void:
 	root.add_child(stick_base)
 	run_button = _make_button(root, "جري", Vector2(-190, -150))
 	jump_button = _make_button(root, "قفز", Vector2(-100, -150))
+	interact_button = _make_button(root, "تفاعل", Vector2(-100, -76))
+	interact_button.pressed.connect(func(): target.call("request_interact"))
 	run_button.button_down.connect(func(): target.set_mobile_run(true))
 	run_button.button_up.connect(func(): target.set_mobile_run(false))
 	jump_button.pressed.connect(func(): target.request_jump())
