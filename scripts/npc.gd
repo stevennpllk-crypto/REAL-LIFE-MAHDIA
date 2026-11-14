@@ -9,6 +9,7 @@ var target_position := Vector3.ZERO
 var wait_time := 0.0
 
 func _ready() -> void:
+	add_to_group("mahdia_residents")
 	home_position = global_position
 	_choose_target()
 	var mesh_instance := MeshInstance3D.new()
