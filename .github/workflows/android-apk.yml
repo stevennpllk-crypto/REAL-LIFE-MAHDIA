@@ -80,6 +80,28 @@ jobs:
           test -s build/REAL_LIFE_MAHDIA-debug.apk
           file build/REAL_LIFE_MAHDIA-debug.apk
 
+      - name: Test APK on cloud Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            set -euxo pipefail
+            adb install -r build/REAL_LIFE_MAHDIA-debug.apk
+            adb shell monkey -p com.jassim.reallifemahdia 1
+            sleep 30
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity'
+            adb logcat -d -t 2500 > build/emulator-logcat.txt
+            if grep -E 'FATAL EXCEPTION|SIGSEGV|Fatal signal' build/emulator-logcat.txt; then
+              echo "Fatal application error detected"
+              exit 1
+            fi
+            adb shell screencap -p /sdcard/mahdia-emulator.png
+            adb pull /sdcard/mahdia-emulator.png build/mahdia-emulator.png
+
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
