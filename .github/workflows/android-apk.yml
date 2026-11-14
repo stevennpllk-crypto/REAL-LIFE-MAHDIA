@@ -67,6 +67,12 @@ jobs:
           "$ANDROID_HOME/platform-tools/adb" version
           godot --headless --editor --path . --quit
 
+      - name: Set monotonically increasing Android version code
+        run: |
+          set -euxo pipefail
+          sed -i "s/^version\/code=.*/version\/code=${GITHUB_RUN_NUMBER}/" export_presets.cfg
+          grep "^version/code=" export_presets.cfg
+
       - name: Export Android APK
         run: |
           mkdir -p build
