@@ -20,5 +20,7 @@ jobs:
           use-dotnet: false
       - name: Import and parse project
         run: godot --headless --editor --path . --quit
+      - name: Test mobile joystick movement
+        run: godot --headless --path . --script res://tests/test_mobile_movement.gd
       - name: Run main scene briefly
         run: timeout 20s godot --headless --path . --quit-after 5
