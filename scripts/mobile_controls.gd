@@ -1,4 +1,4 @@
-extends CanvasLayer
+extends Node
 class_name MahdiaMobileControls
 
 # Touch controls are created explicitly for Android/iOS.  The previous layout
