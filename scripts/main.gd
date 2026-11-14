@@ -13,6 +13,7 @@ var player: CharacterBody3D
 var sun: DirectionalLight3D
 var world_environment: Environment
 var status_label: Label
+var hint_label: Label
 var vehicle: CharacterBody3D
 var world_systems: Node
 var network_manager: Node
@@ -153,10 +154,26 @@ func _build_hud() -> void:
 	status_label = Label.new()
 	status_label.text = "MAHDIA • 08:00 • Prototype"
 	panel.add_child(status_label)
-	var hint := Label.new()
-	hint.text = "WASD/عصا اللمس • E ركوب/نزول • Shift جري • Space قفز"
-	hint.position = Vector2(16, 78)
-	layer.add_child(hint)
+	hint_label = Label.new()
+	hint_label.text = "عصا اللمس للحركة • تفاعل قرب الأشخاص والأماكن • جري • قفز"
+	hint_label.position = Vector2(16, 78)
+	layer.add_child(hint_label)
+	var message_panel := PanelContainer.new()
+	message_panel.anchor_left = 0.5
+	message_panel.anchor_right = 0.5
+	message_panel.anchor_top = 1.0
+	message_panel.anchor_bottom = 1.0
+	message_panel.offset_left = -250
+	message_panel.offset_right = 250
+	message_panel.offset_top = -82
+	message_panel.offset_bottom = -28
+	layer.add_child(message_panel)
+	var message_label := Label.new()
+	message_label.name = "LifeMessage"
+	message_label.text = "مرحباً بك في المهدية! اقترب من شخص أو مبنى للتفاعل."
+	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_panel.add_child(message_label)
+	life_manager.message_changed.connect(func(value: String): message_label.text = value)
 	var controls := Node.new()
 	controls.set_script(MOBILE_CONTROLS)
 	layer.add_child(controls)
