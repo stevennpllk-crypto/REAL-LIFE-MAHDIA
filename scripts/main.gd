@@ -23,6 +23,7 @@ var save_manager: Node
 var life_manager: Node
 var planet_navigation: Node
 var terrain_streamer: Node3D
+var material_cache: Dictionary = {}
 
 func _ready() -> void:
 	randomize()
@@ -34,9 +35,14 @@ func _ready() -> void:
 	_setup_systems()
 	_build_hud()
 
-func _material(color: Color) -> StandardMaterial3D:
+func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
+	var key := color.to_html() + str(roughness)
+	if material_cache.has(key):
+		return material_cache[key]
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
+	mat.roughness = roughness
+	material_cache[key] = mat
 	return mat
 
 func _box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInstance3D:
@@ -62,14 +68,17 @@ func _build_environment() -> void:
 	sky.sky_material = sky_mat
 	world_environment.sky = sky
 	world_environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	world_environment.ambient_light_energy = 0.85
 	world_env.environment = world_environment
 	add_child(world_env)
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48, -32, 0)
 	sun.light_energy = 1.1
+	sun.shadow_enabled = true
 	add_child(sun)
+
 	var ground := StaticBody3D.new()
-	_box(ground, Vector3(180, 1, 180), Vector3(0, -0.55, 0), Color(0.78, 0.68, 0.48))
+	_box(ground, Vector3(180, 1, 180), Vector3(0, -0.55, 0), Color(0.72, 0.66, 0.53))
 	var floor_shape := CollisionShape3D.new()
 	var floor_box := BoxShape3D.new()
 	floor_box.size = Vector3(180, 1, 180)
@@ -77,38 +86,112 @@ func _build_environment() -> void:
 	floor_shape.position.y = -0.55
 	ground.add_child(floor_shape)
 	add_child(ground)
-	_box(self, Vector3(180, 0.12, 32), Vector3(0, 0.02, -72), Color(0.08, 0.38, 0.62))
+
+	# Mediterranean sea and a pale coastal promenade.
+	_box(self, Vector3(180, 0.16, 38), Vector3(0, -0.02, -78), Color(0.035, 0.34, 0.56))
+	_box(self, Vector3(180, 0.18, 5), Vector3(0, 0.04, -57), Color(0.82, 0.76, 0.64))
 
 func _build_town() -> void:
-	for i in range(5):
-		for j in range(4):
-			var x := float(i) * 13.0 - 26.0
-			var z := float(j) * 13.0 - 18.0
-			if absf(x) < 8.0 and absf(z) < 8.0:
+	# Main asphalt streets crossing a compact Mahdia-inspired neighborhood.
+	_box(self, Vector3(180, 0.12, 9), Vector3(0, 0.035, 0), Color(0.16, 0.18, 0.19))
+	_box(self, Vector3(9, 0.12, 180), Vector3(0, 0.04, 0), Color(0.16, 0.18, 0.19))
+	for x in range(-80, 81, 12):
+		_box(self, Vector3(5.0, 0.025, 0.16), Vector3(float(x), 0.11, 0), Color(0.92, 0.84, 0.58))
+	for z in range(-80, 81, 12):
+		_box(self, Vector3(0.16, 0.025, 5.0), Vector3(0, 0.12, float(z)), Color(0.92, 0.84, 0.58))
+
+	# Sidewalk strips.
+	for side in [-1.0, 1.0]:
+		_box(self, Vector3(180, 0.2, 1.6), Vector3(0, 0.08, side * 5.5), Color(0.78, 0.75, 0.68))
+		_box(self, Vector3(1.6, 0.2, 180), Vector3(side * 5.5, 0.08, 0), Color(0.78, 0.75, 0.68))
+
+	var palette := [
+		Color(0.88, 0.82, 0.70), Color(0.94, 0.89, 0.78),
+		Color(0.78, 0.72, 0.62), Color(0.84, 0.86, 0.83),
+		Color(0.91, 0.84, 0.75)
+	]
+	for i in range(6):
+		for j in range(5):
+			var x := float(i) * 15.0 - 37.5
+			var z := float(j) * 15.0 - 30.0
+			if absf(x) < 9.0 or absf(z) < 9.0:
 				continue
-			var height := randf_range(5.0, 9.0)
-			var building := StaticBody3D.new()
-			var shades := [Color(0.88,0.83,0.72), Color(0.92,0.89,0.80), Color(0.76,0.70,0.60)]
-			var shade: Color = shades[randi_range(0, 2)]
-			_box(building, Vector3(7.0,height,7.0), Vector3(x,height/2.0,z), shade)
-			var col := CollisionShape3D.new()
-			var shape := BoxShape3D.new()
-			shape.size = Vector3(7.0,height,7.0)
-			col.shape = shape
-			col.position = Vector3(x,height/2.0,z)
-			building.add_child(col)
-			add_child(building)
-	var tower := StaticBody3D.new()
-	var cyl := MeshInstance3D.new()
-	var cylinder := CylinderMesh.new()
-	cylinder.top_radius = 1.2
-	cylinder.bottom_radius = 1.8
-	cylinder.height = 13.0
-	cyl.mesh = cylinder
-	cyl.position = Vector3(42, 6.5, -48)
-	cyl.material_override = _material(Color(0.9,0.86,0.74))
-	tower.add_child(cyl)
-	add_child(tower)
+			var height := randf_range(5.5, 9.0)
+			var width := randf_range(7.0, 9.0)
+			var depth := randf_range(7.0, 9.0)
+			_create_building(Vector3(x, 0, z), Vector3(width, height, depth), palette[randi_range(0, palette.size()-1)], i * 11 + j)
+
+	_create_palm(Vector3(-10, 0, -10))
+	_create_palm(Vector3(10, 0, -10))
+	_create_palm(Vector3(-10, 0, 10))
+	_create_palm(Vector3(10, 0, 10))
+	_create_street_lamp(Vector3(-6.5, 0, -8))
+	_create_street_lamp(Vector3(6.5, 0, 8))
+	_create_street_lamp(Vector3(-8, 0, 6.5))
+	_create_street_lamp(Vector3(8, 0, -6.5))
+
+func _create_building(origin: Vector3, size: Vector3, wall_color: Color, seed_value: int) -> void:
+	var building := StaticBody3D.new()
+	building.position = origin
+	var w := size.x
+	var h := size.y
+	var d := size.z
+	_box(building, size, Vector3(0, h * 0.5, 0), wall_color)
+	# Roof rim and a small rooftop room break up the plain box silhouette.
+	_box(building, Vector3(w + 0.25, 0.28, d + 0.25), Vector3(0, h + 0.12, 0), Color(0.72, 0.68, 0.59))
+	_box(building, Vector3(w * 0.34, 1.15, d * 0.32), Vector3(-w * 0.18, h + 0.82, -d * 0.16), wall_color.darkened(0.08))
+	# Front entrance.
+	_box(building, Vector3(1.15, 2.15, 0.10), Vector3(0, 1.08, d * 0.501), Color(0.30, 0.22, 0.17))
+	_box(building, Vector3(1.32, 0.14, 0.18), Vector3(0, 2.22, d * 0.51), Color(0.92, 0.85, 0.70))
+	# Recessed-looking windows with dark glass and light frames.
+	var window_rows := maxi(1, int(h / 2.5))
+	for row in range(window_rows):
+		var y := 2.65 + float(row) * 2.25
+		if y > h - 0.7:
+			continue
+		for col in range(2):
+			var wx := (float(col) - 0.5) * w * 0.48
+			if absf(wx) < 0.9:
+				continue
+			_box(building, Vector3(1.15, 1.25, 0.09), Vector3(wx, y, d * 0.505), Color(0.16, 0.31, 0.39))
+			_box(building, Vector3(1.28, 0.09, 0.12), Vector3(wx, y, d * 0.52), Color(0.94, 0.90, 0.80))
+			_box(building, Vector3(0.09, 1.32, 0.12), Vector3(wx, y, d * 0.52), Color(0.94, 0.90, 0.80))
+			_box(building, Vector3(1.25, 0.12, 0.65), Vector3(wx, y - 0.73, d * 0.78), Color(0.74, 0.72, 0.66))
+			_box(building, Vector3(0.08, 0.65, 0.08), Vector3(wx - 0.55, y - 0.35, d * 0.78), Color(0.55, 0.53, 0.48))
+			_box(building, Vector3(0.08, 0.65, 0.08), Vector3(wx + 0.55, y - 0.35, d * 0.78), Color(0.55, 0.53, 0.48))
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	collision.shape = shape
+	collision.position.y = h * 0.5
+	building.add_child(collision)
+	add_child(building)
+
+func _create_palm(pos: Vector3) -> void:
+	var trunk := MeshInstance3D.new()
+	var trunk_mesh := CylinderMesh.new()
+	trunk_mesh.top_radius = 0.16
+	trunk_mesh.bottom_radius = 0.24
+	trunk_mesh.height = 3.8
+	trunk.mesh = trunk_mesh
+	trunk.position = pos + Vector3(0, 1.9, 0)
+	trunk.material_override = _material(Color(0.42, 0.29, 0.17))
+	add_child(trunk)
+	for i in range(7):
+		var angle := TAU * float(i) / 7.0
+		var leaf := MeshInstance3D.new()
+		var leaf_mesh := BoxMesh.new()
+		leaf_mesh.size = Vector3(0.34, 0.12, 2.5)
+		leaf.mesh = leaf_mesh
+		leaf.position = pos + Vector3(cos(angle) * 0.85, 3.8, sin(angle) * 0.85)
+		leaf.rotation.y = -angle
+		leaf.rotation.x = -0.22
+		leaf.material_override = _material(Color(0.13, 0.38, 0.22))
+		add_child(leaf)
+
+func _create_street_lamp(pos: Vector3) -> void:
+	_box(self, Vector3(0.12, 3.5, 0.12), pos + Vector3(0, 1.75, 0), Color(0.12, 0.14, 0.16))
+	_box(self, Vector3(0.65, 0.12, 0.3), pos + Vector3(0.22, 3.45, 0), Color(0.96, 0.82, 0.52))
 
 func _spawn_player() -> void:
 	player = CharacterBody3D.new()
@@ -167,7 +250,7 @@ func _build_hud() -> void:
 	status_label.text = "MAHDIA • 08:00 • Prototype"
 	panel.add_child(status_label)
 	hint_label = Label.new()
-	hint_label.text = "عصا اللمس للحركة • تفاعل قرب الأشخاص والأماكن • جري • قفز"
+	hint_label.text = "عصا اللمس للحركة • اسحب يمين الشاشة لتحريك الكاميرا • تفاعل • جري • قفز"
 	hint_label.position = Vector2(16, 78)
 	layer.add_child(hint_label)
 	var message_panel := PanelContainer.new()
