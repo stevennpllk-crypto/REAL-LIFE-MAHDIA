@@ -8,6 +8,7 @@ const WORLD_SYSTEMS = preload("res://scripts/world_systems.gd")
 const NETWORK_SCRIPT = preload("res://scripts/multiplayer_manager.gd")
 const SAVE_SCRIPT = preload("res://scripts/save_manager.gd")
 const LIFE_SCRIPT = preload("res://scripts/life_manager.gd")
+const PLANET_NAV_SCRIPT = preload("res://scripts/planet_navigation.gd")
 
 var player: CharacterBody3D
 var sun: DirectionalLight3D
@@ -19,6 +20,7 @@ var world_systems: Node
 var network_manager: Node
 var save_manager: Node
 var life_manager: Node
+var planet_navigation: Node
 
 func _ready() -> void:
 	randomize()
@@ -139,6 +141,10 @@ func _setup_systems() -> void:
 	save_manager = Node.new()
 	save_manager.set_script(SAVE_SCRIPT)
 	add_child(save_manager)
+	planet_navigation = Node.new()
+	planet_navigation.set_script(PLANET_NAV_SCRIPT)
+	add_child(planet_navigation)
+	planet_navigation.attach_player(player)
 	life_manager = Node.new()
 	life_manager.set_script(LIFE_SCRIPT)
 	add_child(life_manager)
@@ -188,6 +194,8 @@ func _process(_delta: float) -> void:
 		else:
 			life_manager.try_interact()
 		player.interact_requested = false
+	if is_instance_valid(planet_navigation) and is_instance_valid(player):
+		planet_navigation.update_from_player(player.global_position)
 	if is_instance_valid(status_label):
 		var hour_value: float = world_systems.hour if is_instance_valid(world_systems) else 8.0
-		status_label.text = "المهدية • %02d:%02d • %s • %d د.ت • طاقة %d%%" % [int(hour_value), int(fposmod(hour_value * 60.0, 60.0)), world_systems.weather, life_manager.money, int(life_manager.energy)]
+		status_label.text = "%s • %s • %02d:%02d • %s • %d د.ت • طاقة %d%%" % [planet_navigation.get_region_name(), planet_navigation.get_coordinate_text(), int(hour_value), int(fposmod(hour_value * 60.0, 60.0)), world_systems.weather, life_manager.money, int(life_manager.energy)]
