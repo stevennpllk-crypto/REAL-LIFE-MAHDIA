@@ -83,7 +83,7 @@ func _build_human_figure() -> void:
 	left_leg = _make_limb(Vector3(-0.17, 0.55, 0), Color(0.10, 0.12, 0.17), 0.62)
 	right_leg = _make_limb(Vector3(0.17, 0.55, 0), Color(0.10, 0.12, 0.17), 0.62)
 	_box_shoe(Vector3(-0.17, 0.12, -0.08))
-	_box_shoe(Vector3(0.17, 0.12, -0.08)
+	_box_shoe(Vector3(0.17, 0.12, -0.08))
 
 func _make_limb(pos: Vector3, color: Color, length: float) -> Node3D:
 	var pivot := Node3D.new()
