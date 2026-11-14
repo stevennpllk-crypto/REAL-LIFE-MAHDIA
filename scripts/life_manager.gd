@@ -21,6 +21,7 @@ func setup(target: CharacterBody3D, saver: Node) -> void:
 	money = int(data.get("money", 100))
 	food = int(data.get("food", 0))
 	energy = float(data.get("energy", 100.0))
+	job_claimed = bool(data.get("job_claimed", false))
 	_create_station("مقهى الميناء", "cafe", Vector3(-12, 0, -5), Color(0.65, 0.28, 0.12))
 	_create_station("منزلك", "home", Vector3(15, 0, 8), Color(0.82, 0.76, 0.61))
 	_create_station("مكتب العمل", "job", Vector3(22, 0, -12), Color(0.18, 0.42, 0.28))
@@ -99,5 +100,5 @@ func try_interact() -> void:
 func _save() -> void:
 	if is_instance_valid(save_manager):
 		var all_data: Dictionary = save_manager.load_progress()
-		all_data[SAVE_KEY] = {"money": money, "food": food, "energy": energy}
+		all_data[SAVE_KEY] = {"money": money, "food": food, "energy": energy, "job_claimed": job_claimed}
 		save_manager.save_progress(all_data)
