@@ -63,7 +63,6 @@ jobs:
           test -d "$ANDROID_HOME/cmdline-tools/latest"
           test -d "$ANDROID_HOME/cmake/3.10.2.4988404"
           test -d "$ANDROID_HOME/ndk/23.2.8568313"
-          "$ANDROID_HOME/platform-tools/adb" start-server
           "$ANDROID_HOME/platform-tools/adb" version
           godot --headless --editor --path . --quit
 
@@ -84,9 +83,14 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
-          target: google_apis
+          target: aosp_atd
           arch: x86_64
           profile: pixel_2
+          ram-size: 2048M
+          heap-size: 512M
+          emulator-boot-timeout: 900
+          disable-linux-hw-accel: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
           disable-animations: true
           script: |
             set -euxo pipefail
