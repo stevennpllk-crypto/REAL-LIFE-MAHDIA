@@ -96,11 +96,18 @@ func _run_tests() -> void:
 	resident.set("build_visuals", false)
 	resident.set("personality", "curious")
 	resident.set("display_name", "ليلى")
+	resident.call("set_ai_context", player, null, Vector3(5, 0, 0), 7, saver)
 	root.add_child(resident)
 	await process_frame
 	_check(not str(resident.get("ai_state")).is_empty(), "NPC starts with an autonomous AI state")
 	resident.call("on_player_interacted")
 	_check(int(resident.get("memory_meetings")) == 1, "NPC remembers an individual player meeting")
+	var returning_resident := CharacterBody3D.new()
+	returning_resident.set_script(load("res://scripts/npc.gd"))
+	returning_resident.set("build_visuals", false)
+	returning_resident.call("set_ai_context", player, null, Vector3(5, 0, 0), 7, saver)
+	_check(int(returning_resident.get("memory_meetings")) == 1, "NPC memory persists across recreated game sessions")
+	returning_resident.queue_free()
 	_check(str(resident.call("get_dialogue")).contains("أخبار المهدية"), "NPC dialogue reflects its own personality")
 	resident.call("_choose_daily_goal", 8.0)
 	_check(str(resident.get("ai_state")) == "socializing", "resident AI selects a morning social routine")
@@ -115,7 +122,7 @@ func _run_tests() -> void:
 	weather_system.call("set_weather", "ثلوج")
 	_check(str(weather_system.get("weather")) == "ممطر", "weather system rejects unsupported weather")
 
-	print("Gameplay tests: ", 26 - failures, "/26 passed")
+	print("Gameplay tests: ", 27 - failures, "/27 passed")
 	# Release scene resources before shutting down the headless renderer.
 	car.queue_free()
 	player.queue_free()
