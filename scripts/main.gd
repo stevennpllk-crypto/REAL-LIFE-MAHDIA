@@ -425,7 +425,7 @@ func _build_hud() -> void:
 	ai_token_input.secret = true
 	setup_col.add_child(ai_token_input)
 	var setup_note := Label.new()
-	setup_note.text = "يُحفظ الرمز داخل مساحة بيانات اللعبة الخاصة. لا تضع رمز الإدارة العام هنا."
+	setup_note.text = "الاتصال مشفّر عبر HTTPS. تُحفظ جلسة الحساب محلياً؛ لا تضع رمز الإدارة العام هنا."
 	setup_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	setup_col.add_child(setup_note)
 	var save_ai_button := Button.new()
