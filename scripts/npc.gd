@@ -555,6 +555,8 @@ func _physics_process(delta: float) -> void:
 			ai_state = "resting"
 			wait_time = randf_range(5.0, 12.0)
 		else:
+			if ai_state == "wandering":
+				_record_experience("explore", "استكشفت جزءاً جديداً من الحي", 0.035)
 			_choose_target()
 		velocity.x = move_toward(velocity.x, 0.0, walk_speed * delta * 4.0)
 		velocity.z = move_toward(velocity.z, 0.0, walk_speed * delta * 4.0)
