@@ -209,6 +209,10 @@ func _create_building(origin: Vector3, size: Vector3, wall_color: Color, seed_va
 		var wx := (float(col) - 0.5) * w * 0.48
 		_box(building, Vector3(1.15, 1.15, 0.08), Vector3(wx, minf(3.45, h * 0.58), d * 0.505), Color(0.12, 0.29, 0.38))
 		_box(building, Vector3(1.28, 0.09, 0.12), Vector3(wx, minf(4.05, h * 0.58 + 0.62), d * 0.52), Color(0.92, 0.88, 0.78))
+		_box(building, Vector3(0.12, 1.18, 0.12), Vector3(wx - 0.62, minf(3.45, h * 0.58), d * 0.54), Color(0.30, 0.23, 0.18))
+		_box(building, Vector3(0.12, 1.18, 0.12), Vector3(wx + 0.62, minf(3.45, h * 0.58), d * 0.54), Color(0.30, 0.23, 0.18))
+		_box(building, Vector3(1.38, 0.12, 0.12), Vector3(wx, minf(3.45, h * 0.58) + 0.48, d * 0.54), Color(0.30, 0.23, 0.18))
+		_box(building, Vector3(1.42, 0.16, 0.68), Vector3(wx, minf(3.45, h * 0.58) - 0.64, d * 0.70), Color(0.68, 0.61, 0.49))
 	if seed_value % 3 == 0:
 		_box(building, Vector3(w * 0.66, 0.18, 0.9), Vector3(0, 2.42, d * 0.72), Color(0.12, 0.40, 0.36))
 	var collision := CollisionShape3D.new()
