@@ -166,8 +166,11 @@ func request_jump() -> void:
 func request_interact() -> void:
 	interact_requested = true
 
+func is_in_water() -> bool:
+	return global_position.z < -59.0 and absf(global_position.x) < 90.0
+
 func _physics_process(delta: float) -> void:
-	is_swimming = global_position.z < -59.0 and absf(global_position.x) < 90.0
+	is_swimming = is_in_water()
 	if is_swimming:
 		var swim_level := -1.25
 		if Input.is_action_just_pressed("jump") or jump_requested:
