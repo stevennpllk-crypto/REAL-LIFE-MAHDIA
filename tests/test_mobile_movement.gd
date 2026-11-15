@@ -130,7 +130,13 @@ func _run_tests() -> void:
 	weather_system.call("set_weather", "ثلوج")
 	_check(str(weather_system.get("weather")) == "ممطر", "weather system rejects unsupported weather")
 
-	print("Gameplay tests: ", 29 - failures, "/29 passed")
+	var city_details := Node3D.new()
+	city_details.set_script(load("res://scripts/main.gd"))
+	city_details.call("_create_city_details")
+	_check(city_details.get_child_count() >= 60, "town detail pass builds bus stops, signals, planters and shop awnings")
+	city_details.queue_free()
+
+	print("Gameplay tests: ", 30 - failures, "/30 passed")
 	# Release scene resources before shutting down the headless renderer.
 	car.queue_free()
 	player.queue_free()
