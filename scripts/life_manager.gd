@@ -43,6 +43,7 @@ func _create_station(title: String, kind: String, at: Vector3, tint: Color) -> v
 	var material := StandardMaterial3D.new()
 	material.albedo_color = tint
 	material.roughness = 0.82
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mesh.material_override = material
 	body.add_child(mesh)
 	var shape := CollisionShape3D.new()
