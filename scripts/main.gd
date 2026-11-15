@@ -266,7 +266,7 @@ func _spawn_residents() -> void:
 		npc.display_name = ["سامي", "مريم", "أيمن", "ليلى", "منير", "آمنة", "يوسف", "سارة"][i]
 		npc.personality = personalities[i]
 		npc.occupation = jobs[i]
-		npc.set_ai_context(player, world_systems, Vector3(-28.0 + float(i) * 8.0, 0, -15.0 + float(i % 3) * 10.0), i)
+		npc.set_ai_context(player, world_systems, Vector3(-28.0 + float(i) * 8.0, 0, -15.0 + float(i % 3) * 10.0), i, save_manager)
 		add_child(npc)
 
 func _spawn_vehicle() -> void:
