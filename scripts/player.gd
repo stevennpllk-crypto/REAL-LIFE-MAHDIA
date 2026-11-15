@@ -7,7 +7,7 @@ class_name MahdiaPlayer
 @export var deceleration := 13.0
 @export var input_deadzone := 0.14
 @export var jump_velocity := 4.5
-@export var mouse_sensitivity := 0.0025
+@export var mouse_sensitivity := 0.0020
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var move_vector := Vector2.ZERO
 var running := false
@@ -137,7 +137,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif not event.pressed and event.index == camera_drag_finger:
 			camera_drag_finger = -1
 	elif event is InputEventScreenDrag and event.index == camera_drag_finger:
-		_rotate_camera(event.relative * 1.7)
+		_rotate_camera(event.relative * 0.72)
 	if event is InputEventKey and event.keycode == KEY_ESCAPE:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
