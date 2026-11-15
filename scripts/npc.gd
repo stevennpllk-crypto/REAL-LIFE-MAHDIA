@@ -112,17 +112,52 @@ func _build_character() -> void:
 	var hair: Color = hair_palette[posmod(personal_seed * 5 + 2, hair_palette.size())]
 	var height_variation := 0.94 + float(posmod(personal_seed * 7, 13)) * 0.01
 	visual_root.scale = Vector3(1.0, height_variation, 1.0)
-	body_visual = _part(_capsule(0.255, 0.78), Vector3(0, 1.19, 0), shirt)
-	head_visual = _part(_sphere(0.19, 0.40), Vector3(0, 1.84, 0), skin)
-	_part(_sphere(0.198, 0.17), Vector3(0, 1.97, 0.015), hair)
+	# Tailored torso: a tapered body, collar, waist and subtle clothing panels.
+	var torso := CylinderMesh.new()
+	torso.top_radius = 0.19
+	torso.bottom_radius = 0.275
+	torso.height = 0.78
+	torso.radial_segments = 12
+	body_visual = _part(torso, Vector3(0, 1.18, 0), shirt)
+	var collar := _part(_torus(0.105, 0.025), Vector3(0, 1.56, -0.005), shirt.darkened(0.18))
+	collar.rotation.x = deg_to_rad(90.0)
+	_part(_capsule(0.045, 0.16), Vector3(0, 1.49, -0.19), shirt.lightened(0.16))
+	_part(_sphere(0.19, 0.40), Vector3(0, 1.84, 0), skin)
+	head_visual = get_node_or_null("ResidentVisual/HeadPivot") as Node3D
+	if not is_instance_valid(head_visual):
+		head_visual = Node3D.new()
+		head_visual.name = "HeadPivot"
+		head_visual.position = Vector3(0, 1.84, 0)
+		visual_root.add_child(head_visual)
+		var head := MeshInstance3D.new()
+		head.mesh = _sphere(0.19, 0.40)
+		head.material_override = _mat(skin)
+		head_visual.add_child(head)
+	# Hair cap, side locks, ears, nose, brows and eyes give faces readable depth.
+	var cap := _part(_sphere(0.195, 0.22), Vector3(0, 1.985, 0.015), hair)
+	cap.scale = Vector3(1.0, 0.62, 1.0)
+	_part(_sphere(0.055, 0.16), Vector3(-0.174, 1.84, 0), hair)
+	_part(_sphere(0.055, 0.16), Vector3(0.174, 1.84, 0), hair)
+	_part(_sphere(0.035, 0.055), Vector3(-0.184, 1.82, 0), skin)
+	_part(_sphere(0.035, 0.055), Vector3(0.184, 1.82, 0), skin)
 	eye_left = _part(_sphere(0.022, 0.03), Vector3(-0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
 	eye_right = _part(_sphere(0.022, 0.03), Vector3(0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
 	_part(_sphere(0.026, 0.045), Vector3(0, 1.82, -0.187), skin.lightened(0.04))
+	_part(_capsule(0.014, 0.075), Vector3(-0.068, 1.905, -0.174), hair)
+	_part(_capsule(0.014, 0.075), Vector3(0.068, 1.905, -0.174), hair)
 	_build_occupation_details()
 	left_arm = _limb(Vector3(-0.30, 1.43, 0), shirt, 0.62, 0.10)
 	right_arm = _limb(Vector3(0.30, 1.43, 0), shirt, 0.62, 0.10)
 	left_leg = _limb(Vector3(-0.14, 0.76, 0), Color(0.12, 0.14, 0.18), 0.72, 0.12)
 	right_leg = _limb(Vector3(0.14, 0.76, 0), Color(0.12, 0.14, 0.18), 0.72, 0.12)
+
+func _torus(inner_radius: float, outer_radius: float) -> TorusMesh:
+	var mesh := TorusMesh.new()
+	mesh.inner_radius = inner_radius
+	mesh.outer_radius = outer_radius
+	mesh.rings = 12
+	mesh.ring_segments = 6
+	return mesh
 
 func _build_occupation_details() -> void:
 	# Distinct, inexpensive silhouettes make residents identifiable at a glance.
@@ -201,6 +236,17 @@ func _limb(pos: Vector3, color: Color, length: float, radius: float) -> Node3D:
 	item.position = Vector3(0, -length * 0.34, 0)
 	item.material_override = _mat(color)
 	pivot.add_child(item)
+	var extremity := MeshInstance3D.new()
+	if length < 0.7:
+		extremity.mesh = _sphere(0.075, 0.14)
+		extremity.position = Vector3(0, -length * 0.72, -0.005)
+		extremity.material_override = _mat(Color(0.60, 0.39, 0.28))
+	else:
+		extremity.mesh = _capsule(0.105, 0.30)
+		extremity.position = Vector3(0, -length * 0.76, -0.035)
+		extremity.rotation.x = deg_to_rad(90.0)
+		extremity.material_override = _mat(Color(0.045, 0.05, 0.06))
+	pivot.add_child(extremity)
 	return pivot
 
 func _current_hour() -> float:
