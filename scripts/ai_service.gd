@@ -3,6 +3,7 @@ class_name MahdiaAIService
 
 signal npc_reply(resident: Node3D, reply: String, success: bool)
 signal connection_status(ready: bool, message: String)
+signal auth_completed(success: bool, message: String)
 
 const CONFIG_PATH := "user://mahdia_ai.cfg"
 const DEFAULT_ENDPOINT := "https://jassim-ai-core-final-production.up.railway.app"
@@ -14,6 +15,8 @@ var endpoint := DEFAULT_ENDPOINT
 var bearer_token := ""
 var client_id := ""
 var request_node: HTTPRequest
+var auth_request_node: HTTPRequest
+var auth_in_flight := false
 var probe_node: HTTPRequest
 var probe_in_flight := false
 var active_resident: Node3D
@@ -25,6 +28,11 @@ func _ready() -> void:
 	request_node.body_size_limit = 1024 * 1024
 	add_child(request_node)
 	request_node.request_completed.connect(_on_request_completed)
+	auth_request_node = HTTPRequest.new()
+	auth_request_node.timeout = 20.0
+	auth_request_node.body_size_limit = 65536
+	add_child(auth_request_node)
+	auth_request_node.request_completed.connect(_on_auth_completed)
 	probe_node = HTTPRequest.new()
 	probe_node.timeout = 8.0
 	probe_node.body_size_limit = 65536
@@ -69,6 +77,60 @@ func configure(new_endpoint: String, new_token: String) -> bool:
 		return false
 	check_readiness()
 	return true
+
+func authenticate_account(email: String, password: String, create_account: bool) -> bool:
+	if auth_in_flight:
+		auth_completed.emit(false, "يوجد طلب تسجيل دخول قيد التنفيذ")
+		return false
+	var clean_email := email.strip_edges().to_lower()
+	if not clean_email.contains("@") or clean_email.length() > 254:
+		auth_completed.emit(false, "أدخل بريداً إلكترونياً صالحاً")
+		return false
+	if password.length() < 10:
+		auth_completed.emit(false, "كلمة المرور يجب أن تكون 10 أحرف على الأقل")
+		return false
+	var route := "/api/auth/register" if create_account else "/api/auth/login"
+	var payload := {"email": clean_email, "password": password}
+	var headers := PackedStringArray(["Content-Type: application/json", "Accept: application/json"])
+	var error := auth_request_node.request(endpoint + route, headers, HTTPClient.METHOD_POST, JSON.stringify(payload))
+	if error != OK:
+		auth_completed.emit(false, "تعذر بدء تسجيل الدخول: " + error_string(error))
+		return false
+	auth_in_flight = true
+	return true
+
+func _on_auth_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	auth_in_flight = false
+	if result != HTTPRequest.RESULT_SUCCESS:
+		auth_completed.emit(false, "تعذر الاتصال بخادم الحسابات")
+		return
+	var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
+	if response_code not in [200, 201] or not (parsed is Dictionary):
+		var detail := "HTTP %d" % response_code
+		if parsed is Dictionary:
+			detail = str(parsed.get("error", detail))
+		var messages := {
+			"email_already_registered": "هذا البريد مسجل بالفعل؛ استخدم تسجيل الدخول",
+			"invalid_credentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+			"password_too_short": "كلمة المرور قصيرة جداً"
+		}
+		auth_completed.emit(false, str(messages.get(detail, "تعذر تسجيل الدخول: " + detail)))
+		return
+	var token := str(parsed.get("token", "")).strip_edges()
+	if token.is_empty():
+		auth_completed.emit(false, "لم يُرجع الخادم رمز جلسة صالحاً")
+		return
+	bearer_token = token
+	var config := ConfigFile.new()
+	config.set_value("ai", "endpoint", endpoint)
+	config.set_value("ai", "token", bearer_token)
+	config.set_value("ai", "client_id", client_id)
+	var save_error := config.save(CONFIG_PATH)
+	if save_error != OK:
+		auth_completed.emit(false, "تم تسجيل الدخول لكن تعذر حفظ الجلسة محلياً")
+		return
+	check_readiness()
+	auth_completed.emit(true, "تم تسجيل الدخول وربط حساب JASSIM بنجاح")
 
 func check_readiness() -> void:
 	if probe_in_flight or endpoint.is_empty() or not is_instance_valid(probe_node):
