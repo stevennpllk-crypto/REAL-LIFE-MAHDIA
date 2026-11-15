@@ -43,6 +43,10 @@ var left_leg: Node3D
 var right_leg: Node3D
 var visual_root: Node3D
 var head_visual: Node3D
+var body_visual: Node3D
+var eye_left: MeshInstance3D
+var eye_right: MeshInstance3D
+var blink_timer := 2.5
 var idle_phase := 0.0
 var clock := 0.0
 # Cognitive simulation: persistent episodic memories, learned preferences and self-review.
@@ -108,11 +112,12 @@ func _build_character() -> void:
 	var hair: Color = hair_palette[posmod(personal_seed * 5 + 2, hair_palette.size())]
 	var height_variation := 0.94 + float(posmod(personal_seed * 7, 13)) * 0.01
 	visual_root.scale = Vector3(1.0, height_variation, 1.0)
-	_part(_capsule(0.255, 0.78), Vector3(0, 1.19, 0), shirt)
+	body_visual = _part(_capsule(0.255, 0.78), Vector3(0, 1.19, 0), shirt)
 	head_visual = _part(_sphere(0.19, 0.40), Vector3(0, 1.84, 0), skin)
 	_part(_sphere(0.198, 0.17), Vector3(0, 1.97, 0.015), hair)
-	_part(_sphere(0.022, 0.03), Vector3(-0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
-	_part(_sphere(0.022, 0.03), Vector3(0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
+	eye_left = _part(_sphere(0.022, 0.03), Vector3(-0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
+	eye_right = _part(_sphere(0.022, 0.03), Vector3(0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
+	_part(_sphere(0.026, 0.045), Vector3(0, 1.82, -0.187), skin.lightened(0.04))
 	_build_occupation_details()
 	left_arm = _limb(Vector3(-0.30, 1.43, 0), shirt, 0.62, 0.10)
 	right_arm = _limb(Vector3(0.30, 1.43, 0), shirt, 0.62, 0.10)
@@ -475,21 +480,29 @@ func get_dialogue() -> String:
 	var remembered := "أهلاً، تذكرتك!" if memory_meetings > 1 else "أهلاً بك."
 	if trust >= 0.55:
 		remembered = "سعيد برؤيتك مجدداً، أصبحتَ مألوفاً لدي."
+	var hour := _current_hour()
+	var greeting := "صباح الخير" if hour >= 5.0 and hour < 12.0 else "مساء الخير" if hour >= 17.0 else "أهلاً بك"
 	if energy < 0.2:
-		return remembered + " أشعر بالتعب وأحتاج إلى الراحة."
+		return greeting + "، " + remembered + " أشعر بالتعب وأحتاج إلى الراحة."
 	if hunger > 0.78:
-		return remembered + " أشعر بالجوع، سأبحث عن طعام."
+		return greeting + "، " + remembered + " أشعر بالجوع، سأبحث عن طعام."
+	if stress > 0.72:
+		return remembered + " يومي مزدحم قليلاً، أحتاج إلى استراحة."
+	if ai_state == "working" or ai_state == "commuting":
+		return greeting + "، أنا في طريقي إلى عملي كـ%s." % occupation
+	if ai_state == "socializing" and memory_meetings > 0:
+		return remembered + " كنت أتحدث مع الجيران. كيف حالك؟"
 	match personality:
 		"shy":
-			return remembered + " أنا خجول قليلاً، لكن تفضل."
+			return greeting + ". " + remembered + " أنا خجول قليلاً، لكن تفضل."
 		"busy":
-			return "مرحباً، أنا أعمل الآن. " + remembered
+			return greeting + "، أنا مشغول قليلاً بعملي، لكن يسعدني لقاؤك."
 		"curious":
-			return remembered + " ما رأيك في أخبار المهدية اليوم؟"
+			return remembered + " هل سمعت آخر أخبار المهدية؟ أحب معرفة ما يحدث حولي."
 		"grumpy":
-			return remembered + " الجو مزدحم اليوم، أليس كذلك؟"
+			return remembered + " الشوارع مزدحمة اليوم، أتمنى أن يهدأ الجو قليلاً."
 		_:
-			return remembered + " يعطيك الصحة!"
+			return greeting + "! " + remembered + " يعطيك الصحة!"
 
 func _player_decision() -> bool:
 	if not is_instance_valid(player) or player.is_queued_for_deletion():
@@ -619,8 +632,12 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 		right_leg.rotation.x = swing
 	else:
 		idle_phase += delta
-		left_arm.rotation.x = lerpf(left_arm.rotation.x, sin(idle_phase * 0.72) * 0.025, delta * 2.8)
-		right_arm.rotation.x = lerpf(right_arm.rotation.x, sin(idle_phase * 0.72 + 0.8) * 0.025, delta * 2.8)
+		var conversational := ai_state == "socializing" or ai_state == "greeting" or ai_state == "acknowledging"
+		var gesture := sin(idle_phase * 2.1 + float(personal_seed)) * (0.18 if conversational else 0.025)
+		left_arm.rotation.x = lerpf(left_arm.rotation.x, gesture, delta * (3.4 if conversational else 2.8))
+		right_arm.rotation.x = lerpf(right_arm.rotation.x, -gesture * 0.7, delta * (3.0 if conversational else 2.8))
+		left_arm.rotation.z = lerpf(left_arm.rotation.z, -0.10 if conversational else 0.0, delta * 2.5)
+		right_arm.rotation.z = lerpf(right_arm.rotation.z, 0.10 if conversational else 0.0, delta * 2.5)
 		left_leg.rotation.x = lerpf(left_leg.rotation.x, 0.0, delta * 5.0)
 		right_leg.rotation.x = lerpf(right_leg.rotation.x, 0.0, delta * 5.0)
 	if is_instance_valid(head_visual):
@@ -642,3 +659,15 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 	if is_instance_valid(visual_root):
 		var bob := (absf(sin(clock)) * 0.025) if moving else sin(idle_phase * 1.35 + float(personal_seed)) * 0.008
 		visual_root.position.y = lerpf(visual_root.position.y, bob, delta * 5.0)
+		var lean := 0.035 if ai_state == "socializing" or ai_state == "greeting" else -0.025 if ai_state == "resting" else 0.0
+		visual_root.rotation.x = lerpf(visual_root.rotation.x, lean + (sin(clock) * 0.018 if moving else 0.0), delta * 3.0)
+	# Residents blink at slightly different natural intervals rather than staring continuously.
+	blink_timer -= delta
+	if blink_timer <= 0.0:
+		blink_timer = randf_range(2.1, 5.2)
+		if is_instance_valid(eye_left) and is_instance_valid(eye_right):
+			eye_left.scale.y = 0.12
+			eye_right.scale.y = 0.12
+	else:
+		if is_instance_valid(eye_left): eye_left.scale.y = move_toward(eye_left.scale.y, 1.0, delta * 12.0)
+		if is_instance_valid(eye_right): eye_right.scale.y = move_toward(eye_right.scale.y, 1.0, delta * 12.0)
