@@ -6,6 +6,8 @@ signal message_changed(value: String)
 const SAVE_KEY := "mahdia_life"
 const AUTOSAVE_SECONDS := 10.0
 var player: CharacterBody3D
+var ai_service: Node
+var active_resident: Node3D
 var save_manager: Node
 var money := 100
 var food := 0
@@ -20,6 +22,36 @@ var inside_station_kind := ""
 var autosave_elapsed := 0.0
 var base_run_speed := 4.8
 var base_walk_speed := 2.6
+
+func set_ai_service(service: Node) -> void:
+	ai_service = service
+	if is_instance_valid(ai_service):
+		var callback := Callable(self, "_on_npc_ai_reply")
+		if not ai_service.is_connected("npc_reply", callback):
+			ai_service.connect("npc_reply", callback)
+
+func send_player_message(message_text: String) -> void:
+	var clean_text := message_text.strip_edges()
+	if clean_text.is_empty():
+		return
+	if not is_instance_valid(active_resident):
+		active_resident = _nearest_resident()
+	if not is_instance_valid(active_resident):
+		_set_message("اقترب من أحد سكان المهدية أولاً.")
+		return
+	if not is_instance_valid(ai_service) or not ai_service.has_method("request_npc_reply"):
+		_set_message(str(active_resident.call("get_dialogue")))
+		return
+	_set_message("%s يفكر في الرد..." % str(active_resident.get("display_name")))
+	ai_service.call("request_npc_reply", active_resident, clean_text)
+
+func _on_npc_ai_reply(resident: Node3D, reply: String, success: bool) -> void:
+	if not is_instance_valid(resident):
+		return
+	if success:
+		_set_message("%s: %s" % [str(resident.get("display_name")), reply])
+	else:
+		_set_message("%s: %s" % [str(resident.get("display_name")), str(resident.call("get_dialogue"))])
 
 func setup(target: CharacterBody3D, saver: Node) -> void:
 	player = target
@@ -154,6 +186,7 @@ func _nearest_resident() -> Node3D:
 	return nearest
 
 func _interact_resident(resident: Node3D) -> void:
+	active_resident = resident
 	if resident.has_method("on_player_interacted"):
 		resident.on_player_interacted()
 	var resident_dialogue := str(resident.call("get_dialogue")) if resident.has_method("get_dialogue") else str(resident.get("display_name"))
