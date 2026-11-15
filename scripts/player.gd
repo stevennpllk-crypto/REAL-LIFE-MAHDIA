@@ -56,6 +56,7 @@ func _mat(color: Color, roughness := 0.82) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
 	m.roughness = roughness
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return m
 
 func _part(parent: Node3D, mesh: Mesh, pos: Vector3, color: Color) -> MeshInstance3D:
