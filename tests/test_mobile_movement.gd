@@ -1,11 +1,13 @@
 extends SceneTree
 
 var failures := 0
+var total_checks := 0
 
 func _initialize() -> void:
 	call_deferred("_run_tests")
 
 func _check(condition: bool, label: String) -> void:
+	total_checks += 1
 	if condition:
 		print("PASS: ", label)
 	else:
@@ -153,7 +155,7 @@ func _run_tests() -> void:
 	weather_system.call("set_weather", "ثلوج")
 	_check(str(weather_system.get("weather")) == "ممطر", "weather system rejects unsupported weather")
 
-	print("Gameplay tests: ", 32 - failures, "/32 passed")
+	print("Gameplay tests: ", total_checks - failures, "/", total_checks, " passed")
 	# Release scene resources before shutting down the headless renderer.
 	car.queue_free()
 	player.queue_free()
