@@ -90,12 +90,12 @@ jobs:
       - name: Test APK on cloud Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 30
           target: aosp_atd
           arch: x86_64
           profile: pixel_2
-          ram-size: 2048M
-          heap-size: 512M
+          ram-size: 1536M
+          heap-size: 384M
           emulator-boot-timeout: 900
           disable-linux-hw-accel: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
