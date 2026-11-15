@@ -119,10 +119,8 @@ func _build_character() -> void:
 	torso.height = 0.78
 	torso.radial_segments = 12
 	body_visual = _part(torso, Vector3(0, 1.18, 0), shirt)
-	var collar := _part(_torus(0.105, 0.025), Vector3(0, 1.56, -0.005), shirt.darkened(0.18))
-	collar.rotation.x = deg_to_rad(90.0)
+	_part(_torus(0.105, 0.025), Vector3(0, 1.56, -0.005), shirt.darkened(0.18))
 	_part(_capsule(0.045, 0.16), Vector3(0, 1.49, -0.19), shirt.lightened(0.16))
-	_part(_sphere(0.19, 0.40), Vector3(0, 1.84, 0), skin)
 	head_visual = get_node_or_null("ResidentVisual/HeadPivot") as Node3D
 	if not is_instance_valid(head_visual):
 		head_visual = Node3D.new()
