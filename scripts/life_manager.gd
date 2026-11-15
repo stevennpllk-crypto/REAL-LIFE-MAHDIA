@@ -48,9 +48,8 @@ func send_player_message(message_text: String) -> void:
 	_set_message("%s يفكر في الرد..." % str(active_resident.get("display_name")))
 	ai_service.call("request_npc_reply", active_resident, clean_text)
 
-func _on_ai_connection_status(ready: bool, status_text: String) -> void:
-	if not ready:
-		_set_message(status_text)
+func _on_ai_connection_status(_ready: bool, status_text: String) -> void:
+	_set_message(status_text)
 
 func _on_npc_ai_reply(resident: Node3D, reply: String, success: bool) -> void:
 	if not is_instance_valid(resident):
