@@ -89,6 +89,22 @@ func _run_tests() -> void:
 	life.call("_apply_stamina", 2.0, false)
 	_check(is_equal_approx(float(life.get("energy")), 10.0) and is_equal_approx(float(stamina_player.get("run_speed")), 4.8), "resting restores energy and sprint speed")
 
+	var resident := CharacterBody3D.new()
+	resident.set_script(load("res://scripts/npc.gd"))
+	resident.set("build_visuals", false)
+	resident.set("personality", "curious")
+	resident.set("display_name", "ليلى")
+	root.add_child(resident)
+	await process_frame
+	_check(str(resident.get("ai_state")) in ["wander", "socializing"], "NPC starts with an autonomous AI state")
+	resident.call("on_player_interacted")
+	_check(int(resident.get("memory_meetings")) == 1, "NPC remembers an individual player meeting")
+	_check(str(resident.call("get_dialogue")).contains("أخبار المهدية"), "NPC dialogue reflects its own personality")
+	resident.call("_choose_daily_goal", 8.0)
+	_check(str(resident.get("ai_state")) == "socializing", "resident AI selects a morning social routine")
+	resident.call("_choose_daily_goal", 15.0)
+	_check(str(resident.get("ai_state")) == "wandering", "resident AI changes its routine in the afternoon")
+
 	var weather_system := Node.new()
 	weather_system.set_script(load("res://scripts/world_systems.gd"))
 	root.add_child(weather_system)
@@ -97,12 +113,13 @@ func _run_tests() -> void:
 	weather_system.call("set_weather", "ثلوج")
 	_check(str(weather_system.get("weather")) == "ممطر", "weather system rejects unsupported weather")
 
-	print("Gameplay tests: ", 21 - failures, "/21 passed")
+	print("Gameplay tests: ", 26 - failures, "/26 passed")
 	# Release scene resources before shutting down the headless renderer.
 	car.queue_free()
 	player.queue_free()
 	saver.queue_free()
 	weather_system.queue_free()
+	resident.queue_free()
 	life.queue_free()
 	stamina_player.queue_free()
 	await process_frame
