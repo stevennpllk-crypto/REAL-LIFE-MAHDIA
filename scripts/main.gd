@@ -28,12 +28,16 @@ var material_cache: Dictionary = {}
 func _ready() -> void:
 	randomize()
 	_build_environment()
-	_build_town()
+	# Yield immediately so Android can present the first rendered frame instead of
+	# keeping the native Godot splash visible during world generation.
+	await get_tree().process_frame
+	await _build_town()
 	_spawn_player()
 	_spawn_residents()
 	_spawn_vehicle()
 	_setup_systems()
 	_build_hud()
+	print("MAHDIA_WORLD_READY")
 
 func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
 	var key := color.to_html() + str(roughness)
@@ -74,7 +78,9 @@ func _build_environment() -> void:
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48, -32, 0)
 	sun.light_energy = 1.1
-	sun.shadow_enabled = true
+	# Disable real-time shadows on the mobile compatibility renderer.
+	# This avoids expensive shadow shader variants on low-memory phones and SwiftShader.
+	sun.shadow_enabled = false
 	add_child(sun)
 
 	var ground := StaticBody3D.new()
@@ -129,6 +135,9 @@ func _build_town() -> void:
 			var width := randf_range(7.0, 9.0)
 			var depth := randf_range(7.0, 9.0)
 			_create_building(Vector3(x, 0, z), Vector3(width, height, depth), palette[randi_range(0, palette.size()-1)], i * 11 + j)
+			# Spread expensive node creation over frames to keep the renderer responsive.
+			if (i * 5 + j) % 3 == 0:
+				await get_tree().process_frame
 
 	_create_palm(Vector3(-10, 0, -10))
 	_create_palm(Vector3(10, 0, -10))
