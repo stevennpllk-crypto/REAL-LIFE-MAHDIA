@@ -90,7 +90,7 @@ import zlib
 from math import sqrt
 
 data = open("build/mahdia-emulator.png", "rb").read()
-if data[:8] != b"\\x89PNG\\r\\n\\x1a\\n":
+if data[:8] != b"\x89PNG\r\n\x1a\n":
     raise SystemExit("Screenshot is not a valid PNG")
 offset = 8
 compressed = bytearray()
