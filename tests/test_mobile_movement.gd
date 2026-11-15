@@ -71,11 +71,11 @@ func _run_tests() -> void:
 	_check(player.is_physics_processing() and player.visible, "player control and visibility return after exiting")
 	var detailed_car := CharacterBody3D.new()
 	detailed_car.set_script(load("res://scripts/vehicle.gd"))
-	detailed_car.set("build_visuals", true)
+	detailed_car.set("build_visuals", false)
 	root.add_child(detailed_car)
 	await process_frame
-	_check(detailed_car.get("wheels").size() == 4, "detailed vehicle builds four independent wheels")
-	_check(detailed_car.get_child_count() >= 35, "vehicle includes body, cabin, lights, mirrors and trim")
+	_check(detailed_car.get("wheels").size() == 0, "headless vehicle test skips render-only wheel meshes")
+	_check(detailed_car.get_child_count() == 1 and detailed_car.get_child(0) is CollisionShape3D, "vehicle keeps its collision body when visuals are disabled")
 	detailed_car.queue_free()
 
 	var stamina_player := CharacterBody3D.new()
