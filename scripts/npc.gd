@@ -180,12 +180,20 @@ func _current_hour() -> float:
 
 func _choose_daily_goal(hour: float) -> void:
 	# Utility-based autonomous decision: needs compete with routine and personality.
-	var rest_score := (1.0 - energy) * 1.25 + (0.22 if hour >= 22.0 or hour < 6.0 else 0.0)
+	# Residents follow staggered daily rhythms instead of all choosing randomly.
+	# Night sleep and evening return-home priorities are deliberately stronger.
+	var is_night := hour >= 22.0 or hour < 6.0
+	var is_evening := hour >= 18.0 and hour < 22.0
+	var is_work_hours := hour >= 7.0 and hour < 17.0
+	var personal_schedule_offset := float(posmod(personal_seed, 5)) * 0.035
+	var rest_score := (1.0 - energy) * 1.25
+	if is_night:
+		rest_score = maxf(rest_score, 1.45 + (1.0 - energy) * 0.35 + personal_schedule_offset)
 	var social_score := social_need * (1.2 if personality in ["friendly", "curious"] else 0.8)
 	var explore_score := curiosity * (1.25 if personality == "curious" else 0.75)
 	var food_score := hunger * 1.45
-	var work_score := 0.72 if occupation != "resident" and hour >= 7.0 and hour < 17.0 else 0.12
-	var home_score := 0.35 if hour >= 18.0 or hour < 6.0 else 0.08
+	var work_score := 0.78 + personal_schedule_offset if occupation != "resident" and is_work_hours else 0.12
+	var home_score := (0.92 + personal_schedule_offset if is_evening else 0.48 if is_night else 0.08)
 	var best_score := maxf(food_score, maxf(rest_score, maxf(social_score, maxf(explore_score, maxf(work_score, home_score)))))
 	if best_score == food_score:
 		var food_station := _nearest_food_station()
