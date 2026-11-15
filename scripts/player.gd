@@ -80,9 +80,11 @@ func _build_human_figure() -> void:
 	visual_root.name = "HumanCharacterVisual"
 	add_child(visual_root)
 	# Proportioned low-poly human silhouette with separate clothing pieces.
-	var torso := CapsuleMesh.new()
-	torso.radius = 0.265
+	var torso := CylinderMesh.new()
+	torso.top_radius = 0.205
+	torso.bottom_radius = 0.285
 	torso.height = 0.82
+	torso.radial_segments = 16
 	_part(visual_root, torso, Vector3(0, 1.22, 0), Color(0.055, 0.24, 0.78))
 	var neck := CylinderMesh.new()
 	neck.top_radius = 0.105
@@ -96,7 +98,20 @@ func _build_human_figure() -> void:
 	var hair := SphereMesh.new()
 	hair.radius = 0.211
 	hair.height = 0.18
-	_part(visual_root, hair, Vector3(0, 2.015, 0.018), Color(0.075, 0.055, 0.045))
+	var hair_cap := _part(visual_root, hair, Vector3(0, 2.015, 0.018), Color(0.075, 0.055, 0.045))
+	hair_cap.scale = Vector3(1.0, 0.62, 1.0)
+	var ear := SphereMesh.new()
+	ear.radius = 0.052
+	ear.height = 0.13
+	_part(visual_root, ear, Vector3(-0.195, 1.87, 0), Color(0.69, 0.48, 0.35))
+	_part(visual_root, ear, Vector3(0.195, 1.87, 0), Color(0.69, 0.48, 0.35))
+	var brow := CapsuleMesh.new()
+	brow.radius = 0.012
+	brow.height = 0.075
+	var left_brow := _part(visual_root, brow, Vector3(-0.073, 1.94, -0.183), Color(0.075, 0.055, 0.045))
+	var right_brow := _part(visual_root, brow, Vector3(0.073, 1.94, -0.183), Color(0.075, 0.055, 0.045))
+	left_brow.rotation.z = -0.12
+	right_brow.rotation.z = 0.12
 	# Eyes and nose face the character's forward direction (-Z).
 	var eye_mesh := SphereMesh.new()
 	eye_mesh.radius = 0.022
@@ -125,9 +140,12 @@ func _make_limb(pos: Vector3, color: Color, length: float, radius: float) -> Nod
 	return pivot
 
 func _make_shoe(pos: Vector3) -> void:
-	var shoe := BoxMesh.new()
-	shoe.size = Vector3(0.25, 0.14, 0.39)
-	_part(visual_root, shoe, pos, Color(0.90, 0.89, 0.83))
+	var shoe := CapsuleMesh.new()
+	shoe.radius = 0.105
+	shoe.height = 0.36
+	var item := _part(visual_root, shoe, pos, Color(0.12, 0.13, 0.15))
+	item.rotation.x = PI * 0.5
+	item.scale = Vector3(1.0, 0.75, 1.0)
 
 func _add_action(action: String, key: Key) -> void:
 	if not InputMap.has_action(action):
