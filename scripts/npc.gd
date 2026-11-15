@@ -395,6 +395,7 @@ func _load_memory() -> void:
 			long_term_memories.append(entry.duplicate(true))
 	learned_preferences = memory.get("preferences", {}).duplicate(true)
 	stress = clampf(float(memory.get("stress", 0.0)), 0.0, 1.0)
+	current_goal = str(memory.get("current_goal", "استكشاف الحي"))
 	confidence = clampf(float(memory.get("confidence", 0.5)), 0.0, 1.0)
 	mood = clampf(float(memory.get("mood", 0.5)), 0.0, 1.0)
 	trust = clampf(float(memory.get("trust", 0.0)), 0.0, 1.0)
