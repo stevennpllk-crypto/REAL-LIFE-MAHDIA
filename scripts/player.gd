@@ -3,9 +3,11 @@ class_name MahdiaPlayer
 
 @export var walk_speed := 2.6
 @export var run_speed := 4.8
-@export var acceleration := 8.0
-@export var deceleration := 13.0
-@export var input_deadzone := 0.14
+@export var acceleration := 5.8
+@export var deceleration := 9.5
+@export var input_deadzone := 0.12
+@export var turn_response := 4.8
+@export var mobile_camera_sensitivity := 0.00125
 @export var jump_velocity := 4.5
 @export var mouse_sensitivity := 0.0020
 @export var build_visuals := true
@@ -147,8 +149,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func _rotate_camera(relative: Vector2) -> void:
-	camera_pivot.rotate_y(-relative.x * mouse_sensitivity)
-	camera.rotate_x(-relative.y * mouse_sensitivity)
+	var sensitivity := mobile_camera_sensitivity if OS.has_feature("mobile") or OS.get_name() == "Android" or OS.get_name() == "iOS" else mouse_sensitivity
+	camera_pivot.rotate_y(-relative.x * sensitivity)
+	camera.rotate_x(-relative.y * sensitivity)
 	camera.rotation.x = clampf(camera.rotation.x, deg_to_rad(-48), deg_to_rad(22))
 
 func set_mobile_move(value: Vector2) -> void:
@@ -157,8 +160,9 @@ func set_mobile_move(value: Vector2) -> void:
 		move_vector = Vector2.ZERO
 		return
 	var strength := clampf((magnitude - input_deadzone) / (1.0 - input_deadzone), 0.0, 1.0)
-	# Gentle response near the center gives precise walking; full tilt still reaches full speed.
-	strength = pow(strength, 1.55)
+	# Smooth analog response: a gentle centre for careful steps and a predictable full-tilt limit.
+	strength = smoothstep(0.0, 1.0, strength)
+	strength = pow(strength, 1.18)
 	move_vector = value.normalized() * strength
 
 func set_mobile_run(value: bool) -> void:
@@ -202,9 +206,12 @@ func _physics_process(delta: float) -> void:
 	var target_speed := speed * strength
 	var moving := strength > 0.01
 	if moving:
-		rotation.y = lerp_angle(rotation.y, atan2(-direction.x, -direction.z), delta * 6.0)
+		rotation.y = lerp_angle(rotation.y, atan2(-direction.x, -direction.z), 1.0 - exp(-turn_response * delta))
 	var desired_velocity := direction * target_speed
 	var rate := acceleration if moving else deceleration
+	# Brake harder when reversing direction to avoid the skating / instant-snap feel.
+	if moving and Vector2(velocity.x, velocity.z).dot(Vector2(desired_velocity.x, desired_velocity.z)) < -0.05:
+		rate *= 1.65
 	velocity.x = move_toward(velocity.x, desired_velocity.x, rate * delta)
 	velocity.z = move_toward(velocity.z, desired_velocity.z, rate * delta)
 	if not is_swimming and (Input.is_action_just_pressed("jump") or jump_requested) and is_on_floor():
