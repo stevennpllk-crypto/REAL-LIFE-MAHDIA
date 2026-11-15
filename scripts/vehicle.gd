@@ -76,6 +76,24 @@ func _build_car() -> void:
 			hub.rotation_degrees.z = 90
 			hub.material_override = _mat(Color(0.58, 0.60, 0.62), 0.8)
 			add_child(hub)
+	# Front fascia: grille, bumper inserts and readable headlamp shapes.
+	_box(Vector3(0.78, 0.20, 0.07), Vector3(0, 0.66, -1.88), Color(0.10, 0.12, 0.13), 0.25)
+	_box(Vector3(0.44, 0.055, 0.075), Vector3(0, 0.69, -1.925), Color(0.34, 0.38, 0.39), 0.45)
+	_box(Vector3(0.38, 0.13, 0.055), Vector3(0, 0.39, -1.91), Color(0.88, 0.88, 0.78))
+	# Rear plate and trim.
+	_box(Vector3(0.62, 0.18, 0.045), Vector3(0, 0.63, 1.88), Color(0.82, 0.84, 0.78))
+	_box(Vector3(1.72, 0.10, 0.10), Vector3(0, 0.36, 1.89), Color(0.18, 0.19, 0.20), 0.35)
+	# Mirrors, door handles and subtle lower side skirts.
+	for side in [-1.0, 1.0]:
+		_box(Vector3(0.22, 0.12, 0.18), Vector3(side * 0.91, 1.43, -0.63), Color(0.10, 0.13, 0.15), 0.3)
+		_box(Vector3(0.055, 0.045, 0.12), Vector3(side * 0.972, 1.16, -0.10), Color(0.82, 0.78, 0.66), 0.35)
+		_box(Vector3(0.10, 0.12, 2.65), Vector3(side * 0.965, 0.42, 0.0), Color(0.20, 0.21, 0.22), 0.25)
+	# A visible cabin through the windows: dashboard, seats and steering wheel.
+	_box(Vector3(1.34, 0.16, 0.38), Vector3(0, 1.05, -0.86), Color(0.075, 0.085, 0.09))
+	for z in [-0.30, 0.43]:
+		_box(Vector3(0.48, 0.48, 0.42), Vector3(-0.40, 1.02, z), Color(0.12, 0.14, 0.15))
+		_box(Vector3(0.48, 0.48, 0.42), Vector3(0.40, 1.02, z), Color(0.12, 0.14, 0.15))
+	_box(Vector3(0.10, 0.10, 0.38), Vector3(0, 1.20, -0.72), Color(0.08, 0.09, 0.10))
 
 func _physics_process(delta: float) -> void:
 	if driver == null:
