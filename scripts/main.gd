@@ -112,6 +112,35 @@ func _build_environment() -> void:
 	# Mediterranean sea and a pale coastal promenade.
 	_box(self, Vector3(180, 0.16, 38), Vector3(0, -0.02, -78), Color(0.035, 0.34, 0.56))
 	_box(self, Vector3(180, 0.18, 5), Vector3(0, 0.04, -57), Color(0.82, 0.76, 0.64))
+	_create_coastal_scenery()
+
+func _create_coastal_scenery() -> void:
+	# A small Mediterranean waterfront set: boats, wave crests, benches and shade.
+	for i in range(3):
+		var x := -25.0 + float(i) * 23.0
+		var z := -76.0 - float(i % 2) * 5.0
+		_box(self, Vector3(5.8, 0.42, 2.0), Vector3(x, 0.18, z), Color(0.32, 0.20, 0.13))
+		_box(self, Vector3(3.6, 0.12, 1.7), Vector3(x, 0.43, z), Color(0.92, 0.88, 0.77))
+		_box(self, Vector3(0.12, 2.1, 0.12), Vector3(x, 1.48, z), Color(0.34, 0.24, 0.15))
+		_box(self, Vector3(2.8, 0.08, 1.5), Vector3(x, 2.45, z), Color(0.88, 0.82, 0.68))
+	for i in range(10):
+		var wave := MeshInstance3D.new()
+		var wave_mesh := BoxMesh.new()
+		wave_mesh.size = Vector3(randf_range(3.0, 8.0), 0.025, 0.07)
+		wave.mesh = wave_mesh
+		wave.position = Vector3(randf_range(-82.0, 82.0), 0.075, -62.0 - float(i) * 2.5)
+		wave.material_override = _material(Color(0.42, 0.76, 0.82))
+		add_child(wave)
+	for i in range(4):
+		var x := -18.0 + float(i) * 12.0
+		_box(self, Vector3(2.2, 0.12, 0.55), Vector3(x, 0.72, -54.0), Color(0.40, 0.23, 0.12))
+		_box(self, Vector3(2.2, 0.12, 0.12), Vector3(x, 1.18, -54.22), Color(0.40, 0.23, 0.12))
+	for i in range(3):
+		var x := -13.0 + float(i) * 13.0
+		var canopy := _box(self, Vector3(3.2, 0.12, 3.2), Vector3(x, 2.55, -50.5), [Color(0.86, 0.28, 0.18), Color(0.92, 0.84, 0.66), Color(0.16, 0.42, 0.48)][i])
+		canopy.rotation.z = 0.08
+		for side in [-1.0, 1.0]:
+			_box(self, Vector3(0.10, 2.5, 0.10), Vector3(x + side * 1.35, 1.25, -50.5), Color(0.35, 0.26, 0.18))
 
 func _build_town() -> void:
 	# Main asphalt streets crossing a compact Mahdia-inspired neighborhood.
@@ -224,11 +253,16 @@ func _spawn_player() -> void:
 	add_child(player)
 
 func _spawn_residents() -> void:
-	for i in range(6):
+	var personalities := ["friendly", "shy", "busy", "curious", "grumpy", "friendly", "curious", "busy"]
+	var jobs := ["fisher", "shopkeeper", "mechanic", "student", "resident", "cook", "driver", "resident"]
+	for i in range(personalities.size()):
 		var npc := CharacterBody3D.new()
 		npc.set_script(NPC_SCRIPT)
-		npc.position = Vector3(randf_range(-24,24), 0, randf_range(-20,20))
-		npc.display_name = "Resident %02d" % (i + 1)
+		npc.position = Vector3(randf_range(-24, 24), 0, randf_range(-20, 20))
+		npc.display_name = ["سامي", "مريم", "أيمن", "ليلى", "منير", "آمنة", "يوسف", "سارة"][i]
+		npc.personality = personalities[i]
+		npc.occupation = jobs[i]
+		npc.set_ai_context(player, world_systems, Vector3(-28.0 + float(i) * 8.0, 0, -15.0 + float(i % 3) * 10.0), i)
 		add_child(npc)
 
 func _spawn_vehicle() -> void:
