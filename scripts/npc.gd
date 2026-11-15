@@ -49,6 +49,7 @@ var confidence := 0.5
 var current_goal := "استكشاف الحي"
 var reflection_elapsed := 0.0
 var memory_save_elapsed := 0.0
+var memory_dirty := false
 var autonomy_cycles := 0
 var last_experience_tag := ""
 var last_experience_time := -1000.0
@@ -61,6 +62,8 @@ func set_ai_context(player_node: CharacterBody3D, clock_node: Node, work_spot: V
 	_load_memory()
 	work_position = work_spot
 	personal_seed = identity
+	# Stagger periodic disk writes so residents never save on the same frame.
+	memory_save_elapsed = float(posmod(identity, 8)) * 5.0
 	rest_position = work_spot + Vector3(3.0, 0, 2.5)
 	turn_bias = -1.0 if identity % 2 == 0 else 1.0
 
@@ -262,6 +265,7 @@ func _record_experience(tag: String, detail: String, emotional_weight: float) ->
 		return
 	last_experience_tag = tag
 	last_experience_time = now
+	memory_dirty = true
 	long_term_memories.append({
 		"tag": tag,
 		"detail": detail,
@@ -290,6 +294,7 @@ func _reflect_on_experiences() -> void:
 		var preference := clampf(float(learned_preferences.get(tag, 0.0)), -0.25, 0.35)
 		learned_preferences[tag] = clampf(preference + minf(float(counts[tag]) * 0.008, 0.025), -0.25, 0.35)
 	confidence = clampf(confidence + 0.004, 0.0, 1.0)
+	memory_dirty = true
 	autonomy_cycles += 1
 	if counts.has("social") and int(counts["social"]) >= 2:
 		decision_reason = "أتذكر أن لقاء الجيران يجعل يومي أفضل"
@@ -297,7 +302,6 @@ func _reflect_on_experiences() -> void:
 		decision_reason = "أحب اكتشاف أماكن جديدة في الحي"
 	elif stress > 0.7:
 		decision_reason = "أشعر بالضغط وأحتاج إلى تغيير روتيني"
-	_save_memory()
 
 func _nearest_food_station() -> Node3D:
 	var nearest: Node3D
@@ -338,6 +342,7 @@ func _update_social_awareness() -> void:
 		_record_experience("social", "قضيت وقتاً مع %s" % str(other.get("display_name")), 0.04)
 		familiarity = clampf(familiarity + 0.012, 0.0, 1.0)
 		resident_relationships[other_id] = familiarity
+		memory_dirty = true
 		if ai_state == "socializing" or social_need > 0.72:
 			social_need = clampf(social_need - 0.035, 0.0, 1.0)
 			other.set("social_need", clampf(float(other.get("social_need")) - 0.02, 0.0, 1.0))
@@ -380,6 +385,7 @@ func on_player_interacted() -> void:
 	social_need = clampf(social_need - 0.28, 0.0, 1.0)
 	curiosity = clampf(curiosity + 0.08, 0.0, 1.0)
 	decision_reason = "تحدثت مع اللاعب وأتذكر اللقاء"
+	memory_dirty = true
 	_save_memory()
 
 func _load_memory() -> void:
@@ -413,7 +419,9 @@ func _save_memory() -> void:
 	memories[memory_id] = {"meetings": memory_meetings, "mood": mood, "trust": trust, "hunger": hunger, "energy": energy, "social_need": social_need, "curiosity": curiosity, "relationships": resident_relationships, "episodic_memories": long_term_memories, "preferences": learned_preferences, "stress": stress, "confidence": confidence, "current_goal": current_goal}
 	all_data["mahdia_npc_memory"] = memories
 	var result: Error = memory_manager.save_progress(all_data)
-	if result != OK:
+	if result == OK:
+		memory_dirty = false
+	else:
 		push_warning("Could not save resident memory: %s" % error_string(result))
 
 func get_ai_context() -> Dictionary:
@@ -517,9 +525,10 @@ func _physics_process(delta: float) -> void:
 	if reflection_elapsed >= 15.0:
 		reflection_elapsed = 0.0
 		_reflect_on_experiences()
-	if memory_save_elapsed >= 25.0:
+	if memory_save_elapsed >= 45.0:
 		memory_save_elapsed = 0.0
-		_save_memory()
+		if memory_dirty:
+			_save_memory()
 	decision_elapsed += delta
 	if decision_elapsed >= 4.0:
 		decision_elapsed = 0.0
