@@ -22,10 +22,15 @@ func _process(delta: float) -> void:
 		var choices := ["مشمس", "مشمس", "غائم", "ممطر"]
 		set_weather(choices[randi_range(0, choices.size() - 1)])
 	var daylight := clampf(sin((hour - 6.0) / 12.0 * PI), 0.08, 1.0)
+	var weather_light := 1.0
+	if weather == "غائم":
+		weather_light = 0.78
+	elif weather == "ممطر":
+		weather_light = 0.58
 	if is_instance_valid(sun):
-		sun.light_energy = daylight
+		sun.light_energy = daylight * weather_light
 	if is_instance_valid(environment):
-		environment.ambient_light_energy = lerpf(0.25, 1.0, daylight)
+		environment.ambient_light_energy = lerpf(0.25, 1.0, daylight) * weather_light
 
 func set_weather(value: String) -> void:
 	if value not in ["مشمس", "غائم", "ممطر"]:
