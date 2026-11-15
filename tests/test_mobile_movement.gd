@@ -59,6 +59,9 @@ func _run_tests() -> void:
 	# Exercise the vehicle lifecycle without constructing render meshes in headless CI.
 	var car := CharacterBody3D.new()
 	car.set_script(load("res://scripts/vehicle.gd"))
+	car.set("build_visuals", false)
+	root.add_child(car)
+	await process_frame
 	car.call("enter_vehicle", player)
 	_check(car.get("driver") == player, "player can enter the vehicle")
 	_check(not player.is_physics_processing(), "player movement is suspended while driving")
