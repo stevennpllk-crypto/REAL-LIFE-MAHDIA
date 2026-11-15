@@ -57,6 +57,7 @@ func is_configured() -> bool:
 func request_npc_reply(resident: Node3D, player_message: String) -> bool:
 	if request_in_flight:
 		connection_status.emit(false, "يوجد طلب محادثة قيد التنفيذ")
+		npc_reply.emit(resident, "", false)
 		return false
 	if not is_configured():
 		connection_status.emit(false, "أدخل عنوان خادم JASSIM ورمز الجلسة أولاً")
