@@ -22,6 +22,7 @@ var left_leg: Node3D
 var right_leg: Node3D
 var animation_clock := 0.0
 var camera_drag_finger := -1
+var is_swimming := false
 
 func _ready() -> void:
 	_add_action("move_forward", KEY_W)
@@ -166,7 +167,15 @@ func request_interact() -> void:
 	interact_requested = true
 
 func _physics_process(delta: float) -> void:
-	if not is_on_floor():
+	is_swimming = global_position.z < -59.0 and absf(global_position.x) < 90.0
+	if is_swimming:
+		var swim_level := -1.25
+		if Input.is_action_just_pressed("jump") or jump_requested:
+			velocity.y = 2.8
+		else:
+			var vertical_target := clampf((swim_level - global_position.y) * 2.0, -1.4, 1.4)
+			velocity.y = move_toward(velocity.y, vertical_target, delta * 3.0)
+	elif not is_on_floor():
 		velocity.y -= gravity * delta
 	var input_dir := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	if move_vector.length() > 0.001:
@@ -182,7 +191,7 @@ func _physics_process(delta: float) -> void:
 	var direction := (right * input_dir.x - forward * input_dir.y)
 	direction.y = 0.0
 	direction = direction.normalized()
-	var speed := run_speed if (running or Input.is_action_pressed("run")) else walk_speed
+	var speed := (2.8 if (running or Input.is_action_pressed("run")) else 1.8) if is_swimming else (run_speed if (running or Input.is_action_pressed("run")) else walk_speed)
 	var target_speed := speed * strength
 	var moving := strength > 0.01
 	if moving:
@@ -191,7 +200,7 @@ func _physics_process(delta: float) -> void:
 	var rate := acceleration if moving else deceleration
 	velocity.x = move_toward(velocity.x, desired_velocity.x, rate * delta)
 	velocity.z = move_toward(velocity.z, desired_velocity.z, rate * delta)
-	if (Input.is_action_just_pressed("jump") or jump_requested) and is_on_floor():
+	if not is_swimming and (Input.is_action_just_pressed("jump") or jump_requested) and is_on_floor():
 		velocity.y = jump_velocity
 	jump_requested = false
 	move_and_slide()
