@@ -100,11 +100,17 @@ func _build_character() -> void:
 	visual_root = Node3D.new()
 	visual_root.name = "ResidentVisual"
 	add_child(visual_root)
-	var palette := [Color(0.72, 0.25, 0.16), Color(0.12, 0.42, 0.36), Color(0.82, 0.62, 0.18), Color(0.24, 0.34, 0.62), Color(0.62, 0.35, 0.22), Color(0.42, 0.30, 0.58)]
+	var palette := [Color(0.72, 0.25, 0.16), Color(0.12, 0.42, 0.36), Color(0.82, 0.62, 0.18), Color(0.24, 0.34, 0.62), Color(0.62, 0.35, 0.22), Color(0.42, 0.30, 0.58), Color(0.78, 0.72, 0.58), Color(0.12, 0.22, 0.28)]
+	var skin_palette := [Color(0.48, 0.30, 0.21), Color(0.60, 0.39, 0.28), Color(0.69, 0.48, 0.35), Color(0.76, 0.56, 0.42), Color(0.55, 0.35, 0.25)]
+	var hair_palette := [Color(0.045, 0.035, 0.03), Color(0.13, 0.075, 0.045), Color(0.22, 0.15, 0.09), Color(0.34, 0.25, 0.16)]
 	var shirt: Color = palette[posmod(personal_seed, palette.size())]
+	var skin: Color = skin_palette[posmod(personal_seed * 3 + 1, skin_palette.size())]
+	var hair: Color = hair_palette[posmod(personal_seed * 5 + 2, hair_palette.size())]
+	var height_variation := 0.94 + float(posmod(personal_seed * 7, 13)) * 0.01
+	visual_root.scale = Vector3(1.0, height_variation, 1.0)
 	_part(_capsule(0.255, 0.78), Vector3(0, 1.19, 0), shirt)
-	head_visual = _part(_sphere(0.19, 0.40), Vector3(0, 1.84, 0), Color(0.68, 0.47, 0.34))
-	_part(_sphere(0.198, 0.17), Vector3(0, 1.97, 0.015), Color(0.09, 0.065, 0.05))
+	head_visual = _part(_sphere(0.19, 0.40), Vector3(0, 1.84, 0), skin)
+	_part(_sphere(0.198, 0.17), Vector3(0, 1.97, 0.015), hair)
 	_part(_sphere(0.022, 0.03), Vector3(-0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
 	_part(_sphere(0.022, 0.03), Vector3(0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
 	_build_occupation_details()
@@ -622,6 +628,13 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 		if is_instance_valid(player) and global_position.distance_to(player.global_position) < 6.0:
 			var toward_player := (player.global_position - global_position).normalized()
 			look_target.y = clampf(atan2(-toward_player.x, -toward_player.z) - rotation.y, -0.42, 0.42)
+		elif ai_state == "socializing":
+			var conversation_partner := _nearest_resident(5.5)
+			if is_instance_valid(conversation_partner):
+				var toward_partner := (conversation_partner.global_position - global_position).normalized()
+				look_target.y = clampf(atan2(-toward_partner.x, -toward_partner.z) - rotation.y, -0.48, 0.48)
+			else:
+				look_target.y = sin(idle_phase * 0.34 + float(personal_seed)) * 0.10
 		else:
 			look_target.y = sin(idle_phase * 0.34 + float(personal_seed)) * 0.10
 		head_visual.rotation.y = lerp_angle(head_visual.rotation.y, look_target.y, 1.0 - exp(-2.2 * delta))
