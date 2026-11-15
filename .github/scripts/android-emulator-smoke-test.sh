@@ -34,8 +34,16 @@ test -s build/REAL_LIFE_MAHDIA-debug.apk
 adb shell cmd package list packages >/dev/null
 adb install -r build/REAL_LIFE_MAHDIA-debug.apk
 adb shell monkey -p com.jassim.reallifemahdia 1
-sleep 30
-adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity'
+# Give the first scene extra time: the world is assembled from many 3D nodes.
+sleep 60
+activity_state="$(adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' || true)"
+echo "$activity_state"
+if ! grep -q 'com.jassim.reallifemahdia' <<< "$activity_state"; then
+  echo "The game activity is not resumed after startup"
+  exit 1
+fi
+adb shell screencap -p /sdcard/mahdia-emulator.png >/dev/null
+adb pull /sdcard/mahdia-emulator.png build/mahdia-emulator.png >/dev/null
 adb logcat -d -t 6000 > build/emulator-logcat.txt
 if grep -E 'FATAL EXCEPTION|SIGSEGV|Fatal signal' build/emulator-logcat.txt; then
   echo "Fatal application error detected"
