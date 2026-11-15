@@ -42,6 +42,8 @@ var right_arm: Node3D
 var left_leg: Node3D
 var right_leg: Node3D
 var visual_root: Node3D
+var head_visual: Node3D
+var idle_phase := 0.0
 var clock := 0.0
 # Cognitive simulation: persistent episodic memories, learned preferences and self-review.
 var long_term_memories: Array[Dictionary] = []
@@ -101,7 +103,7 @@ func _build_character() -> void:
 	var palette := [Color(0.72, 0.25, 0.16), Color(0.12, 0.42, 0.36), Color(0.82, 0.62, 0.18), Color(0.24, 0.34, 0.62), Color(0.62, 0.35, 0.22), Color(0.42, 0.30, 0.58)]
 	var shirt: Color = palette[posmod(personal_seed, palette.size())]
 	_part(_capsule(0.255, 0.78), Vector3(0, 1.19, 0), shirt)
-	_part(_sphere(0.19, 0.40), Vector3(0, 1.84, 0), Color(0.68, 0.47, 0.34))
+	head_visual = _part(_sphere(0.19, 0.40), Vector3(0, 1.84, 0), Color(0.68, 0.47, 0.34))
 	_part(_sphere(0.198, 0.17), Vector3(0, 1.97, 0.015), Color(0.09, 0.065, 0.05))
 	_part(_sphere(0.022, 0.03), Vector3(-0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
 	_part(_sphere(0.022, 0.03), Vector3(0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
@@ -171,12 +173,13 @@ func _sphere(radius: float, height: float) -> SphereMesh:
 	mesh.height = height
 	return mesh
 
-func _part(mesh: Mesh, pos: Vector3, color: Color) -> void:
+func _part(mesh: Mesh, pos: Vector3, color: Color) -> MeshInstance3D:
 	var item := MeshInstance3D.new()
 	item.mesh = mesh
 	item.position = pos
 	item.material_override = _mat(color)
 	visual_root.add_child(item)
+	return item
 
 func _limb(pos: Vector3, color: Color, length: float, radius: float) -> Node3D:
 	var pivot := Node3D.new()
@@ -591,24 +594,38 @@ func _physics_process(delta: float) -> void:
 		return
 	direction = _avoid_obstacle(direction.normalized(), delta)
 	var pace := walk_speed * (0.72 if ai_state == "avoiding" else 1.0)
-	velocity.x = direction.x * pace
-	velocity.z = direction.z * pace
-	rotation.y = lerp_angle(rotation.y, atan2(-direction.x, -direction.z), delta * 4.0)
+	# Residents accelerate and brake like people instead of snapping to a fixed velocity.
+	velocity.x = move_toward(velocity.x, direction.x * pace, delta * 3.2)
+	velocity.z = move_toward(velocity.z, direction.z * pace, delta * 3.2)
+	rotation.y = lerp_angle(rotation.y, atan2(-direction.x, -direction.z), 1.0 - exp(-4.2 * delta))
 	move_and_slide()
-	_animate(delta, true)
+	_animate(delta, true, pace)
 
-func _animate(delta: float, moving: bool) -> void:
+func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 	if not is_instance_valid(left_arm) or not is_instance_valid(right_arm) or not is_instance_valid(left_leg) or not is_instance_valid(right_leg):
 		return
 	if moving:
-		clock += delta * 5.0
-		var swing := sin(clock) * 0.34
+		clock += delta * (4.8 + pace * 1.35)
+		var swing := sin(clock) * 0.31
 		left_arm.rotation.x = swing
 		right_arm.rotation.x = -swing
 		left_leg.rotation.x = -swing
 		right_leg.rotation.x = swing
 	else:
-		left_arm.rotation.x = lerpf(left_arm.rotation.x, 0.0, delta * 5.0)
-		right_arm.rotation.x = lerpf(right_arm.rotation.x, 0.0, delta * 5.0)
+		idle_phase += delta
+		left_arm.rotation.x = lerpf(left_arm.rotation.x, sin(idle_phase * 0.72) * 0.025, delta * 2.8)
+		right_arm.rotation.x = lerpf(right_arm.rotation.x, sin(idle_phase * 0.72 + 0.8) * 0.025, delta * 2.8)
 		left_leg.rotation.x = lerpf(left_leg.rotation.x, 0.0, delta * 5.0)
 		right_leg.rotation.x = lerpf(right_leg.rotation.x, 0.0, delta * 5.0)
+	if is_instance_valid(head_visual):
+		var look_target := Vector3.ZERO
+		if is_instance_valid(player) and global_position.distance_to(player.global_position) < 6.0:
+			var toward_player := (player.global_position - global_position).normalized()
+			look_target.y = clampf(atan2(-toward_player.x, -toward_player.z) - rotation.y, -0.42, 0.42)
+		else:
+			look_target.y = sin(idle_phase * 0.34 + float(personal_seed)) * 0.10
+		head_visual.rotation.y = lerp_angle(head_visual.rotation.y, look_target.y, 1.0 - exp(-2.2 * delta))
+		head_visual.rotation.x = lerpf(head_visual.rotation.x, sin(idle_phase * 0.55) * 0.025, delta * 2.0)
+	if is_instance_valid(visual_root):
+		var bob := (absf(sin(clock)) * 0.025) if moving else sin(idle_phase * 1.35 + float(personal_seed)) * 0.008
+		visual_root.position.y = lerpf(visual_root.position.y, bob, delta * 5.0)
