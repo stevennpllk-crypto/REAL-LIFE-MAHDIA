@@ -84,10 +84,19 @@ func _build_environment() -> void:
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48, -32, 0)
 	sun.light_energy = 1.1
-	# Disable real-time shadows on the mobile compatibility renderer.
-	# This avoids expensive shadow shader variants on low-memory phones and SwiftShader.
+	# The entire scene uses unshaded, vertex-coloured geometry. A scene light
+	# adds no visible quality but can exceed GLES3 uniform limits on mobile GPUs.
+	# Keep the time-of-day controller node, but exclude it from rendering.
 	sun.shadow_enabled = false
+	sun.visible = false
 	add_child(sun)
+	# Explicitly disable costly environment passes for broad GLES3 compatibility.
+	world_environment.glow_enabled = false
+	world_environment.ssao_enabled = false
+	world_environment.ssil_enabled = false
+	world_environment.sdfgi_enabled = false
+	world_environment.fog_enabled = false
+	world_environment.volumetric_fog_enabled = false
 
 	# Solid land stops at the shoreline; the sea area remains swimmable.
 	var ground := StaticBody3D.new()
@@ -428,6 +437,8 @@ func _apply_graphics_quality() -> void:
 		quality_button.text = "الرسوم: " + labels[quality_level]
 	Engine.max_fps = [30, 45, 60][quality_level]
 	if is_instance_valid(sun):
-		sun.shadow_enabled = quality_level == 2
+		# All quality tiers remain on the GLES3-safe unlit path.
+		sun.shadow_enabled = false
+		sun.visible = false
 	if is_instance_valid(world_environment):
 		world_environment.ambient_light_energy = [0.58, 0.78, 0.95][quality_level]
