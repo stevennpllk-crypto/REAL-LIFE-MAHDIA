@@ -197,8 +197,9 @@ func save_now() -> void:
 func _apply_stamina(delta: float, sprinting: bool) -> void:
 	if not is_instance_valid(player):
 		return
-	if sprinting and energy > 0.0:
-		energy = maxf(0.0, energy - delta * 9.0)
+	if sprinting:
+		if energy > 0.0:
+			energy = maxf(0.0, energy - delta * 9.0)
 	else:
 		energy = minf(100.0, energy + delta * 5.0)
 	var available_speed := base_run_speed if energy > 0.0 else base_walk_speed
