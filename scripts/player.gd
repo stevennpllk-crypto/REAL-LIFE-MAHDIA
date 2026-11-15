@@ -47,7 +47,9 @@ func _ready() -> void:
 	add_child(camera_pivot)
 	camera = Camera3D.new()
 	camera.position = Vector3(0, 1.0, 5.8)
-	camera.rotation_degrees.x = 12.0
+	# A positive pitch points the camera above the horizon in Godot's -Z forward convention.
+	# Tilt slightly downward so the player and the nearby 3D street occupy the opening frame.
+	camera.rotation_degrees.x = -12.0
 	camera.current = true
 	camera.fov = 68.0
 	camera.near = 0.08
