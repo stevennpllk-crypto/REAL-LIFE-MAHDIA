@@ -73,14 +73,15 @@ func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
 	return mat
 
 var rounded_mesh_cache: Dictionary = {}
+var plaster_texture: ImageTexture
 
 func _rounded_box_mesh(size: Vector3) -> ArrayMesh:
-	var key := "%0.2f_%0.2f_%0.2f" % [size.x, size.y, size.z]
+	var key := "%0.3f_%0.3f_%0.3f" % [size.x, size.y, size.z]
 	if rounded_mesh_cache.has(key):
 		return rounded_mesh_cache[key]
 	var half := size * 0.5
 	var bevel := minf(minf(size.x, minf(size.y, size.z)) * 0.12, 0.16)
-	bevel = maxf(0.015, bevel)
+	bevel = maxf(0.002, bevel)
 	var faces := [
 		[Vector3.RIGHT, Vector3.UP, Vector3.BACK],
 		[Vector3.LEFT, Vector3.UP, Vector3.FORWARD],
@@ -120,9 +121,10 @@ func _rounded_box_mesh(size: Vector3) -> ArrayMesh:
 				var p10: Array = grid[y][x + 1]
 				var p11: Array = grid[y + 1][x + 1]
 				var p01: Array = grid[y + 1][x]
-				for point in [p00, p10, p11, p00, p11, p01]:
-					surface.set_normal(point[1])
-					surface.add_vertex(point[0])
+				for point in [[p00, 0, 0], [p10, 1, 0], [p11, 1, 1], [p00, 0, 0], [p11, 1, 1], [p01, 0, 1]]:
+					surface.set_normal(point[0][1])
+					surface.set_uv(Vector2((float(x) + float(point[1])) / divisions, (float(y) + float(point[2])) / divisions))
+					surface.add_vertex(point[0][0])
 	var mesh := surface.commit()
 	rounded_mesh_cache[key] = mesh
 	return mesh
@@ -132,6 +134,32 @@ func _box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInst
 	item.mesh = _rounded_box_mesh(size)
 	item.position = pos
 	item.material_override = _material(color)
+	parent.add_child(item)
+	return item
+
+func _plaster_material(color: Color) -> StandardMaterial3D:
+	if plaster_texture == null:
+		var image := Image.create(128, 128, false, Image.FORMAT_RGBA8)
+		for y in range(128):
+			for x in range(128):
+				var grain := randf_range(0.91, 1.0)
+				var stain := 0.96 + sin(float(x) * 0.11 + sin(float(y) * 0.07)) * 0.025
+				var value := clampf(grain * stain, 0.82, 1.0)
+				image.set_pixel(x, y, Color(value, value, value, 1.0))
+		plaster_texture = ImageTexture.create_from_image(image)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.albedo_texture = plaster_texture
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+	material.roughness = 1.0
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	return material
+
+func _plaster_box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInstance3D:
+	var item := MeshInstance3D.new()
+	item.mesh = _rounded_box_mesh(size)
+	item.position = pos
+	item.material_override = _plaster_material(color)
 	parent.add_child(item)
 	return item
 
@@ -283,7 +311,7 @@ func _create_building(origin: Vector3, size: Vector3, wall_color: Color, seed_va
 	var trim_color := Color(0.91, 0.87, 0.77)
 	var frame_color := Color(0.29, 0.23, 0.18)
 
-	_box(building, size, Vector3(0, h * 0.5, 0), wall_color)
+	_plaster_box(building, size, Vector3(0, h * 0.5, 0), wall_color)
 	_box(building, Vector3(w + 0.32, 0.24, d + 0.32), Vector3(0, h + 0.12, 0), Color(0.70, 0.66, 0.58))
 	# Roof parapet gives flat Tunisian rooftops a recognisable silhouette.
 	for side in [-1.0, 1.0]:
@@ -360,12 +388,14 @@ func _create_palm(pos: Vector3) -> void:
 	for i in range(7):
 		var angle := TAU * float(i) / 7.0
 		var leaf := MeshInstance3D.new()
-		var leaf_mesh := BoxMesh.new()
-		leaf_mesh.size = Vector3(0.34, 0.12, 2.5)
+		var leaf_mesh := CapsuleMesh.new()
+		leaf_mesh.radius = 0.105
+		leaf_mesh.height = 2.75
 		leaf.mesh = leaf_mesh
 		leaf.position = pos + Vector3(cos(angle) * 0.85, 3.8, sin(angle) * 0.85)
+		leaf.rotation.x = PI * 0.5
 		leaf.rotation.y = -angle
-		leaf.rotation.x = -0.22
+		leaf.rotation.z = -0.22
 		leaf.material_override = _material(Color(0.13, 0.38, 0.22))
 		add_child(leaf)
 
