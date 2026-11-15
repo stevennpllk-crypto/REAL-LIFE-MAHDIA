@@ -8,6 +8,7 @@ const WORLD_SYSTEMS = preload("res://scripts/world_systems.gd")
 const NETWORK_SCRIPT = preload("res://scripts/multiplayer_manager.gd")
 const SAVE_SCRIPT = preload("res://scripts/save_manager.gd")
 const LIFE_SCRIPT = preload("res://scripts/life_manager.gd")
+const AI_SERVICE_SCRIPT = preload("res://scripts/ai_service.gd")
 const PLANET_NAV_SCRIPT = preload("res://scripts/planet_navigation.gd")
 const TERRAIN_STREAMER_SCRIPT = preload("res://scripts/terrain_streamer.gd")
 
@@ -21,6 +22,11 @@ var world_systems: Node
 var network_manager: Node
 var save_manager: Node
 var life_manager: Node
+var ai_service: Node
+var chat_input: LineEdit
+var ai_endpoint_input: LineEdit
+var ai_token_input: LineEdit
+var ai_setup_panel: PanelContainer
 var planet_navigation: Node
 var terrain_streamer: Node3D
 var material_cache: Dictionary = {}
@@ -311,6 +317,11 @@ func _setup_systems() -> void:
 	life_manager.set_script(LIFE_SCRIPT)
 	add_child(life_manager)
 	life_manager.setup(player, save_manager)
+	ai_service = Node.new()
+	ai_service.name = "MahdiaAIService"
+	ai_service.set_script(AI_SERVICE_SCRIPT)
+	add_child(ai_service)
+	life_manager.set_ai_service(ai_service)
 	_restore_world_progress()
 	_apply_graphics_quality()
 
@@ -357,10 +368,109 @@ func _build_hud() -> void:
 	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	message_panel.add_child(message_label)
 	life_manager.message_changed.connect(func(value: String): message_label.text = value)
+
+	# Lightweight chat input for the currently selected resident.
+	var chat_row := HBoxContainer.new()
+	chat_row.anchor_left = 0.08
+	chat_row.anchor_right = 0.92
+	chat_row.anchor_top = 1.0
+	chat_row.anchor_bottom = 1.0
+	chat_row.offset_top = -132
+	chat_row.offset_bottom = -88
+	layer.add_child(chat_row)
+	chat_input = LineEdit.new()
+	chat_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chat_input.placeholder_text = "اكتب للمواطن القريب..."
+	chat_input.text_submitted.connect(_on_chat_submitted)
+	chat_row.add_child(chat_input)
+	var send_button := Button.new()
+	send_button.text = "إرسال"
+	send_button.pressed.connect(_on_chat_send_pressed)
+	chat_row.add_child(send_button)
+
+	var ai_config_button := Button.new()
+	ai_config_button.text = "إعداد الذكاء"
+	ai_config_button.anchor_left = 1.0
+	ai_config_button.anchor_right = 1.0
+	ai_config_button.offset_left = -170
+	ai_config_button.offset_right = -16
+	ai_config_button.offset_top = 72
+	ai_config_button.offset_bottom = 116
+	ai_config_button.pressed.connect(_toggle_ai_setup)
+	layer.add_child(ai_config_button)
+
+	ai_setup_panel = PanelContainer.new()
+	ai_setup_panel.anchor_left = 0.5
+	ai_setup_panel.anchor_right = 0.5
+	ai_setup_panel.anchor_top = 0.5
+	ai_setup_panel.anchor_bottom = 0.5
+	ai_setup_panel.offset_left = -230
+	ai_setup_panel.offset_right = 230
+	ai_setup_panel.offset_top = -145
+	ai_setup_panel.offset_bottom = 145
+	ai_setup_panel.visible = false
+	layer.add_child(ai_setup_panel)
+	var setup_col := VBoxContainer.new()
+	ai_setup_panel.add_child(setup_col)
+	var setup_title := Label.new()
+	setup_title.text = "ربط ذكاء JASSIM AI الخاص"
+	setup_col.add_child(setup_title)
+	ai_endpoint_input = LineEdit.new()
+	ai_endpoint_input.placeholder_text = "https://عنوان-خادمك"
+	ai_endpoint_input.text = str(ai_service.get("default_endpoint"))
+	setup_col.add_child(ai_endpoint_input)
+	ai_token_input = LineEdit.new()
+	ai_token_input.placeholder_text = "رمز جلسة JASSIM (Bearer)"
+	ai_token_input.secret = true
+	setup_col.add_child(ai_token_input)
+	var setup_note := Label.new()
+	setup_note.text = "يُحفظ الرمز داخل مساحة بيانات اللعبة الخاصة. لا تضع رمز الإدارة العام هنا."
+	setup_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	setup_col.add_child(setup_note)
+	var save_ai_button := Button.new()
+	save_ai_button.text = "حفظ إعدادات الاتصال"
+	save_ai_button.pressed.connect(_save_ai_settings)
+	setup_col.add_child(save_ai_button)
+	var close_ai_button := Button.new()
+	close_ai_button.text = "إغلاق"
+	close_ai_button.pressed.connect(func(): ai_setup_panel.visible = false)
+	setup_col.add_child(close_ai_button)
+
 	var controls := Node.new()
 	controls.set_script(MOBILE_CONTROLS)
 	layer.add_child(controls)
 	controls.setup(player)
+
+
+func _on_chat_submitted(value: String) -> void:
+	_send_chat_message(value)
+
+func _on_chat_send_pressed() -> void:
+	_send_chat_message(chat_input.text if is_instance_valid(chat_input) else "")
+
+func _send_chat_message(value: String) -> void:
+	if value.strip_edges().is_empty() or not is_instance_valid(life_manager):
+		return
+	life_manager.send_player_message(value)
+	chat_input.clear()
+	chat_input.release_focus()
+
+func _toggle_ai_setup() -> void:
+	if is_instance_valid(ai_setup_panel):
+		ai_setup_panel.visible = not ai_setup_panel.visible
+
+func _save_ai_settings() -> void:
+	if not is_instance_valid(ai_service):
+		return
+	var endpoint := ai_endpoint_input.text.strip_edges()
+	var token := ai_token_input.text.strip_edges()
+	var ok: bool = ai_service.configure(endpoint, token)
+	if ok:
+		ai_token_input.clear()
+		ai_setup_panel.visible = false
+		print("MAHDIA_AI_SETTINGS_SAVED")
+	else:
+		print("MAHDIA_AI_SETTINGS_INVALID")
 
 func _process(delta: float) -> void:
 	# _process continues while _ready() yields during town generation.
