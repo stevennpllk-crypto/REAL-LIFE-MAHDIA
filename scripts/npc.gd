@@ -183,10 +183,15 @@ func _choose_daily_goal(hour: float) -> void:
 	var rest_score := (1.0 - energy) * 1.25 + (0.22 if hour >= 22.0 or hour < 6.0 else 0.0)
 	var social_score := social_need * (1.2 if personality in ["friendly", "curious"] else 0.8)
 	var explore_score := curiosity * (1.25 if personality == "curious" else 0.75)
+	var food_score := hunger * 1.45
 	var work_score := 0.72 if occupation != "resident" and hour >= 7.0 and hour < 17.0 else 0.12
 	var home_score := 0.35 if hour >= 18.0 or hour < 6.0 else 0.08
-	var best_score := maxf(rest_score, maxf(social_score, maxf(explore_score, maxf(work_score, home_score))))
-	if best_score == rest_score:
+	var best_score := maxf(food_score, maxf(rest_score, maxf(social_score, maxf(explore_score, maxf(work_score, home_score)))))
+	if best_score == food_score:
+		ai_state = "seeking_food"
+		target_position = home_position + Vector3(3.2, 0, 2.0)
+		decision_reason = "أبحث عن طعام لأنني جائع"
+	elif best_score == rest_score:
 		ai_state = "resting"
 		target_position = rest_position
 		decision_reason = "أحتاج إلى الراحة"
@@ -416,6 +421,13 @@ func _physics_process(delta: float) -> void:
 		if ai_state == "greeting" or ai_state == "acknowledging":
 			ai_state = "socializing"
 			wait_time = randf_range(2.0, 5.0)
+		elif ai_state == "seeking_food":
+			hunger = maxf(0.08, hunger - 0.68)
+			ai_state = "eating"
+			decision_reason = "أتناول الطعام وأستعيد طاقتي"
+			wait_time = randf_range(5.0, 9.0)
+		elif ai_state == "eating":
+			_choose_daily_goal(_current_hour())
 		elif ai_state == "commuting":
 			ai_state = "working"
 			wait_time = randf_range(8.0, 16.0)
