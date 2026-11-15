@@ -4,6 +4,7 @@ class_name MahdiaVehicle
 @export var acceleration := 9.0
 @export var max_speed := 9.0
 @export var reverse_speed := 4.0
+@export var build_visuals := true
 @export var turn_speed := 1.45
 var driver: CharacterBody3D
 var speed := 0.0
@@ -11,7 +12,8 @@ var steering_input := 0.0
 var wheels: Array[MeshInstance3D] = []
 
 func _ready() -> void:
-	_build_car()
+	if build_visuals:
+		_build_car()
 	var collision := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(2.0, 1.45, 3.8)
