@@ -531,10 +531,12 @@ func _build_hud() -> void:
 	setup_col.add_child(ai_endpoint_input)
 	ai_email_input = LineEdit.new()
 	ai_email_input.placeholder_text = "البريد الإلكتروني لحساب JASSIM"
-	ai_email_input.keyboard_type = LineEdit.KEYBOARD_TYPE_EMAIL_ADDRESS
+	ai_email_input.max_length = 254
+	ai_email_input.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_EMAIL_ADDRESS
 	setup_col.add_child(ai_email_input)
 	ai_password_input = LineEdit.new()
 	ai_password_input.placeholder_text = "كلمة المرور (10 أحرف على الأقل)"
+	ai_password_input.max_length = 256
 	ai_password_input.secret = true
 	setup_col.add_child(ai_password_input)
 	var auth_buttons := HBoxContainer.new()
