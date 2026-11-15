@@ -87,10 +87,8 @@ func _run_tests() -> void:
 	_check(is_equal_approx(float(life.get("energy")), 82.0), "sprinting consumes energy at a predictable rate")
 	life.set("energy", 0.0)
 	life.call("_apply_stamina", 1.0, true)
-	print("DEBUG stamina empty: energy=", life.get("energy"), " base_walk=", life.get("base_walk_speed"), " speed=", stamina_player.get("run_speed"), " player_ref=", life.get("player") == stamina_player)
 	_check(is_equal_approx(float(stamina_player.get("run_speed")), 2.6), "empty energy prevents sprint speed")
 	life.call("_apply_stamina", 2.0, false)
-	print("DEBUG stamina recovery: energy=", life.get("energy"), " base_run=", life.get("base_run_speed"), " speed=", stamina_player.get("run_speed"))
 	_check(is_equal_approx(float(life.get("energy")), 10.0) and is_equal_approx(float(stamina_player.get("run_speed")), 4.8), "resting restores energy and sprint speed")
 
 	var resident := CharacterBody3D.new()
