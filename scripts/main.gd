@@ -201,6 +201,7 @@ func _build_town() -> void:
 	_create_street_lamp(Vector3(6.5, 0, 8))
 	_create_street_lamp(Vector3(-8, 0, 6.5))
 	_create_street_lamp(Vector3(8, 0, -6.5))
+	_create_city_details()
 
 func _create_building(origin: Vector3, size: Vector3, wall_color: Color, seed_value: int) -> void:
 	# Keep each building intentionally lightweight: one body, one roof, one door,
@@ -442,3 +443,44 @@ func _apply_graphics_quality() -> void:
 		sun.visible = false
 	if is_instance_valid(world_environment):
 		world_environment.ambient_light_energy = [0.58, 0.78, 0.95][quality_level]
+
+
+func _create_city_details() -> void:
+	# Street-level details add scale and recognizable Mediterranean town character
+	# without textures, real-time lights, or costly physics bodies.
+	# Two compact bus shelters along the main avenue.
+	for i in range(2):
+		var x := -29.0 + float(i) * 58.0
+		var z := 13.0
+		_box(self, Vector3(4.2, 0.12, 1.65), Vector3(x, 2.15, z), Color(0.80, 0.83, 0.80))
+		for side in [-1.0, 1.0]:
+			_box(self, Vector3(0.12, 2.1, 0.12), Vector3(x + side * 1.95, 1.05, z), Color(0.22, 0.31, 0.32))
+		_box(self, Vector3(3.7, 0.10, 0.48), Vector3(x, 0.62, z + 0.35), Color(0.35, 0.25, 0.17))
+		_box(self, Vector3(0.85, 1.05, 0.08), Vector3(x - 1.35, 1.42, z - 0.78), Color(0.12, 0.34, 0.42))
+		_box(self, Vector3(0.92, 0.12, 0.12), Vector3(x - 1.35, 2.02, z - 0.70), Color(0.92, 0.84, 0.64))
+
+	# Low-cost traffic signals at the central crossing.
+	for corner in [Vector3(-6.2, 0, -6.2), Vector3(6.2, 0, 6.2)]:
+		_box(self, Vector3(0.12, 3.2, 0.12), corner + Vector3(0, 1.6, 0), Color(0.15, 0.17, 0.18))
+		_box(self, Vector3(0.48, 0.92, 0.30), corner + Vector3(0, 3.55, 0), Color(0.12, 0.13, 0.14))
+		_box(self, Vector3(0.19, 0.19, 0.08), corner + Vector3(0, 3.82, -0.17), Color(0.72, 0.16, 0.12))
+		_box(self, Vector3(0.19, 0.19, 0.08), corner + Vector3(0, 3.55, -0.17), Color(0.88, 0.66, 0.16))
+		_box(self, Vector3(0.19, 0.19, 0.08), corner + Vector3(0, 3.28, -0.17), Color(0.16, 0.58, 0.28))
+
+	# Planters, rubbish bins and short protective bollards on the promenade.
+	for i in range(6):
+		var x := -30.0 + float(i) * 12.0
+		_box(self, Vector3(1.35, 0.42, 0.72), Vector3(x, 0.28, -52.2), Color(0.58, 0.43, 0.30))
+		_box(self, Vector3(1.12, 0.22, 0.54), Vector3(x, 0.58, -52.2), Color(0.20, 0.40, 0.24))
+		if i % 2 == 0:
+			_box(self, Vector3(0.48, 0.85, 0.48), Vector3(x + 2.4, 0.53, -51.8), Color(0.16, 0.30, 0.31))
+	for i in range(12):
+		var x := -33.0 + float(i) * 6.0
+		_box(self, Vector3(0.22, 0.72, 0.22), Vector3(x, 0.42, -55.8), Color(0.78, 0.76, 0.68))
+
+	# Small storefront awnings make the ground-level blocks read as lived-in shops.
+	for i in range(5):
+		var x := -30.0 + float(i) * 15.0
+		var awning_color: Color = [Color(0.76, 0.22, 0.16), Color(0.88, 0.78, 0.58), Color(0.16, 0.40, 0.43)][i % 3]
+		_box(self, Vector3(3.2, 0.14, 1.05), Vector3(x, 3.0, 10.8), awning_color)
+		_box(self, Vector3(3.2, 0.12, 0.12), Vector3(x, 2.88, 11.28), Color(0.94, 0.88, 0.74))
