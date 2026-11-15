@@ -155,6 +155,22 @@ func _run_tests() -> void:
 	weather_system.call("set_weather", "ثلوج")
 	_check(str(weather_system.get("weather")) == "ممطر", "weather system rejects unsupported weather")
 
+	# Autonomous traffic cars follow the correct road axis and stay inside lane bounds.
+	var traffic := CharacterBody3D.new()
+	traffic.set_script(load("res://scripts/traffic_car.gd"))
+	traffic.set("build_visuals", false)
+	root.add_child(traffic)
+	traffic.call("configure_traffic", true, -1.65, 0.0, 1.0, 4.0)
+	traffic.call("_physics_process", 1.0)
+	_check(is_equal_approx(float(traffic.global_position.x), 4.0) and is_equal_approx(float(traffic.global_position.z), -1.65), "traffic car advances along the horizontal road lane")
+	traffic.call("configure_traffic", false, 1.65, 10.0, -1.0, 3.0)
+	traffic.call("_physics_process", 1.0)
+	_check(is_equal_approx(float(traffic.global_position.z), 7.0) and is_equal_approx(float(traffic.global_position.x), 1.65), "traffic car follows the vertical lane in reverse direction")
+	traffic.call("configure_traffic", true, -1.65, 77.5, 1.0, 4.0)
+	traffic.call("_physics_process", 1.0)
+	_check(float(traffic.global_position.x) < -70.0, "traffic car wraps safely at the end of the road")
+	traffic.queue_free()
+
 	print("Gameplay tests: ", total_checks - failures, "/", total_checks, " passed")
 	# Release scene resources before shutting down the headless renderer.
 	car.queue_free()
