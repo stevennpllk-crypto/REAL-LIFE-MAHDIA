@@ -69,6 +69,14 @@ func _run_tests() -> void:
 	car.call("exit_vehicle")
 	_check(car.get("driver") == null, "player can exit the vehicle")
 	_check(player.is_physics_processing() and player.visible, "player control and visibility return after exiting")
+	var detailed_car := CharacterBody3D.new()
+	detailed_car.set_script(load("res://scripts/vehicle.gd"))
+	detailed_car.set("build_visuals", true)
+	root.add_child(detailed_car)
+	await process_frame
+	_check(detailed_car.get("wheels").size() == 4, "detailed vehicle builds four independent wheels")
+	_check(detailed_car.get_child_count() >= 35, "vehicle includes body, cabin, lights, mirrors and trim")
+	detailed_car.queue_free()
 
 	var stamina_player := CharacterBody3D.new()
 	stamina_player.set_script(load("res://scripts/player.gd"))
@@ -122,7 +130,7 @@ func _run_tests() -> void:
 	weather_system.call("set_weather", "ثلوج")
 	_check(str(weather_system.get("weather")) == "ممطر", "weather system rejects unsupported weather")
 
-	print("Gameplay tests: ", 27 - failures, "/27 passed")
+	print("Gameplay tests: ", 29 - failures, "/29 passed")
 	# Release scene resources before shutting down the headless renderer.
 	car.queue_free()
 	player.queue_free()
