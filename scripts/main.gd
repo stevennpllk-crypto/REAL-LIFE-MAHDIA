@@ -31,6 +31,7 @@ func _ready() -> void:
 	# Bring up a playable camera and HUD before constructing decorative city blocks.
 	# This guarantees that even a slow phone can present a real game frame quickly.
 	_spawn_player()
+	_setup_systems()
 	_build_hud()
 	print("MAHDIA_PLAYER_READY")
 	await get_tree().process_frame
@@ -38,7 +39,6 @@ func _ready() -> void:
 	print("MAHDIA_TOWN_READY")
 	_spawn_residents()
 	_spawn_vehicle()
-	_setup_systems()
 	print("MAHDIA_WORLD_READY")
 
 func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
