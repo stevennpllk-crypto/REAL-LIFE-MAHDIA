@@ -70,6 +70,25 @@ func _run_tests() -> void:
 	_check(car.get("driver") == null, "player can exit the vehicle")
 	_check(player.is_physics_processing() and player.visible, "player control and visibility return after exiting")
 
+	var stamina_player := CharacterBody3D.new()
+	stamina_player.set_script(load("res://scripts/player.gd"))
+	stamina_player.set("build_visuals", false)
+	root.add_child(stamina_player)
+	await process_frame
+	var life := Node.new()
+	life.set_script(load("res://scripts/life_manager.gd"))
+	life.set("player", stamina_player)
+	life.set("base_run_speed", 4.8)
+	life.set("base_walk_speed", 2.6)
+	life.set("energy", 100.0)
+	life.call("_apply_stamina", 2.0, true)
+	_check(is_equal_approx(float(life.get("energy")), 82.0), "sprinting consumes energy at a predictable rate")
+	life.set("energy", 0.0)
+	life.call("_apply_stamina", 1.0, true)
+	_check(is_equal_approx(float(stamina_player.get("run_speed")), 2.6), "empty energy prevents sprint speed")
+	life.call("_apply_stamina", 2.0, false)
+	_check(is_equal_approx(float(life.get("energy")), 10.0) and is_equal_approx(float(stamina_player.get("run_speed")), 4.8), "resting restores energy and sprint speed")
+
 	var weather_system := Node.new()
 	weather_system.set_script(load("res://scripts/world_systems.gd"))
 	root.add_child(weather_system)
@@ -78,11 +97,13 @@ func _run_tests() -> void:
 	weather_system.call("set_weather", "ثلوج")
 	_check(str(weather_system.get("weather")) == "ممطر", "weather system rejects unsupported weather")
 
-	print("Gameplay tests: ", 18 - failures, "/18 passed")
+	print("Gameplay tests: ", 21 - failures, "/21 passed")
 	# Release scene resources before shutting down the headless renderer.
 	car.queue_free()
 	player.queue_free()
 	saver.queue_free()
 	weather_system.queue_free()
+	life.queue_free()
+	stamina_player.queue_free()
 	await process_frame
 	quit(0 if failures == 0 else 1)
