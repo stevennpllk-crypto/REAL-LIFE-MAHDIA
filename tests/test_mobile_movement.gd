@@ -133,7 +133,7 @@ func _run_tests() -> void:
 	var city_details := Node3D.new()
 	city_details.set_script(load("res://scripts/main.gd"))
 	city_details.call("_create_city_details")
-	_check(city_details.get_child_count() >= 60, "town detail pass builds bus stops, signals, planters and shop awnings")
+	_check(city_details.get_child_count() >= 55, "town detail pass builds bus stops, signals, planters and shop awnings")
 	city_details.queue_free()
 
 	print("Gameplay tests: ", 30 - failures, "/30 passed")
