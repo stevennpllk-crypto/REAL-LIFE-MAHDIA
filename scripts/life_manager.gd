@@ -154,6 +154,9 @@ func _nearest_resident() -> Node3D:
 	return nearest
 
 func _interact_resident(resident: Node3D) -> void:
+	if resident.has_method("on_player_interacted"):
+		resident.on_player_interacted()
+	var resident_dialogue := str(resident.call("get_dialogue")) if resident.has_method("get_dialogue") else str(resident.get("display_name"))
 	if delivery_state == "ready" and food > 0:
 		food -= 1
 		money += 20
@@ -163,11 +166,11 @@ func _interact_resident(resident: Node3D) -> void:
 	elif delivery_state == "accepted":
 		_set_message("المواطن ينتظر الوجبة. اشترها من متجر الحي ثم عد إليه.")
 	elif delivery_state == "completed":
-		_set_message("%s: يعطيك الصحة! ساعدتني كثيراً." % str(resident.get("display_name")))
+		_set_message("%s: يعطيك الصحة! ساعدتني كثيراً." % resident_dialogue)
 	else:
 		delivery_state = "accepted"
 		delivery_npc = resident
-		_set_message("%s: هل يمكنك إحضار وجبة من متجر الحي؟ المكافأة 20 د.ت!" % str(resident.get("display_name")))
+		_set_message("%s هل يمكنك إحضار وجبة من متجر الحي؟ المكافأة 20 د.ت!" % resident_dialogue)
 	save_now()
 
 func _set_message(value: String) -> void:
