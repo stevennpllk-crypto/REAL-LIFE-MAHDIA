@@ -28,6 +28,8 @@ var social_need := 0.45
 var curiosity := 0.55
 var decision_reason := "أبحث عن شيء أفعله"
 var need_update_elapsed := 0.0
+var social_scan_elapsed := 0.0
+var resident_relationships: Dictionary = {}
 var ai_state := "wander"
 var personal_seed := 0
 var turn_bias := 1.0
@@ -190,7 +192,11 @@ func _choose_daily_goal(hour: float) -> void:
 		decision_reason = "أحتاج إلى الراحة"
 	elif best_score == social_score:
 		ai_state = "socializing"
-		target_position = rest_position + _random_near(Vector3.ZERO) * 0.35
+		var known_resident := _nearest_resident(10.0)
+		if is_instance_valid(known_resident):
+			target_position = known_resident.global_position + Vector3(1.2, 0, 0.8)
+		else:
+			target_position = rest_position + _random_near(Vector3.ZERO) * 0.35
 		decision_reason = "أبحث عن رفقة وحديث"
 	elif best_score == work_score:
 		ai_state = "commuting"
@@ -205,6 +211,41 @@ func _choose_daily_goal(hour: float) -> void:
 		target_position = _random_near(home_position)
 		decision_reason = "أستكشف الحي"
 	wait_time = randf_range(0.5, 2.0)
+
+
+func _nearest_resident(max_distance: float) -> MahdiaNPC:
+	var nearest: MahdiaNPC
+	var best_distance := max_distance
+	for candidate in get_tree().get_nodes_in_group("mahdia_residents"):
+		if candidate == self or not is_instance_valid(candidate) or candidate.is_queued_for_deletion():
+			continue
+		var distance := global_position.distance_to(candidate.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			nearest = candidate as MahdiaNPC
+	return nearest
+
+func _update_social_awareness() -> void:
+	var other := _nearest_resident(7.0)
+	if not is_instance_valid(other):
+		return
+	var other_id := str(other.get("memory_id"))
+	if other_id.is_empty():
+		other_id = str(other.get("display_name"))
+	if other_id.is_empty():
+		return
+	var familiarity := clampf(float(resident_relationships.get(other_id, 0.0)), 0.0, 1.0)
+	var distance := global_position.distance_to(other.global_position)
+	if distance <= 2.4:
+		familiarity = clampf(familiarity + 0.012, 0.0, 1.0)
+		resident_relationships[other_id] = familiarity
+		if ai_state == "socializing" or social_need > 0.72:
+			social_need = clampf(social_need - 0.035, 0.0, 1.0)
+			other.set("social_need", clampf(float(other.get("social_need")) - 0.02, 0.0, 1.0))
+			decision_reason = "أتحدث مع %s وأتعرف إليه أكثر" % str(other.get("display_name"))
+			if ai_state != "working" and ai_state != "resting":
+				ai_state = "socializing"
+				wait_time = maxf(wait_time, 1.0)
 
 func _update_needs(delta: float) -> void:
 	hunger = clampf(hunger + delta * 0.00032, 0.0, 1.0)
@@ -252,13 +293,14 @@ func _load_memory() -> void:
 	energy = clampf(float(memory.get("energy", 0.82)), 0.0, 1.0)
 	social_need = clampf(float(memory.get("social_need", 0.45)), 0.0, 1.0)
 	curiosity = clampf(float(memory.get("curiosity", 0.55)), 0.0, 1.0)
+	resident_relationships = memory.get("relationships", {}).duplicate(true)
 
 func _save_memory() -> void:
 	if not is_instance_valid(memory_manager) or memory_id.is_empty():
 		return
 	var all_data: Dictionary = memory_manager.load_progress()
 	var memories: Dictionary = all_data.get("mahdia_npc_memory", {})
-	memories[memory_id] = {"meetings": memory_meetings, "mood": mood, "trust": trust, "hunger": hunger, "energy": energy, "social_need": social_need, "curiosity": curiosity}
+	memories[memory_id] = {"meetings": memory_meetings, "mood": mood, "trust": trust, "hunger": hunger, "energy": energy, "social_need": social_need, "curiosity": curiosity, "relationships": resident_relationships}
 	all_data["mahdia_npc_memory"] = memories
 	var result: Error = memory_manager.save_progress(all_data)
 	if result != OK:
@@ -335,6 +377,10 @@ func _physics_process(delta: float) -> void:
 	if need_update_elapsed >= 1.0:
 		_update_needs(need_update_elapsed)
 		need_update_elapsed = 0.0
+	social_scan_elapsed += delta
+	if social_scan_elapsed >= 2.0:
+		social_scan_elapsed = 0.0
+		_update_social_awareness()
 	decision_elapsed += delta
 	if decision_elapsed >= 4.0:
 		decision_elapsed = 0.0
