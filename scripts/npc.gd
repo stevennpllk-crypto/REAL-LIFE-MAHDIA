@@ -306,6 +306,21 @@ func _save_memory() -> void:
 	if result != OK:
 		push_warning("Could not save resident memory: %s" % error_string(result))
 
+func get_ai_context() -> Dictionary:
+	return {
+		"id": memory_id,
+		"name": display_name,
+		"personality": personality,
+		"occupation": occupation,
+		"mood": mood,
+		"trust": trust,
+		"hunger": hunger,
+		"energy": energy,
+		"social_need": social_need,
+		"meetings": memory_meetings,
+		"reason": decision_reason
+	}
+
 func get_dialogue() -> String:
 	var remembered := "أهلاً، تذكرتك!" if memory_meetings > 1 else "أهلاً بك."
 	if trust >= 0.55:
