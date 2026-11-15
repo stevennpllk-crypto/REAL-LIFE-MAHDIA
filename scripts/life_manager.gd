@@ -29,6 +29,9 @@ func set_ai_service(service: Node) -> void:
 		var callback := Callable(self, "_on_npc_ai_reply")
 		if not ai_service.is_connected("npc_reply", callback):
 			ai_service.connect("npc_reply", callback)
+		var status_callback := Callable(self, "_on_ai_connection_status")
+		if ai_service.has_signal("connection_status") and not ai_service.is_connected("connection_status", status_callback):
+			ai_service.connect("connection_status", status_callback)
 
 func send_player_message(message_text: String) -> void:
 	var clean_text := message_text.strip_edges()
@@ -44,6 +47,10 @@ func send_player_message(message_text: String) -> void:
 		return
 	_set_message("%s يفكر في الرد..." % str(active_resident.get("display_name")))
 	ai_service.call("request_npc_reply", active_resident, clean_text)
+
+func _on_ai_connection_status(ready: bool, status_text: String) -> void:
+	if not ready:
+		_set_message(status_text)
 
 func _on_npc_ai_reply(resident: Node3D, reply: String, success: bool) -> void:
 	if not is_instance_valid(resident):
