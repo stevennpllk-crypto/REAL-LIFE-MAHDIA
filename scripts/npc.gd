@@ -346,9 +346,19 @@ func _update_social_awareness() -> void:
 		# A pair can deepen its relationship at most once every 20 seconds.
 		if now_msec - last_encounter >= 20000:
 			social_encounter_cooldowns[other_id] = now_msec
+			# Store the encounter on both sides: relationships are reciprocal.
+			other.set("social_encounter_cooldowns", other.get("social_encounter_cooldowns"))
+			var other_cooldowns: Dictionary = other.get("social_encounter_cooldowns")
+			other_cooldowns[memory_id] = now_msec
+			other.set("social_encounter_cooldowns", other_cooldowns)
 			_record_experience("social", "قضيت وقتاً مع %s" % str(other.get("display_name")), 0.04)
 			familiarity = clampf(familiarity + 0.004, 0.0, 1.0)
 			resident_relationships[other_id] = familiarity
+			var other_relationships: Dictionary = other.get("resident_relationships").duplicate(true)
+			var my_id := memory_id if not memory_id.is_empty() else str(display_name)
+			var reverse_familiarity := clampf(float(other_relationships.get(my_id, 0.0)) + 0.004, 0.0, 1.0)
+			other_relationships[my_id] = reverse_familiarity
+			other.set("resident_relationships", other_relationships)
 			memory_dirty = true
 			if ai_state == "socializing" or social_need > 0.72:
 				social_need = clampf(social_need - 0.035, 0.0, 1.0)
