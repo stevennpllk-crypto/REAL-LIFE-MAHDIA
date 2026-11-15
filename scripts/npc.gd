@@ -188,9 +188,16 @@ func _choose_daily_goal(hour: float) -> void:
 	var home_score := 0.35 if hour >= 18.0 or hour < 6.0 else 0.08
 	var best_score := maxf(food_score, maxf(rest_score, maxf(social_score, maxf(explore_score, maxf(work_score, home_score)))))
 	if best_score == food_score:
-		ai_state = "seeking_food"
-		target_position = home_position + Vector3(3.2, 0, 2.0)
-		decision_reason = "أبحث عن طعام لأنني جائع"
+		var food_station := _nearest_food_station()
+		if is_instance_valid(food_station):
+			ai_state = "seeking_food"
+			# Approach the public entrance, not the building's centre.
+			target_position = food_station.global_position + Vector3(0, 0, 2.7)
+			decision_reason = "أتجه إلى مقهى الحي لأتناول الطعام"
+		else:
+			ai_state = "wandering"
+			target_position = _random_near(home_position)
+			decision_reason = "أبحث عن مكان يقدم الطعام"
 	elif best_score == rest_score:
 		ai_state = "resting"
 		target_position = rest_position
@@ -217,6 +224,18 @@ func _choose_daily_goal(hour: float) -> void:
 		decision_reason = "أستكشف الحي"
 	wait_time = randf_range(0.5, 2.0)
 
+
+func _nearest_food_station() -> Node3D:
+	var nearest: Node3D
+	var best_distance := INF
+	for station in get_tree().get_nodes_in_group("resident_food_stations"):
+		if not is_instance_valid(station) or station.is_queued_for_deletion():
+			continue
+		var distance := global_position.distance_to(station.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			nearest = station as Node3D
+	return nearest
 
 func _nearest_resident(max_distance: float) -> MahdiaNPC:
 	var nearest: MahdiaNPC
@@ -422,11 +441,12 @@ func _physics_process(delta: float) -> void:
 			ai_state = "socializing"
 			wait_time = randf_range(2.0, 5.0)
 		elif ai_state == "seeking_food":
-			hunger = maxf(0.08, hunger - 0.68)
 			ai_state = "eating"
-			decision_reason = "أتناول الطعام وأستعيد طاقتي"
+			decision_reason = "وصلت إلى مكان الطعام وأتناول وجبتي"
 			wait_time = randf_range(5.0, 9.0)
 		elif ai_state == "eating":
+			hunger = maxf(0.08, hunger - 0.68)
+			decision_reason = "أنهيت وجبتي وأشعر بتحسن"
 			_choose_daily_goal(_current_hour())
 		elif ai_state == "commuting":
 			ai_state = "working"
