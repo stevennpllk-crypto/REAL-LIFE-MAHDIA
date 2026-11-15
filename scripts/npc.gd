@@ -132,17 +132,17 @@ func _build_character() -> void:
 		head.material_override = _mat(skin)
 		head_visual.add_child(head)
 	# Hair cap, side locks, ears, nose, brows and eyes give faces readable depth.
-	var cap := _part(_sphere(0.195, 0.22), Vector3(0, 1.985, 0.015), hair)
+	var cap := _head_part(_sphere(0.195, 0.22), Vector3(0, 0.145, 0.015), hair)
 	cap.scale = Vector3(1.0, 0.62, 1.0)
-	_part(_sphere(0.055, 0.16), Vector3(-0.174, 1.84, 0), hair)
-	_part(_sphere(0.055, 0.16), Vector3(0.174, 1.84, 0), hair)
-	_part(_sphere(0.035, 0.055), Vector3(-0.184, 1.82, 0), skin)
-	_part(_sphere(0.035, 0.055), Vector3(0.184, 1.82, 0), skin)
-	eye_left = _part(_sphere(0.022, 0.03), Vector3(-0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
-	eye_right = _part(_sphere(0.022, 0.03), Vector3(0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
-	_part(_sphere(0.026, 0.045), Vector3(0, 1.82, -0.187), skin.lightened(0.04))
-	_part(_capsule(0.014, 0.075), Vector3(-0.068, 1.905, -0.174), hair)
-	_part(_capsule(0.014, 0.075), Vector3(0.068, 1.905, -0.174), hair)
+	_head_part(_sphere(0.055, 0.16), Vector3(-0.174, 0, 0), hair)
+	_head_part(_sphere(0.055, 0.16), Vector3(0.174, 0, 0), hair)
+	_head_part(_sphere(0.035, 0.055), Vector3(-0.184, -0.02, 0), skin)
+	_head_part(_sphere(0.035, 0.055), Vector3(0.184, -0.02, 0), skin)
+	eye_left = _head_part(_sphere(0.022, 0.03), Vector3(-0.068, 0.02, -0.175), Color(0.035, 0.025, 0.02))
+	eye_right = _head_part(_sphere(0.022, 0.03), Vector3(0.068, 0.02, -0.175), Color(0.035, 0.025, 0.02))
+	_head_part(_sphere(0.026, 0.045), Vector3(0, -0.02, -0.187), skin.lightened(0.04))
+	_head_part(_capsule(0.014, 0.075), Vector3(-0.068, 0.065, -0.174), hair)
+	_head_part(_capsule(0.014, 0.075), Vector3(0.068, 0.065, -0.174), hair)
 	_build_occupation_details()
 	left_arm = _limb(Vector3(-0.30, 1.43, 0), shirt, 0.62, 0.10)
 	right_arm = _limb(Vector3(0.30, 1.43, 0), shirt, 0.62, 0.10)
@@ -216,6 +216,14 @@ func _sphere(radius: float, height: float) -> SphereMesh:
 	mesh.radius = radius
 	mesh.height = height
 	return mesh
+
+func _head_part(mesh: Mesh, pos: Vector3, color: Color) -> MeshInstance3D:
+	var item := MeshInstance3D.new()
+	item.mesh = mesh
+	item.position = pos
+	item.material_override = _mat(color)
+	head_visual.add_child(item)
+	return item
 
 func _part(mesh: Mesh, pos: Vector3, color: Color) -> MeshInstance3D:
 	var item := MeshInstance3D.new()
