@@ -13,6 +13,8 @@ var default_endpoint := DEFAULT_ENDPOINT
 var endpoint := DEFAULT_ENDPOINT
 var bearer_token := ""
 var request_node: HTTPRequest
+var probe_node: HTTPRequest
+var probe_in_flight := false
 var active_resident: Node3D
 var request_in_flight := false
 
@@ -22,7 +24,13 @@ func _ready() -> void:
 	request_node.body_size_limit = 1024 * 1024
 	add_child(request_node)
 	request_node.request_completed.connect(_on_request_completed)
+	probe_node = HTTPRequest.new()
+	probe_node.timeout = 8.0
+	probe_node.body_size_limit = 65536
+	add_child(probe_node)
+	probe_node.request_completed.connect(_on_probe_completed)
 	_load_config()
+	check_readiness()
 
 func _load_config() -> void:
 	var config := ConfigFile.new()
@@ -49,7 +57,36 @@ func configure(new_endpoint: String, new_token: String) -> bool:
 	if result != OK:
 		push_warning("Could not save private AI connection settings: %s" % error_string(result))
 		return false
+	check_readiness()
 	return true
+
+func check_readiness() -> void:
+	if probe_in_flight or endpoint.is_empty() or not is_instance_valid(probe_node):
+		return
+	var error := probe_node.request(endpoint + "/ready", PackedStringArray(["Accept: application/json"]), HTTPClient.METHOD_GET)
+	if error == OK:
+		probe_in_flight = true
+	else:
+		connection_status.emit(false, "تعذر بدء فحص جاهزية خادم JASSIM: " + error_string(error))
+
+func _on_probe_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	probe_in_flight = false
+	if result != HTTPRequest.RESULT_SUCCESS:
+		connection_status.emit(false, "تعذر الوصول إلى خادم JASSIM AI")
+		return
+	var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
+	if not (parsed is Dictionary):
+		connection_status.emit(false, "رد فحص الخادم غير صالح")
+		return
+	var model_ready := bool(parsed.get("ready", false))
+	var ollama_ready := bool(parsed.get("ollama_reachable", false))
+	var external_ready := bool(parsed.get("external_provider_ready", false))
+	if response_code == 200 and model_ready:
+		connection_status.emit(true, "خادم JASSIM والنموذج جاهزان" if is_configured() else "الخادم والنموذج جاهزان؛ أضف رمز جلسة الحساب")
+	elif response_code == 503 or not model_ready:
+		connection_status.emit(false, "الخادم متصل لكن نموذج الذكاء غير جاهز (Ollama: %s، مزود خارجي: %s)" % ["جاهز" if ollama_ready else "غير جاهز", "جاهز" if external_ready else "غير مفعّل"])
+	else:
+		connection_status.emit(false, "فشل فحص جاهزية الخادم: HTTP %d" % response_code)
 
 func is_configured() -> bool:
 	return not endpoint.is_empty() and not bearer_token.is_empty()
