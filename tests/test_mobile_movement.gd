@@ -33,6 +33,10 @@ func _run_tests() -> void:
 	player.call("set_mobile_move", Vector2(0.0, 1.0))
 	var vertical: Vector2 = player.get("move_vector")
 	_check(vertical.x == 0.0 and vertical.y > 0.0, "joystick direction is preserved")
+	player.global_position = Vector3(0, 0, -65)
+	_check(bool(player.call("is_in_water")), "player enters the sea swimming zone")
+	player.global_position = Vector3(0, 0, -40)
+	_check(not bool(player.call("is_in_water")), "player leaves the swimming zone at the shore")
 
 	player.call("set_mobile_run", true)
 	_check(player.get("running") == true, "run button state is accepted")
@@ -71,5 +75,5 @@ func _run_tests() -> void:
 	weather_system.call("set_weather", "ثلوج")
 	_check(str(weather_system.get("weather")) == "ممطر", "weather system rejects unsupported weather")
 
-	print("Gameplay tests: ", 16 - failures, "/16 passed")
+	print("Gameplay tests: ", 18 - failures, "/18 passed")
 	quit(0 if failures == 0 else 1)
