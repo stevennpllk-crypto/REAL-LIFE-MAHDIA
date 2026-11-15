@@ -9,6 +9,7 @@ var save_manager: Node
 var money := 100
 var food := 0
 var energy := 100.0
+var hunger := 100.0
 var message := "اقترب من مكان واضغط تفاعل"
 var stations: Array[Dictionary] = []
 var job_claimed := false
@@ -22,7 +23,8 @@ func setup(target: CharacterBody3D, saver: Node) -> void:
 	var data: Dictionary = saved.get(SAVE_KEY, {})
 	money = int(data.get("money", 100))
 	food = int(data.get("food", 0))
-	energy = float(data.get("energy", 100.0))
+	energy = clampf(float(data.get("energy", 100.0)), 0.0, 100.0)
+	hunger = clampf(float(data.get("hunger", 100.0)), 0.0, 100.0)
 	job_claimed = bool(data.get("job_claimed", false))
 	delivery_state = str(data.get("delivery_state", "not_started"))
 	_create_station("مقهى الميناء", "cafe", Vector3(-12, 0, -5), Color(0.65, 0.28, 0.12))
@@ -87,8 +89,13 @@ func try_interact() -> void:
 			else:
 				_set_message("رصيدك لا يكفي للقهوة. تحتاج 5 د.ت.")
 		"home":
-			energy = 100.0
-			_set_message("استرحت في منزلك واستعدت كامل الطاقة.")
+			energy = minf(100.0, energy + 45.0)
+			if food > 0:
+				food -= 1
+				hunger = minf(100.0, hunger + 35.0)
+				_set_message("تناولت وجبة في منزلك واستعدت طاقتك. الجوع %d%%" % int(hunger))
+			else:
+				_set_message("استرحت في منزلك واستعدت بعض الطاقة. اشترِ طعاماً لتخفيف الجوع.")
 		"job":
 			if not job_claimed:
 				money += 30
@@ -152,7 +159,15 @@ func _save() -> void:
 			"money": money,
 			"food": food,
 			"energy": energy,
+		"hunger": hunger,
 			"job_claimed": job_claimed,
 			"delivery_state": delivery_state
 		}
 		save_manager.save_progress(all_data)
+
+
+func _process(delta: float) -> void:
+	# Hunger advances slowly in real time so short play sessions remain comfortable.
+	hunger = maxf(0.0, hunger - delta * 0.025)
+	if hunger <= 0.0:
+		energy = maxf(0.0, energy - delta * 0.01)
