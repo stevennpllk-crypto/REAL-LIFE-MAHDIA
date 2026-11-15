@@ -27,6 +27,8 @@ var life_manager: Node
 var ai_service: Node
 var chat_input: LineEdit
 var ai_endpoint_input: LineEdit
+var ai_email_input: LineEdit
+var ai_password_input: LineEdit
 var ai_token_input: LineEdit
 var ai_setup_panel: PanelContainer
 var planet_navigation: Node
@@ -410,6 +412,7 @@ func _setup_systems() -> void:
 	ai_service.set_script(AI_SERVICE_SCRIPT)
 	add_child(ai_service)
 	ai_service.connection_status.connect(_on_ai_connection_status)
+	ai_service.auth_completed.connect(_on_ai_auth_completed)
 	life_manager.set_ai_service(ai_service)
 	_restore_world_progress()
 	_apply_graphics_quality()
@@ -513,29 +516,52 @@ func _build_hud() -> void:
 	ai_setup_panel.anchor_bottom = 0.5
 	ai_setup_panel.offset_left = -230
 	ai_setup_panel.offset_right = 230
-	ai_setup_panel.offset_top = -145
-	ai_setup_panel.offset_bottom = 145
+	ai_setup_panel.offset_top = -205
+	ai_setup_panel.offset_bottom = 205
 	ai_setup_panel.visible = false
 	layer.add_child(ai_setup_panel)
 	var setup_col := VBoxContainer.new()
 	ai_setup_panel.add_child(setup_col)
 	var setup_title := Label.new()
-	setup_title.text = "ربط ذكاء JASSIM AI الخاص"
+	setup_title.text = "ربط سكان المهدية بالذكاء الاصطناعي المجاني"
 	setup_col.add_child(setup_title)
 	ai_endpoint_input = LineEdit.new()
-	ai_endpoint_input.placeholder_text = "https://عنوان-خادمك"
+	ai_endpoint_input.placeholder_text = "عنوان خادم JASSIM"
 	ai_endpoint_input.text = str(ai_service.get("default_endpoint"))
 	setup_col.add_child(ai_endpoint_input)
+	ai_email_input = LineEdit.new()
+	ai_email_input.placeholder_text = "البريد الإلكتروني لحساب JASSIM"
+	ai_email_input.keyboard_type = LineEdit.KEYBOARD_TYPE_EMAIL_ADDRESS
+	setup_col.add_child(ai_email_input)
+	ai_password_input = LineEdit.new()
+	ai_password_input.placeholder_text = "كلمة المرور (10 أحرف على الأقل)"
+	ai_password_input.secret = true
+	setup_col.add_child(ai_password_input)
+	var auth_buttons := HBoxContainer.new()
+	var login_button := Button.new()
+	login_button.text = "تسجيل الدخول"
+	login_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	login_button.pressed.connect(func(): _login_ai_account(false))
+	auth_buttons.add_child(login_button)
+	var register_button := Button.new()
+	register_button.text = "إنشاء حساب مجاني"
+	register_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	register_button.pressed.connect(func(): _login_ai_account(true))
+	auth_buttons.add_child(register_button)
+	setup_col.add_child(auth_buttons)
+	var token_note := Label.new()
+	token_note.text = "أو أدخل رمز جلسة موجوداً:"
+	setup_col.add_child(token_note)
 	ai_token_input = LineEdit.new()
-	ai_token_input.placeholder_text = "رمز جلسة JASSIM (Bearer)"
+	ai_token_input.placeholder_text = "رمز جلسة JASSIM (اختياري)"
 	ai_token_input.secret = true
 	setup_col.add_child(ai_token_input)
 	var setup_note := Label.new()
-	setup_note.text = "الاتصال مشفّر عبر HTTPS. تُحفظ جلسة الحساب محلياً؛ لا تضع رمز الإدارة العام هنا."
+	setup_note.text = "المحادثات العادية تبقى خاصة؛ شخصيات اللعبة فقط تستخدم مزود الذكاء المجاني. لا تضع رمز الإدارة العام هنا."
 	setup_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	setup_col.add_child(setup_note)
 	var save_ai_button := Button.new()
-	save_ai_button.text = "حفظ إعدادات الاتصال"
+	save_ai_button.text = "حفظ رمز الجلسة"
 	save_ai_button.pressed.connect(_save_ai_settings)
 	setup_col.add_child(save_ai_button)
 	var close_ai_button := Button.new()
@@ -571,6 +597,23 @@ func _send_chat_message(value: String) -> void:
 func _toggle_ai_setup() -> void:
 	if is_instance_valid(ai_setup_panel):
 		ai_setup_panel.visible = not ai_setup_panel.visible
+
+func _login_ai_account(create_account: bool) -> void:
+	if not is_instance_valid(ai_service):
+		return
+	var new_endpoint := ai_endpoint_input.text.strip_edges()
+	if not new_endpoint.begins_with("https://") or new_endpoint.ends_with("/api/chat"):
+		_on_ai_auth_completed(false, "عنوان الخادم غير صالح؛ استخدم رابط HTTPS الأساسي")
+		return
+	ai_service.set("endpoint", new_endpoint.trim_suffix("/"))
+	ai_service.authenticate_account(ai_email_input.text, ai_password_input.text, create_account)
+
+func _on_ai_auth_completed(success: bool, message: String) -> void:
+	_on_ai_connection_status(success, message)
+	if success:
+		ai_password_input.clear()
+		ai_token_input.clear()
+		ai_setup_panel.visible = false
 
 func _save_ai_settings() -> void:
 	if not is_instance_valid(ai_service):
