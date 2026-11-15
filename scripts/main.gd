@@ -89,15 +89,25 @@ func _build_environment() -> void:
 	sun.shadow_enabled = false
 	add_child(sun)
 
+	# Solid land stops at the shoreline; the sea area remains swimmable.
 	var ground := StaticBody3D.new()
-	_box(ground, Vector3(180, 1, 180), Vector3(0, -0.55, 0), Color(0.72, 0.66, 0.53))
+	_box(ground, Vector3(180, 1, 120), Vector3(0, -0.55, 30), Color(0.72, 0.66, 0.53))
 	var floor_shape := CollisionShape3D.new()
 	var floor_box := BoxShape3D.new()
-	floor_box.size = Vector3(180, 1, 180)
+	floor_box.size = Vector3(180, 1, 120)
 	floor_shape.shape = floor_box
-	floor_shape.position.y = -0.55
+	floor_shape.position = Vector3(0, -0.55, 30)
 	ground.add_child(floor_shape)
 	add_child(ground)
+	var shore := StaticBody3D.new()
+	_box(shore, Vector3(180, 1, 29), Vector3(0, -0.55, -44.5), Color(0.82, 0.76, 0.64))
+	var shore_shape := CollisionShape3D.new()
+	var shore_box := BoxShape3D.new()
+	shore_box.size = Vector3(180, 1, 29)
+	shore_shape.shape = shore_box
+	shore_shape.position = Vector3(0, -0.55, -44.5)
+	shore.add_child(shore_shape)
+	add_child(shore)
 
 	# Mediterranean sea and a pale coastal promenade.
 	_box(self, Vector3(180, 0.16, 38), Vector3(0, -0.02, -78), Color(0.035, 0.34, 0.56))
