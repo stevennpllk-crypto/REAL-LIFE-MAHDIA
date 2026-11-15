@@ -78,10 +78,59 @@ func _build_character() -> void:
 	_part(_sphere(0.198, 0.17), Vector3(0, 1.97, 0.015), Color(0.09, 0.065, 0.05))
 	_part(_sphere(0.022, 0.03), Vector3(-0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
 	_part(_sphere(0.022, 0.03), Vector3(0.068, 1.86, -0.175), Color(0.035, 0.025, 0.02))
+	_build_occupation_details()
 	left_arm = _limb(Vector3(-0.30, 1.43, 0), shirt, 0.62, 0.10)
 	right_arm = _limb(Vector3(0.30, 1.43, 0), shirt, 0.62, 0.10)
 	left_leg = _limb(Vector3(-0.14, 0.76, 0), Color(0.12, 0.14, 0.18), 0.72, 0.12)
 	right_leg = _limb(Vector3(0.14, 0.76, 0), Color(0.12, 0.14, 0.18), 0.72, 0.12)
+
+func _build_occupation_details() -> void:
+	# Distinct, inexpensive silhouettes make residents identifiable at a glance.
+	var details := Node3D.new()
+	details.name = "OccupationDetails"
+	visual_root.add_child(details)
+	match occupation:
+		"fisher":
+			_detail_cylinder(details, 0.19, 0.12, Vector3(0, 2.08, 0), Color(0.12, 0.30, 0.42))
+			_detail_box(details, Vector3(0.42, 0.07, 0.32), Vector3(0, 2.04, -0.02), Color(0.12, 0.30, 0.42))
+			_detail_box(details, Vector3(0.40, 0.48, 0.06), Vector3(0, 1.18, 0.25), Color(0.42, 0.28, 0.16))
+		"shopkeeper":
+			_detail_box(details, Vector3(0.43, 0.60, 0.055), Vector3(0, 1.17, -0.245), Color(0.16, 0.31, 0.27))
+			_detail_box(details, Vector3(0.08, 0.42, 0.06), Vector3(-0.17, 1.52, -0.245), Color(0.16, 0.31, 0.27))
+		"mechanic":
+			_detail_box(details, Vector3(0.55, 0.14, 0.32), Vector3(0, 0.91, 0), Color(0.20, 0.19, 0.16))
+			_detail_box(details, Vector3(0.18, 0.16, 0.08), Vector3(0.17, 0.91, -0.20), Color(0.78, 0.55, 0.16))
+		"student":
+			_detail_box(details, Vector3(0.42, 0.56, 0.22), Vector3(0, 1.25, 0.25), Color(0.18, 0.24, 0.34))
+			_detail_box(details, Vector3(0.08, 0.42, 0.08), Vector3(-0.22, 1.31, 0.05), Color(0.18, 0.24, 0.34))
+		"cook":
+			_detail_cylinder(details, 0.17, 0.22, Vector3(0, 2.12, 0), Color(0.93, 0.91, 0.84))
+			_detail_box(details, Vector3(0.44, 0.62, 0.055), Vector3(0, 1.17, -0.245), Color(0.88, 0.84, 0.72))
+		"driver":
+			_detail_box(details, Vector3(0.38, 0.10, 0.32), Vector3(0, 2.05, 0), Color(0.16, 0.20, 0.25))
+			_detail_box(details, Vector3(0.44, 0.06, 0.26), Vector3(0, 1.99, -0.06), Color(0.16, 0.20, 0.25))
+		_:
+			_detail_box(details, Vector3(0.42, 0.12, 0.30), Vector3(0, 1.66, 0), Color(0.78, 0.68, 0.48))
+
+func _detail_box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> void:
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	var item := MeshInstance3D.new()
+	item.mesh = mesh
+	item.position = pos
+	item.material_override = _mat(color)
+	parent.add_child(item)
+
+func _detail_cylinder(parent: Node3D, radius: float, height: float, pos: Vector3, color: Color) -> void:
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius * 0.92
+	mesh.bottom_radius = radius
+	mesh.height = height
+	var item := MeshInstance3D.new()
+	item.mesh = mesh
+	item.position = pos
+	item.material_override = _mat(color)
+	parent.add_child(item)
 
 func _capsule(radius: float, height: float) -> CapsuleMesh:
 	var mesh := CapsuleMesh.new()
