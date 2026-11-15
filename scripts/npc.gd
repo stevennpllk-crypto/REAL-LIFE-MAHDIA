@@ -21,6 +21,13 @@ var decision_elapsed := 0.0
 var memory_meetings := 0
 var last_player_interaction := -1000.0
 var mood := 0.5
+var trust := 0.0
+var hunger := 0.18
+var energy := 0.82
+var social_need := 0.45
+var curiosity := 0.55
+var decision_reason := "أبحث عن شيء أفعله"
+var need_update_elapsed := 0.0
 var ai_state := "wander"
 var personal_seed := 0
 var turn_bias := 1.0
@@ -170,20 +177,47 @@ func _current_hour() -> float:
 	return 12.0
 
 func _choose_daily_goal(hour: float) -> void:
-	# A lightweight utility AI: every resident follows a personal daily routine.
-	if hour >= 7.0 and hour < 12.0:
-		ai_state = "commuting" if occupation != "resident" else "socializing"
-		target_position = work_position if occupation != "resident" else rest_position
-	elif hour >= 12.0 and hour < 14.0:
+	# Utility-based autonomous decision: needs compete with routine and personality.
+	var rest_score := (1.0 - energy) * 1.25 + (0.22 if hour >= 22.0 or hour < 6.0 else 0.0)
+	var social_score := social_need * (1.2 if personality in ["friendly", "curious"] else 0.8)
+	var explore_score := curiosity * (1.25 if personality == "curious" else 0.75)
+	var work_score := 0.72 if occupation != "resident" and hour >= 7.0 and hour < 17.0 else 0.12
+	var home_score := 0.35 if hour >= 18.0 or hour < 6.0 else 0.08
+	var best_score := maxf(rest_score, maxf(social_score, maxf(explore_score, maxf(work_score, home_score))))
+	if best_score == rest_score:
 		ai_state = "resting"
 		target_position = rest_position
-	elif hour >= 14.0 and hour < 18.0:
-		ai_state = "working" if occupation != "resident" else "wandering"
-		target_position = work_position if occupation != "resident" else _random_near(home_position)
-	else:
+		decision_reason = "أحتاج إلى الراحة"
+	elif best_score == social_score:
+		ai_state = "socializing"
+		target_position = rest_position + _random_near(Vector3.ZERO) * 0.35
+		decision_reason = "أبحث عن رفقة وحديث"
+	elif best_score == work_score:
+		ai_state = "commuting"
+		target_position = work_position
+		decision_reason = "حان وقت العمل"
+	elif best_score == home_score:
 		ai_state = "going_home"
 		target_position = home_position
+		decision_reason = "أريد العودة إلى المنزل"
+	else:
+		ai_state = "wandering"
+		target_position = _random_near(home_position)
+		decision_reason = "أستكشف الحي"
 	wait_time = randf_range(0.5, 2.0)
+
+func _update_needs(delta: float) -> void:
+	hunger = clampf(hunger + delta * 0.00032, 0.0, 1.0)
+	energy = clampf(energy - delta * (0.00020 if ai_state != "resting" else -0.00085), 0.0, 1.0)
+	social_need = clampf(social_need + delta * 0.00024, 0.0, 1.0)
+	curiosity = clampf(curiosity + delta * 0.00012, 0.0, 1.0)
+	if ai_state == "resting":
+		energy = clampf(energy + delta * 0.0010, 0.0, 1.0)
+		social_need = clampf(social_need - delta * 0.00012, 0.0, 1.0)
+	elif ai_state == "socializing":
+		social_need = clampf(social_need - delta * 0.0009, 0.0, 1.0)
+	elif ai_state == "working":
+		curiosity = clampf(curiosity - delta * 0.00015, 0.0, 1.0)
 
 func _random_near(center: Vector3) -> Vector3:
 	var angle := randf() * TAU
@@ -199,6 +233,10 @@ func on_player_interacted() -> void:
 	memory_meetings += 1
 	last_player_interaction = Time.get_ticks_msec() / 1000.0
 	mood = clampf(mood + 0.12, 0.0, 1.0)
+	trust = clampf(trust + (0.10 if personality != "shy" else 0.045), 0.0, 1.0)
+	social_need = clampf(social_need - 0.28, 0.0, 1.0)
+	curiosity = clampf(curiosity + 0.08, 0.0, 1.0)
+	decision_reason = "تحدثت مع اللاعب وأتذكر اللقاء"
 	_save_memory()
 
 func _load_memory() -> void:
@@ -209,13 +247,18 @@ func _load_memory() -> void:
 	var memory: Dictionary = memories.get(memory_id, {})
 	memory_meetings = maxi(0, int(memory.get("meetings", 0)))
 	mood = clampf(float(memory.get("mood", 0.5)), 0.0, 1.0)
+	trust = clampf(float(memory.get("trust", 0.0)), 0.0, 1.0)
+	hunger = clampf(float(memory.get("hunger", 0.18)), 0.0, 1.0)
+	energy = clampf(float(memory.get("energy", 0.82)), 0.0, 1.0)
+	social_need = clampf(float(memory.get("social_need", 0.45)), 0.0, 1.0)
+	curiosity = clampf(float(memory.get("curiosity", 0.55)), 0.0, 1.0)
 
 func _save_memory() -> void:
 	if not is_instance_valid(memory_manager) or memory_id.is_empty():
 		return
 	var all_data: Dictionary = memory_manager.load_progress()
 	var memories: Dictionary = all_data.get("mahdia_npc_memory", {})
-	memories[memory_id] = {"meetings": memory_meetings, "mood": mood}
+	memories[memory_id] = {"meetings": memory_meetings, "mood": mood, "trust": trust, "hunger": hunger, "energy": energy, "social_need": social_need, "curiosity": curiosity}
 	all_data["mahdia_npc_memory"] = memories
 	var result: Error = memory_manager.save_progress(all_data)
 	if result != OK:
@@ -223,6 +266,12 @@ func _save_memory() -> void:
 
 func get_dialogue() -> String:
 	var remembered := "أهلاً، تذكرتك!" if memory_meetings > 1 else "أهلاً بك."
+	if trust >= 0.55:
+		remembered = "سعيد برؤيتك مجدداً، أصبحتَ مألوفاً لدي."
+	if energy < 0.2:
+		return remembered + " أشعر بالتعب وأحتاج إلى الراحة."
+	if hunger > 0.78:
+		return remembered + " أشعر بالجوع، سأبحث عن طعام."
 	match personality:
 		"shy":
 			return remembered + " أنا خجول قليلاً، لكن تفضل."
@@ -282,6 +331,10 @@ func _avoid_obstacle(direction: Vector3, delta: float) -> Vector3:
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= 9.8 * delta
+	need_update_elapsed += delta
+	if need_update_elapsed >= 1.0:
+		_update_needs(need_update_elapsed)
+		need_update_elapsed = 0.0
 	decision_elapsed += delta
 	if decision_elapsed >= 4.0:
 		decision_elapsed = 0.0
