@@ -82,6 +82,33 @@ func _build_visuals() -> void:
 			wheel.material_override = rubber
 			add_child(wheel)
 
+			var hub := MeshInstance3D.new()
+			var hub_mesh := CylinderMesh.new()
+			hub_mesh.top_radius = 0.13
+			hub_mesh.bottom_radius = 0.13
+			hub_mesh.height = 0.18
+			hub.mesh = hub_mesh
+			hub.position = wheel.position
+			hub.rotation_degrees.z = 90
+			var hub_material := StandardMaterial3D.new()
+			hub_material.albedo_color = Color(0.52, 0.55, 0.57)
+			hub_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			hub.material_override = hub_material
+			add_child(hub)
+	# Bumpers, grille, plates, mirrors and side glass add a recognisable car silhouette.
+	var trim := StandardMaterial3D.new()
+	trim.albedo_color = Color(0.12, 0.14, 0.15)
+	trim.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_add_ellipsoid(Vector3(1.58, 0.14, 0.16), Vector3(0, 0.43, -1.60), trim)
+	_add_ellipsoid(Vector3(1.58, 0.14, 0.16), Vector3(0, 0.43, 1.60), trim)
+	_add_ellipsoid(Vector3(0.72, 0.18, 0.055), Vector3(0, 0.67, -1.63), trim)
+	_add_ellipsoid(Vector3(0.48, 0.12, 0.045), Vector3(0, 0.55, 1.68), glass)
+	for side in [-1.0, 1.0]:
+		_add_ellipsoid(Vector3(0.055, 0.30, 0.62), Vector3(side * 0.67, 1.10, -0.10), glass)
+		_add_ellipsoid(Vector3(0.22, 0.12, 0.16), Vector3(side * 0.88, 1.24, -0.66), paint)
+		_add_ellipsoid(Vector3(0.055, 0.055, 0.12), Vector3(side * 0.90, 1.24, -0.66), glass)
+		_add_ellipsoid(Vector3(0.055, 0.035, 0.46), Vector3(side * 0.86, 0.54, 0.0), trim)
+
 func _add_ellipsoid(size: Vector3, pos: Vector3, material: Material) -> MeshInstance3D:
 	var item := MeshInstance3D.new()
 	var mesh := SphereMesh.new()
