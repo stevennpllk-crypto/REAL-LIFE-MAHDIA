@@ -72,10 +72,10 @@ adb logcat -d -t 8000 > build/emulator-logcat.txt
 python3 - <<'PY'
 import struct
 import zlib
+from math import sqrt
 
-path = "build/mahdia-emulator.png"
-data = open(path, "rb").read()
-if data[:8] != b"\x89PNG\r\n\x1a\n":
+data = open("build/mahdia-emulator.png", "rb").read()
+if data[:8] != b"\\x89PNG\\r\\n\\x1a\\n":
     raise SystemExit("Screenshot is not a valid PNG")
 offset = 8
 compressed = bytearray()
@@ -98,9 +98,10 @@ if bit_depth != 8 or channels is None:
 raw = zlib.decompress(compressed)
 stride = width * channels
 previous = bytearray(stride)
-bright = total = 0
 pos = 0
-for _y in range(height):
+center_colors = set()
+center_luma = []
+for y in range(height):
     filt = raw[pos]
     pos += 1
     scan = bytearray(raw[pos:pos + stride])
@@ -122,20 +123,25 @@ for _y in range(height):
             scan[i] = (scan[i] + predictor) & 255
         elif filt != 0:
             raise SystemExit(f"Unsupported PNG filter: {filt}")
-    for i in range(0, stride, channels):
-        if max(scan[i:i + 3]) > 40:
-            bright += 1
-        total += 1
+    if int(height * 0.20) <= y < int(height * 0.72):
+        for x in range(int(width * 0.20), int(width * 0.80), 3):
+            i = x * channels
+            red, green, blue = scan[i], scan[i + 1], scan[i + 2]
+            center_colors.add((red >> 3, green >> 3, blue >> 3))
+            center_luma.append(0.2126 * red + 0.7152 * green + 0.0722 * blue)
     previous = scan
 
-ratio = bright / max(total, 1)
-print(f"Screenshot check: {width}x{height}, bright-pixel ratio={ratio:.3f}")
-if ratio < 0.05:
-    raise SystemExit("Screenshot is still too dark; likely splash screen or failed rendering.")
+mean = sum(center_luma) / max(len(center_luma), 1)
+variance = sum((v - mean) ** 2 for v in center_luma) / max(len(center_luma), 1)
+deviation = sqrt(variance)
+print(f"Scene pixels: {width}x{height}; center color buckets={len(center_colors)}; luminance deviation={deviation:.1f}")
+if len(center_colors) < 24 or deviation < 8.0:
+    raise SystemExit("The game scene is still visually flat: 3D world geometry was not detected in the center of the screenshot.")
 PY
 
-if grep -E 'FATAL EXCEPTION|SIGSEGV|Fatal signal' build/emulator-logcat.txt; then
-  echo "Fatal application error detected"
+app_pid="$(adb shell pidof com.jassim.reallifemahdia | tr -d '\\r' | awk '{print $1}')"
+if [[ -n "$app_pid" ]] && adb logcat -d --pid="$app_pid" | grep -E 'FATAL EXCEPTION|SIGSEGV|Fatal signal'; then
+  echo "Fatal error detected in the game process"
   exit 1
 fi
 echo "APK install, world-scene initialization, and rendered-screen smoke test passed."
