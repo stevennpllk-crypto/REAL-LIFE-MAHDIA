@@ -24,6 +24,7 @@ var right_arm: Node3D
 var left_leg: Node3D
 var right_leg: Node3D
 var animation_clock := 0.0
+var idle_clock := 0.0
 var camera_drag_finger := -1
 var is_swimming := false
 
@@ -231,7 +232,10 @@ func _animate_figure(delta: float, moving: bool, speed: float) -> void:
 		left_leg.rotation.x = -swing * 0.85
 		right_leg.rotation.x = swing * 0.85
 	else:
-		left_arm.rotation.x = lerpf(left_arm.rotation.x, 0.0, delta * 8.0)
-		right_arm.rotation.x = lerpf(right_arm.rotation.x, 0.0, delta * 8.0)
+		idle_clock += delta
+		var breath := sin(idle_clock * 1.35) * 0.018
+		left_arm.rotation.x = lerpf(left_arm.rotation.x, breath, delta * 5.0)
+		right_arm.rotation.x = lerpf(right_arm.rotation.x, breath, delta * 5.0)
 		left_leg.rotation.x = lerpf(left_leg.rotation.x, 0.0, delta * 8.0)
 		right_leg.rotation.x = lerpf(right_leg.rotation.x, 0.0, delta * 8.0)
+	visual_root.position.y = lerpf(visual_root.position.y, 0.0 if moving else sin(idle_clock * 1.35) * 0.006, delta * 6.0)
