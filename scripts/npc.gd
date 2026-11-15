@@ -24,6 +24,8 @@ var mood := 0.5
 var ai_state := "wander"
 var personal_seed := 0
 var turn_bias := 1.0
+var obstacle_check_elapsed := 0.0
+var obstacle_steering := Vector3.ZERO
 var left_arm: Node3D
 var right_arm: Node3D
 var left_leg: Node3D
@@ -257,17 +259,25 @@ func _player_decision() -> bool:
 				return true
 	return false
 
-func _avoid_obstacle(direction: Vector3) -> Vector3:
+func _avoid_obstacle(direction: Vector3, delta: float) -> Vector3:
 	if direction.length_squared() < 0.01:
 		return direction
+	# Eight residents do not need eight raycasts every rendered frame.
+	# Reuse the last steering result and refresh it four times per second.
+	obstacle_check_elapsed += delta
+	if obstacle_check_elapsed < 0.25:
+		return obstacle_steering if obstacle_steering.length_squared() > 0.01 else direction
+	obstacle_check_elapsed = 0.0
 	var origin := global_position + Vector3.UP * 0.8
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction.normalized() * 1.6)
 	query.exclude = [get_rid()]
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
+		obstacle_steering = direction
 		return direction
 	var side := Vector3(-direction.z, 0, direction.x) * turn_bias
-	return (direction + side * 1.8).normalized()
+	obstacle_steering = (direction + side * 1.8).normalized()
+	return obstacle_steering
 
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
@@ -303,7 +313,7 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		_animate(delta, false)
 		return
-	direction = _avoid_obstacle(direction.normalized())
+	direction = _avoid_obstacle(direction.normalized(), delta)
 	var pace := walk_speed * (0.72 if ai_state == "avoiding" else 1.0)
 	velocity.x = direction.x * pace
 	velocity.z = direction.z * pace
