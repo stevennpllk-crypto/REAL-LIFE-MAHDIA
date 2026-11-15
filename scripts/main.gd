@@ -278,6 +278,7 @@ func _build_hud() -> void:
 	quality_button.focus_mode = Control.FOCUS_NONE
 	quality_button.pressed.connect(_cycle_graphics_quality)
 	layer.add_child(quality_button)
+	_apply_graphics_quality()
 	hint_label = Label.new()
 	hint_label.text = "عصا اللمس للحركة • اسحب يمين الشاشة لتحريك الكاميرا • تفاعل • جري • قفز"
 	hint_label.position = Vector2(16, 78)
