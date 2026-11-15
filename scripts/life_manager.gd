@@ -18,9 +18,13 @@ var delivery_state := "not_started"
 var delivery_npc: Node3D
 var inside_station_kind := ""
 var autosave_elapsed := 0.0
+var base_run_speed := 4.8
+var base_walk_speed := 2.6
 
 func setup(target: CharacterBody3D, saver: Node) -> void:
 	player = target
+	base_run_speed = float(player.get("run_speed"))
+	base_walk_speed = float(player.get("walk_speed"))
 	save_manager = saver
 	var saved: Dictionary = save_manager.load_progress()
 	var data: Dictionary = saved.get(SAVE_KEY, {})
@@ -187,8 +191,20 @@ func save_now() -> void:
 	if result != OK:
 		push_warning("Could not save life progress: %s" % error_string(result))
 
+func _apply_stamina(delta: float, sprinting: bool) -> void:
+	if not is_instance_valid(player):
+		return
+	if sprinting and energy > 0.0:
+		energy = maxf(0.0, energy - delta * 9.0)
+	else:
+		energy = minf(100.0, energy + delta * 5.0)
+	var available_speed := base_run_speed if energy > 0.0 else base_walk_speed
+	player.set("run_speed", available_speed)
+
 func _process(delta: float) -> void:
 	hunger = maxf(0.0, hunger - delta * 0.025)
+	var sprinting := bool(player.get("running")) or Input.is_action_pressed("run") if is_instance_valid(player) else false
+	_apply_stamina(delta, sprinting)
 	if hunger <= 0.0:
 		energy = maxf(0.0, energy - delta * 0.01)
 	autosave_elapsed += delta
