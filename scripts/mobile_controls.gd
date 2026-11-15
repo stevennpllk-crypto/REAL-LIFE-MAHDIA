@@ -10,6 +10,7 @@ var stick_base: Control
 var run_button: Button
 var jump_button: Button
 var interact_button: Button
+var stick_max_radius := 62.0
 
 func setup(player: CharacterBody3D) -> void:
 	target = player
@@ -66,9 +67,9 @@ func _make_button(parent: Control, caption: String, offset: Vector2) -> Button:
 
 func _draw_stick() -> void:
 	var center := stick_base.size * 0.5
-	stick_base.draw_circle(center, 70.0, Color(0.04, 0.07, 0.12, 0.48))
-	stick_base.draw_arc(center, 70.0, 0.0, TAU, 48, Color(0.82, 0.88, 0.98, 0.8), 3.0)
-	stick_base.draw_circle(center + stick_value * 43.0, 29.0, Color(0.78, 0.87, 1.0, 0.88))
+	stick_base.draw_circle(center, stick_max_radius + 8.0, Color(0.04, 0.07, 0.12, 0.38))
+	stick_base.draw_arc(center, stick_max_radius + 8.0, 0.0, TAU, 48, Color(0.82, 0.88, 0.98, 0.72), 3.0)
+	stick_base.draw_circle(center + stick_value * stick_max_radius, 27.0, Color(0.78, 0.87, 1.0, 0.92))
 
 func _on_stick_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
@@ -85,6 +86,6 @@ func _on_stick_input(event: InputEvent) -> void:
 
 func _update_stick(local_position: Vector2) -> void:
 	var center := stick_base.size * 0.5
-	stick_value = ((local_position - center) / 54.0).limit_length(1.0)
+	stick_value = ((local_position - center) / stick_max_radius).limit_length(1.0)
 	target.set_mobile_move(stick_value)
 	stick_base.queue_redraw()
