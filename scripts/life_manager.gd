@@ -203,7 +203,9 @@ func _apply_stamina(delta: float, sprinting: bool) -> void:
 
 func _process(delta: float) -> void:
 	hunger = maxf(0.0, hunger - delta * 0.025)
-	var sprinting := bool(player.get("running")) or Input.is_action_pressed("run") if is_instance_valid(player) else false
+	var sprinting := false
+	if is_instance_valid(player):
+		sprinting = bool(player.get("running")) or Input.is_action_pressed("run")
 	_apply_stamina(delta, sprinting)
 	if hunger <= 0.0:
 		energy = maxf(0.0, energy - delta * 0.01)
