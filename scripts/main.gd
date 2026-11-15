@@ -352,7 +352,7 @@ func _spawn_residents() -> void:
 		Vector3(-6.6, 0, 17), Vector3(6.6, 0, 17),
 		Vector3(-6.6, 0, 25), Vector3(6.6, 0, 25)
 	]
-	var resident_budget := [8, 10, 12][quality_level]
+	var resident_budget: int = int([8, 10, 12][quality_level])
 	for i in range(mini(sidewalk_positions.size(), resident_budget)):
 		var npc := CharacterBody3D.new()
 		npc.set_script(NPC_SCRIPT)
@@ -382,7 +382,7 @@ func _spawn_traffic() -> void:
 		[false, -1.65, -40.0, 1.0, 3.8],
 		[false, 1.65, 48.0, -1.0, 4.2]
 	]
-	var traffic_budget := [2, 3, 4][quality_level]
+	var traffic_budget: int = int([2, 3, 4][quality_level])
 	for i in range(mini(traffic_specs.size(), traffic_budget)):
 		var spec: Array = traffic_specs[i]
 		var car := CharacterBody3D.new()
