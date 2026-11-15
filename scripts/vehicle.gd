@@ -2,10 +2,12 @@ extends CharacterBody3D
 class_name MahdiaVehicle
 
 @export var acceleration := 9.0
-@export var max_speed := 15.0
+@export var max_speed := 9.0
+@export var reverse_speed := 4.0
 @export var turn_speed := 1.45
 var driver: CharacterBody3D
 var speed := 0.0
+var steering_input := 0.0
 var wheels: Array[MeshInstance3D] = []
 
 func _ready() -> void:
@@ -83,11 +85,20 @@ func _physics_process(delta: float) -> void:
 		var touch_input: Vector2 = touch_value
 		throttle = -touch_input.y
 		steering = touch_input.x
-	speed = move_toward(speed, throttle * max_speed, acceleration * delta)
-	rotation.y -= steering * turn_speed * delta * clampf(absf(speed) / 4.0, 0.0, 1.0)
-	velocity = -global_transform.basis.z * speed
-	velocity.y -= 9.8 * delta
+	var target_speed := throttle * (max_speed if throttle >= 0.0 else reverse_speed)
+	speed = move_toward(speed, target_speed, acceleration * delta)
+	steering_input = move_toward(steering_input, steering, delta * 5.0)
+	var steering_factor := clampf(absf(speed) / 2.0, 0.0, 1.0)
+	rotation.y -= steering_input * turn_speed * delta * steering_factor * (1.0 if speed >= 0.0 else -1.0)
+	velocity.x = -global_transform.basis.z.x * speed
+	velocity.z = -global_transform.basis.z.z * speed
+	if not is_on_floor():
+		velocity.y -= 9.8 * delta
+	else:
+		velocity.y = -0.1
 	move_and_slide()
+	if get_slide_collision_count() > 0:
+		speed *= 0.82
 	for wheel in wheels:
 		wheel.rotate_object_local(Vector3(0, 0, 1), speed * delta / 0.39)
 	driver.global_position = global_position + Vector3(0, 1.8, 0)
@@ -106,6 +117,8 @@ func exit_vehicle() -> void:
 		return
 	driver.visible = true
 	driver.global_position = global_position + global_transform.basis.x * 2.0 + Vector3.UP
+	driver.velocity = Vector3.ZERO
 	driver.set_physics_process(true)
 	driver = null
 	speed = 0.0
+	steering_input = 0.0
