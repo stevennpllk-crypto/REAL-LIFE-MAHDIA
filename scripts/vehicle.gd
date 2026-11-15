@@ -17,7 +17,7 @@ func _rounded_mesh(size: Vector3) -> ArrayMesh:
 	if rounded_mesh_cache.has(key):
 		return rounded_mesh_cache[key]
 	var half := size * 0.5
-	var bevel := maxf(0.025, minf(minf(size.x, minf(size.y, size.z)) * 0.16, 0.14))
+	var bevel := maxf(0.001, minf(minf(size.x, minf(size.y, size.z)) * 0.12, 0.14))
 	var faces := [
 		[Vector3.RIGHT, Vector3.UP, Vector3.BACK],
 		[Vector3.LEFT, Vector3.UP, Vector3.FORWARD],
