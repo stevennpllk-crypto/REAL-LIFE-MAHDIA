@@ -97,7 +97,7 @@ func try_interact() -> void:
 		return
 	var kind := str(nearest.kind)
 	if inside_station_kind != kind:
-		player.global_position = Vector3(nearest.position) + Vector3(0, 0, 0.35)
+		player.global_position = nearest.position + Vector3(0, 0, 0.35)
 		inside_station_kind = kind
 		_set_message("دخلت %s. اضغط تفاعل مرة أخرى لاستخدام المكان، أو اخرج من الباب." % str(nearest.title))
 		return
