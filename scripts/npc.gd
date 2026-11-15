@@ -237,6 +237,8 @@ func _physics_process(delta: float) -> void:
 	_animate(delta, true)
 
 func _animate(delta: float, moving: bool) -> void:
+	if not is_instance_valid(left_arm) or not is_instance_valid(right_arm) or not is_instance_valid(left_leg) or not is_instance_valid(right_leg):
+		return
 	if moving:
 		clock += delta * 5.0
 		var swing := sin(clock) * 0.34
