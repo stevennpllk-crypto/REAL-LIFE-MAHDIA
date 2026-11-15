@@ -15,8 +15,10 @@ window/size/window_height_override=540
 window/stretch/mode="canvas_items"
 
 [rendering]
-limits/opengl/max_lights_per_object=2
-limits/opengl/max_renderable_lights=8
+; All world geometry is unshaded, so positional lights are unnecessary.
+; Zero positional-light slots avoids oversized GLES3 scene shader uniforms on mobile GPUs.
+limits/opengl/max_lights_per_object=0
+limits/opengl/max_renderable_lights=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
