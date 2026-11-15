@@ -336,10 +336,12 @@ func _spawn_residents() -> void:
 		"يوسف", "سارة", "حاتم", "نجلاء", "وليد", "ريم"
 	]
 	var sidewalk_positions := [
-		Vector3(-30, 0, -6.6), Vector3(-20, 0, -6.6), Vector3(-10, 0, -6.6),
-		Vector3(10, 0, -6.6), Vector3(20, 0, -6.6), Vector3(30, 0, -6.6),
-		Vector3(-30, 0, 6.6), Vector3(-20, 0, 6.6), Vector3(-10, 0, 6.6),
-		Vector3(10, 0, 6.6), Vector3(20, 0, 6.6), Vector3(30, 0, 6.6)
+		Vector3(-6.6, 0, -25), Vector3(6.6, 0, -25),
+		Vector3(-6.6, 0, -17), Vector3(6.6, 0, -17),
+		Vector3(-6.6, 0, -9), Vector3(6.6, 0, -9),
+		Vector3(-6.6, 0, 9), Vector3(6.6, 0, 9),
+		Vector3(-6.6, 0, 17), Vector3(6.6, 0, 17),
+		Vector3(-6.6, 0, 25), Vector3(6.6, 0, 25)
 	]
 	for i in range(sidewalk_positions.size()):
 		var npc := CharacterBody3D.new()
