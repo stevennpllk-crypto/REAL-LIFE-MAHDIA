@@ -72,11 +72,64 @@ func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
 	material_cache[key] = mat
 	return mat
 
+var rounded_mesh_cache: Dictionary = {}
+
+func _rounded_box_mesh(size: Vector3) -> ArrayMesh:
+	var key := "%0.2f_%0.2f_%0.2f" % [size.x, size.y, size.z]
+	if rounded_mesh_cache.has(key):
+		return rounded_mesh_cache[key]
+	var half := size * 0.5
+	var bevel := minf(minf(size.x, minf(size.y, size.z)) * 0.12, 0.16)
+	bevel = maxf(0.015, bevel)
+	var faces := [
+		[Vector3.RIGHT, Vector3.UP, Vector3.BACK],
+		[Vector3.LEFT, Vector3.UP, Vector3.FORWARD],
+		[Vector3.UP, Vector3.BACK, Vector3.RIGHT],
+		[Vector3.DOWN, Vector3.BACK, Vector3.LEFT],
+		[Vector3.FORWARD, Vector3.RIGHT, Vector3.UP],
+		[Vector3.BACK, Vector3.LEFT, Vector3.UP]
+	]
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var divisions := 4
+	for face in faces:
+		var normal: Vector3 = face[0]
+		var axis_u: Vector3 = face[1]
+		var axis_v: Vector3 = face[2]
+		var hu := half.y if absf(axis_u.y) > 0.5 else half.x if absf(axis_u.x) > 0.5 else half.z
+		var hv := half.y if absf(axis_v.y) > 0.5 else half.x if absf(axis_v.x) > 0.5 else half.z
+		var grid: Array = []
+		for y in range(divisions + 1):
+			var line: Array = []
+			for x in range(divisions + 1):
+				var raw := normal * (half.x if absf(normal.x) > 0.5 else half.y if absf(normal.y) > 0.5 else half.z)
+				raw += axis_u * lerpf(-hu, hu, float(x) / divisions)
+				raw += axis_v * lerpf(-hv, hv, float(y) / divisions)
+				var inner := Vector3(
+					clampf(raw.x, -half.x + bevel, half.x - bevel),
+					clampf(raw.y, -half.y + bevel, half.y - bevel),
+					clampf(raw.z, -half.z + bevel, half.z - bevel)
+				)
+				var delta := raw - inner
+				var vertex_normal := delta.normalized() if delta.length_squared() > 0.00001 else normal
+				line.append([inner + vertex_normal * bevel, vertex_normal])
+			grid.append(line)
+		for y in range(divisions):
+			for x in range(divisions):
+				var p00: Array = grid[y][x]
+				var p10: Array = grid[y][x + 1]
+				var p11: Array = grid[y + 1][x + 1]
+				var p01: Array = grid[y + 1][x]
+				for point in [p00, p10, p11, p00, p11, p01]:
+					surface.set_normal(point[1])
+					surface.add_vertex(point[0])
+	var mesh := surface.commit()
+	rounded_mesh_cache[key] = mesh
+	return mesh
+
 func _box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInstance3D:
 	var item := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	item.mesh = mesh
+	item.mesh = _rounded_box_mesh(size)
 	item.position = pos
 	item.material_override = _material(color)
 	parent.add_child(item)
