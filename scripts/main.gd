@@ -16,6 +16,7 @@ var player: CharacterBody3D
 var sun: DirectionalLight3D
 var world_environment: Environment
 var status_label: Label
+var ai_status_label: Label
 var hint_label: Label
 var vehicle: CharacterBody3D
 var world_systems: Node
@@ -321,6 +322,7 @@ func _setup_systems() -> void:
 	ai_service.name = "MahdiaAIService"
 	ai_service.set_script(AI_SERVICE_SCRIPT)
 	add_child(ai_service)
+	ai_service.connection_status.connect(_on_ai_connection_status)
 	life_manager.set_ai_service(ai_service)
 	_restore_world_progress()
 	_apply_graphics_quality()
@@ -404,6 +406,19 @@ func _build_hud() -> void:
 	ai_config_button.pressed.connect(_toggle_ai_setup)
 	layer.add_child(ai_config_button)
 
+	# Expose real backend/model readiness instead of silently losing service signals.
+	ai_status_label = Label.new()
+	ai_status_label.text = "JASSIM AI: جارٍ فحص الخادم..."
+	ai_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	ai_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ai_status_label.anchor_left = 1.0
+	ai_status_label.anchor_right = 1.0
+	ai_status_label.offset_left = -340
+	ai_status_label.offset_right = -16
+	ai_status_label.offset_top = 122
+	ai_status_label.offset_bottom = 166
+	layer.add_child(ai_status_label)
+
 	ai_setup_panel = PanelContainer.new()
 	ai_setup_panel.anchor_left = 0.5
 	ai_setup_panel.anchor_right = 0.5
@@ -446,6 +461,12 @@ func _build_hud() -> void:
 	layer.add_child(controls)
 	controls.setup(player)
 
+
+func _on_ai_connection_status(ready: bool, message: String) -> void:
+	if not is_instance_valid(ai_status_label):
+		return
+	ai_status_label.text = ("● " if ready else "○ ") + "JASSIM AI: " + message
+	ai_status_label.add_theme_color_override("font_color", Color(0.35, 0.92, 0.55) if ready else Color(1.0, 0.72, 0.38))
 
 func _on_chat_submitted(value: String) -> void:
 	_send_chat_message(value)
