@@ -317,6 +317,8 @@ func get_ai_context() -> Dictionary:
 		"hunger": hunger,
 		"energy": energy,
 		"social_need": social_need,
+		"curiosity": curiosity,
+		"relationships": resident_relationships.duplicate(true),
 		"meetings": memory_meetings,
 		"reason": decision_reason
 	}
