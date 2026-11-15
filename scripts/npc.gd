@@ -55,6 +55,7 @@ func _part(mesh: Mesh, pos: Vector3, color: Color) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
 	mat.roughness = 0.84
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	item.material_override = mat
 	add_child(item)
 
@@ -71,6 +72,7 @@ func _part_to(parent: Node3D, mesh: Mesh, pos: Vector3, color: Color) -> void:
 	item.position = pos
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	item.material_override = mat
 	parent.add_child(item)
 
