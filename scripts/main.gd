@@ -74,6 +74,7 @@ func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
 
 var rounded_mesh_cache: Dictionary = {}
 var plaster_texture: ImageTexture
+var surface_texture_cache: Dictionary = {}
 
 func _rounded_box_mesh(size: Vector3) -> ArrayMesh:
 	var key := "%0.3f_%0.3f_%0.3f" % [size.x, size.y, size.z]
@@ -246,8 +247,8 @@ func _create_coastal_scenery() -> void:
 
 func _build_town() -> void:
 	# Main asphalt streets crossing a compact Mahdia-inspired neighborhood.
-	_box(self, Vector3(180, 0.12, 9), Vector3(0, 0.035, 0), Color(0.16, 0.18, 0.19))
-	_box(self, Vector3(9, 0.12, 180), Vector3(0, 0.04, 0), Color(0.16, 0.18, 0.19))
+	_textured_box(self, Vector3(180, 0.12, 9), Vector3(0, 0.035, 0), Color(0.16, 0.18, 0.19), "asphalt", Vector3(4, 30, 1))
+	_textured_box(self, Vector3(9, 0.12, 180), Vector3(0, 0.04, 0), Color(0.16, 0.18, 0.19), "asphalt", Vector3(30, 4, 1))
 	for x in range(-80, 81, 12):
 		_box(self, Vector3(5.0, 0.025, 0.16), Vector3(float(x), 0.11, 0), Color(0.92, 0.84, 0.58))
 	for z in range(-80, 81, 12):
@@ -264,8 +265,8 @@ func _build_town() -> void:
 
 	# Sidewalk strips.
 	for side in [-1.0, 1.0]:
-		_box(self, Vector3(180, 0.2, 1.6), Vector3(0, 0.08, side * 5.5), Color(0.78, 0.75, 0.68))
-		_box(self, Vector3(1.6, 0.2, 180), Vector3(side * 5.5, 0.08, 0), Color(0.78, 0.75, 0.68))
+		_textured_box(self, Vector3(180, 0.2, 1.6), Vector3(0, 0.08, side * 5.5), Color(0.78, 0.75, 0.68), "stone", Vector3(2, 30, 1))
+		_textured_box(self, Vector3(1.6, 0.2, 180), Vector3(side * 5.5, 0.08, 0), Color(0.78, 0.75, 0.68), "stone", Vector3(30, 2, 1))
 
 	var palette := [
 		Color(0.88, 0.82, 0.70), Color(0.94, 0.89, 0.78),
@@ -815,6 +816,101 @@ func _apply_graphics_quality() -> void:
 		world_environment.ambient_light_energy = [0.58, 0.78, 0.95][quality_level]
 
 
+func _surface_texture(kind: String) -> ImageTexture:
+	if surface_texture_cache.has(kind):
+		return surface_texture_cache[kind]
+	var image := Image.create(128, 128, false, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 74123 if kind == "asphalt" else 91827
+	for y in range(128):
+		for x in range(128):
+			var grain := rng.randf_range(0.84, 1.0) if kind == "asphalt" else rng.randf_range(0.91, 1.0)
+			var broad := 0.97 + sin(float(x) * 0.09 + sin(float(y) * 0.055)) * (0.035 if kind == "asphalt" else 0.018)
+			var value := clampf(grain * broad, 0.72, 1.0)
+			image.set_pixel(x, y, Color(value, value, value, 1.0))
+	var texture := ImageTexture.create_from_image(image)
+	surface_texture_cache[kind] = texture
+	return texture
+
+func _textured_box(parent: Node3D, size: Vector3, pos: Vector3, tint: Color, texture_kind: String, uv_scale: Vector3) -> MeshInstance3D:
+	var item := MeshInstance3D.new()
+	item.mesh = _rounded_box_mesh(size)
+	item.position = pos
+	var material := StandardMaterial3D.new()
+	material.albedo_color = tint
+	material.albedo_texture = _surface_texture(texture_kind)
+	material.uv1_scale = uv_scale
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+	material.roughness = 1.0
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	item.material_override = material
+	parent.add_child(item)
+	return item
+
+func _create_realistic_street_layer() -> void:
+	# Fine pavement joints break up the huge flat sidewalk slabs.
+	for side in [-1.0, 1.0]:
+		for step in range(-14, 15):
+			var x := float(step) * 6.0
+			_box(self, Vector3(0.035, 0.012, 1.48), Vector3(x, 0.185, side * 5.5), Color(0.62, 0.59, 0.53))
+			var z := float(step) * 6.0
+			_box(self, Vector3(1.48, 0.012, 0.035), Vector3(side * 5.5, 0.185, z), Color(0.62, 0.59, 0.53))
+	# Drain grates and manhole covers add believable street-scale details.
+	for x in [-42.0, -18.0, 18.0, 42.0]:
+		_box(self, Vector3(0.72, 0.035, 0.24), Vector3(x, 0.115, 4.35), Color(0.19, 0.21, 0.21))
+		for slot in range(5):
+			_box(self, Vector3(0.045, 0.012, 0.20), Vector3(x - 0.28 + float(slot) * 0.14, 0.139, 4.35), Color(0.48, 0.50, 0.49))
+	for pos in [Vector3(-4.25, 0.13, -22.0), Vector3(4.25, 0.13, 26.0), Vector3(-22.0, 0.13, 4.25)]:
+		var cover := MeshInstance3D.new()
+		var disc := CylinderMesh.new()
+		disc.top_radius = 0.34
+		disc.bottom_radius = 0.34
+		disc.height = 0.035
+		disc.radial_segments = 16
+		cover.mesh = disc
+		cover.position = pos
+		cover.material_override = _material(Color(0.32, 0.34, 0.34))
+		add_child(cover)
+	# Street-name signs around the central junction.
+	for sign_data in [[Vector3(-7.4, 2.75, -7.4), "نهج البحر"], [Vector3(7.4, 2.75, 7.4), "المهدية"]]:
+		var sign_pos: Vector3 = sign_data[0]
+		_box(self, Vector3(1.85, 0.55, 0.10), sign_pos, Color(0.12, 0.34, 0.30))
+		var sign_text := Label3D.new()
+		sign_text.text = str(sign_data[1])
+		sign_text.position = sign_pos + Vector3(0, 0, -0.065)
+		sign_text.font_size = 30
+		sign_text.pixel_size = 0.006
+		sign_text.modulate = Color(0.96, 0.94, 0.84)
+		add_child(sign_text)
+	# Utility poles and subtly sagging overhead cables; no physics or dynamic lights.
+	var cable_material := StandardMaterial3D.new()
+	cable_material.albedo_color = Color(0.12, 0.13, 0.14)
+	cable_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	for pole_index in range(4):
+		var px := -45.0 + float(pole_index) * 30.0
+		var pole := MeshInstance3D.new()
+		var pole_mesh := CylinderMesh.new()
+		pole_mesh.top_radius = 0.10
+		pole_mesh.bottom_radius = 0.15
+		pole_mesh.height = 6.5
+		pole.mesh = pole_mesh
+		pole.position = Vector3(px, 3.25, 17.0)
+		pole.material_override = _material(Color(0.43, 0.37, 0.29))
+		add_child(pole)
+		_box(self, Vector3(1.1, 0.10, 0.10), Vector3(px, 6.15, 17.0), Color(0.30, 0.28, 0.24))
+	for cable_index in range(3):
+		var cable := ImmediateMesh.new()
+		cable.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, cable_material)
+		for segment in range(17):
+			var t := float(segment) / 16.0
+			var x := lerpf(-45.0, 45.0, t)
+			var sag := sin(t * PI) * 0.52
+			cable.surface_add_vertex(Vector3(x, 6.25 - sag - float(cable_index) * 0.20, 17.0 + float(cable_index - 1) * 0.16))
+		cable.surface_end()
+		var cable_instance := MeshInstance3D.new()
+		cable_instance.mesh = cable
+		add_child(cable_instance)
+
 func _create_city_details() -> void:
 	# Street-level details add scale and recognizable Mediterranean town character
 	# without textures, real-time lights, or costly physics bodies.
@@ -854,3 +950,5 @@ func _create_city_details() -> void:
 		var awning_color: Color = [Color(0.76, 0.22, 0.16), Color(0.88, 0.78, 0.58), Color(0.16, 0.40, 0.43)][i % 3]
 		_box(self, Vector3(3.2, 0.14, 1.05), Vector3(x, 3.0, 10.8), awning_color)
 		_box(self, Vector3(3.2, 0.12, 0.12), Vector3(x, 2.88, 11.28), Color(0.94, 0.88, 0.74))
+
+	_create_realistic_street_layer()
