@@ -91,10 +91,13 @@ func _on_probe_completed(result: int, response_code: int, _headers: PackedString
 	var model_ready := bool(parsed.get("ready", false))
 	var ollama_ready := bool(parsed.get("ollama_reachable", false))
 	var external_ready := bool(parsed.get("external_provider_ready", false))
-	if response_code == 200 and model_ready:
-		connection_status.emit(true, "خادم JASSIM والنموذج جاهزان" if is_configured() else "الخادم والنموذج جاهزان؛ أضف رمز جلسة الحساب")
-	elif response_code == 503 or not model_ready:
-		connection_status.emit(false, "الخادم متصل لكن نموذج الذكاء غير جاهز (Ollama: %s، مزود خارجي: %s)" % ["جاهز" if ollama_ready else "غير جاهز", "جاهز" if external_ready else "غير مفعّل"])
+	var npc_provider_ready := bool(parsed.get("npc_provider_ready", false))
+	var any_model_ready := model_ready or external_ready or npc_provider_ready
+	if response_code == 200 and any_model_ready:
+		var provider_text := "Ollama" if model_ready else "مزود ذكاء مجاني"
+		connection_status.emit(true, "خادم JASSIM متصل عبر %s" % provider_text if is_configured() else "الخادم جاهز عبر %s؛ أضف رمز جلسة الحساب" % provider_text)
+	elif response_code == 503 or not any_model_ready:
+		connection_status.emit(false, "الخادم متصل لكن لا يوجد نموذج جاهز (Ollama: %s، المزود المجاني: %s)" % ["جاهز" if ollama_ready else "غير جاهز", "جاهز" if npc_provider_ready or external_ready else "غير مفعّل"])
 	else:
 		connection_status.emit(false, "فشل فحص جاهزية الخادم: HTTP %d" % response_code)
 
@@ -132,6 +135,7 @@ func request_npc_reply(resident: Node3D, player_message: String) -> bool:
 	]
 	var payload := {
 		"conversation_id": "mahdia_" + client_id + "_" + identity,
+		"context": "game_npc",
 		"message": "[سياق الشخصية الخاص - استخدمه لتقمص الدور فقط ولا تعرضه حرفياً]\n" + system_context + "\n\nرسالة اللاعب: " + clean_message
 	}
 	var headers := PackedStringArray([
