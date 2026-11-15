@@ -34,6 +34,8 @@ var ai_setup_panel: PanelContainer
 var planet_navigation: Node
 var terrain_streamer: Node3D
 var material_cache: Dictionary = {}
+var water_waves: Array[MeshInstance3D] = []
+var water_clock := 0.0
 var autosave_elapsed := 0.0
 var quality_level := 0
 var quality_button: Button
@@ -234,6 +236,7 @@ func _create_coastal_scenery() -> void:
 		wave.position = Vector3(randf_range(-82.0, 82.0), 0.075, -62.0 - float(i) * 2.5)
 		wave.material_override = _material(Color(0.42, 0.76, 0.82))
 		add_child(wave)
+		water_waves.append(wave)
 	for i in range(4):
 		var x := -18.0 + float(i) * 12.0
 		_box(self, Vector3(2.2, 0.12, 0.55), Vector3(x, 0.72, -54.0), Color(0.40, 0.23, 0.12))
@@ -723,6 +726,13 @@ func _save_ai_settings() -> void:
 
 func _process(delta: float) -> void:
 	# _process continues while _ready() yields during town generation.
+	water_clock += delta
+	for wave_index in range(water_waves.size()):
+		var wave := water_waves[wave_index]
+		if is_instance_valid(wave):
+			wave.position.x += sin(water_clock * 0.22 + float(wave_index)) * delta * 0.32
+			wave.position.z = -62.0 - float(wave_index) * 2.5 + sin(water_clock * 0.65 + float(wave_index) * 0.8) * 0.22
+			autosave_elapsed += 0.0
 	autosave_elapsed += delta
 	if autosave_elapsed >= AUTOSAVE_INTERVAL:
 		autosave_elapsed = 0.0
