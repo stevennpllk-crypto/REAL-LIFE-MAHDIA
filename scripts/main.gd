@@ -44,6 +44,7 @@ const WORLD_SAVE_KEY := "mahdia_world"
 
 func _ready() -> void:
 	randomize()
+	_select_device_profile()
 	_build_environment()
 	# Bring up a playable camera and HUD before constructing decorative city blocks.
 	# This guarantees that even a slow phone can present a real game frame quickly.
@@ -212,7 +213,9 @@ func _build_town() -> void:
 	_create_street_lamp(Vector3(6.5, 0, 8))
 	_create_street_lamp(Vector3(-8, 0, 6.5))
 	_create_street_lamp(Vector3(8, 0, -6.5))
-	_create_city_details()
+	# Extra street props are decorative; keep the low tier focused on smooth play.
+	if quality_level >= 1:
+		_create_city_details()
 
 func _create_building(origin: Vector3, size: Vector3, wall_color: Color, seed_value: int) -> void:
 	# Mediterranean/Mahdia-inspired low-rise architecture. Keep geometry static
@@ -325,6 +328,8 @@ func _spawn_player() -> void:
 	add_child(player)
 
 func _spawn_residents() -> void:
+	# Keep active simulation population proportional to the selected device tier.
+	# Residents beyond this budget are not instantiated, avoiding hidden CPU/RAM cost.
 	# Place residents on public sidewalks rather than random points that may
 	# intersect buildings or spawn directly inside traffic lanes.
 	var personalities := [
@@ -347,7 +352,8 @@ func _spawn_residents() -> void:
 		Vector3(-6.6, 0, 17), Vector3(6.6, 0, 17),
 		Vector3(-6.6, 0, 25), Vector3(6.6, 0, 25)
 	]
-	for i in range(sidewalk_positions.size()):
+	var resident_budget := [8, 10, 12][quality_level]
+	for i in range(mini(sidewalk_positions.size(), resident_budget)):
 		var npc := CharacterBody3D.new()
 		npc.set_script(NPC_SCRIPT)
 		npc.position = sidewalk_positions[i]
@@ -376,7 +382,8 @@ func _spawn_traffic() -> void:
 		[false, -1.65, -40.0, 1.0, 3.8],
 		[false, 1.65, 48.0, -1.0, 4.2]
 	]
-	for i in range(traffic_specs.size()):
+	var traffic_budget := [2, 3, 4][quality_level]
+	for i in range(mini(traffic_specs.size(), traffic_budget)):
 		var spec: Array = traffic_specs[i]
 		var car := CharacterBody3D.new()
 		car.set_script(TRAFFIC_SCRIPT)
@@ -695,16 +702,28 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
 		_save_world_progress()
 
+func _select_device_profile() -> void:
+	# Android phones start in the conservative tier. This is a deliberate
+	# performance budget, not a requirement for the player to change phone settings.
+	if OS.has_feature("mobile"):
+		quality_level = 0
+	else:
+		quality_level = 2
+
 func _cycle_graphics_quality() -> void:
 	quality_level = (quality_level + 1) % 3
 	_apply_graphics_quality()
 	_save_world_progress()
 
 func _apply_graphics_quality() -> void:
-	var labels := ["منخفضة", "متوسطة", "عالية"]
+	var labels := ["اقتصادية", "متوازنة", "مرتفعة"]
 	if is_instance_valid(quality_button):
-		quality_button.text = "الرسوم: " + labels[quality_level]
+		quality_button.text = "الأداء: " + labels[quality_level]
+	# Frame pacing, physics cadence and 3D internal resolution are real workload
+	# controls. The UI stays full resolution for readable touch controls.
 	Engine.max_fps = [30, 45, 60][quality_level]
+	Engine.physics_ticks_per_second = [30, 45, 60][quality_level]
+	get_viewport().scaling_3d_scale = [0.72, 0.86, 1.0][quality_level]
 	if is_instance_valid(sun):
 		# All quality tiers remain on the GLES3-safe unlit path.
 		sun.shadow_enabled = false
