@@ -28,15 +28,17 @@ var material_cache: Dictionary = {}
 func _ready() -> void:
 	randomize()
 	_build_environment()
-	# Yield immediately so Android can present the first rendered frame instead of
-	# keeping the native Godot splash visible during world generation.
+	# Bring up a playable camera and HUD before constructing decorative city blocks.
+	# This guarantees that even a slow phone can present a real game frame quickly.
+	_spawn_player()
+	_build_hud()
+	print("MAHDIA_PLAYER_READY")
 	await get_tree().process_frame
 	await _build_town()
-	_spawn_player()
+	print("MAHDIA_TOWN_READY")
 	_spawn_residents()
 	_spawn_vehicle()
 	_setup_systems()
-	_build_hud()
 	print("MAHDIA_WORLD_READY")
 
 func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
@@ -122,10 +124,10 @@ func _build_town() -> void:
 		Color(0.78, 0.72, 0.62), Color(0.84, 0.86, 0.83),
 		Color(0.91, 0.84, 0.75)
 	]
-	for i in range(6):
-		for j in range(5):
-			var x := float(i) * 15.0 - 37.5
-			var z := float(j) * 15.0 - 30.0
+	for i in range(5):
+		for j in range(4):
+			var x := float(i) * 17.0 - 34.0
+			var z := float(j) * 18.0 - 27.0
 			if absf(x) < 9.0 or absf(z) < 9.0:
 				continue
 			var height := randf_range(5.5, 9.0)
@@ -146,43 +148,23 @@ func _build_town() -> void:
 	_create_street_lamp(Vector3(8, 0, -6.5))
 
 func _create_building(origin: Vector3, size: Vector3, wall_color: Color, seed_value: int) -> void:
+	# Keep each building intentionally lightweight: one body, one roof, one door,
+	# and a small number of windows. The previous facade generated hundreds of
+	# tiny mesh nodes and delayed first-frame rendering on mobile GPUs.
 	var building := StaticBody3D.new()
 	building.position = origin
 	var w := size.x
 	var h := size.y
 	var d := size.z
 	_box(building, size, Vector3(0, h * 0.5, 0), wall_color)
-	# Roof rim and a small rooftop room break up the plain box silhouette.
-	_box(building, Vector3(w + 0.25, 0.28, d + 0.25), Vector3(0, h + 0.12, 0), Color(0.72, 0.68, 0.59))
-	_box(building, Vector3(w * 0.34, 1.15, d * 0.32), Vector3(-w * 0.18, h + 0.82, -d * 0.16), wall_color.darkened(0.08))
-	# Front entrance.
-	_box(building, Vector3(1.15, 2.15, 0.10), Vector3(0, 1.08, d * 0.501), Color(0.30, 0.22, 0.17))
-	_box(building, Vector3(1.32, 0.14, 0.18), Vector3(0, 2.22, d * 0.51), Color(0.92, 0.85, 0.70))
-	# Recessed-looking windows with dark glass and light frames.
-	var window_rows := maxi(1, int(h / 2.5))
-	for row in range(window_rows):
-		var y := 2.65 + float(row) * 2.25
-		if y > h - 0.7:
-			continue
-		for col in range(2):
-			var wx := (float(col) - 0.5) * w * 0.48
-			if absf(wx) < 0.9:
-				continue
-			_box(building, Vector3(1.15, 1.25, 0.09), Vector3(wx, y, d * 0.505), Color(0.16, 0.31, 0.39))
-			_box(building, Vector3(1.28, 0.09, 0.12), Vector3(wx, y, d * 0.52), Color(0.94, 0.90, 0.80))
-			_box(building, Vector3(0.09, 1.32, 0.12), Vector3(wx, y, d * 0.52), Color(0.94, 0.90, 0.80))
-			_box(building, Vector3(1.25, 0.12, 0.65), Vector3(wx, y - 0.73, d * 0.78), Color(0.74, 0.72, 0.66))
-			_box(building, Vector3(0.08, 0.65, 0.08), Vector3(wx - 0.55, y - 0.35, d * 0.78), Color(0.55, 0.53, 0.48))
-			_box(building, Vector3(0.08, 0.65, 0.08), Vector3(wx + 0.55, y - 0.35, d * 0.78), Color(0.55, 0.53, 0.48))
-			_box(building, Vector3(1.55, 0.12, 0.72), Vector3(wx, y - 0.78, d * 0.78), Color(0.86, 0.83, 0.75))
-			_box(building, Vector3(1.45, 0.08, 0.08), Vector3(wx, y - 0.35, d * 0.98), Color(0.24, 0.29, 0.30))
-			_box(building, Vector3(0.08, 0.42, 0.08), Vector3(wx - 0.68, y - 0.56, d * 0.98), Color(0.24, 0.29, 0.30))
-			_box(building, Vector3(0.08, 0.42, 0.08), Vector3(wx + 0.68, y - 0.56, d * 0.98), Color(0.24, 0.29, 0.30))
+	_box(building, Vector3(w + 0.2, 0.22, d + 0.2), Vector3(0, h + 0.11, 0), Color(0.70, 0.66, 0.58))
+	_box(building, Vector3(1.05, 2.05, 0.10), Vector3(0, 1.03, d * 0.501), Color(0.25, 0.17, 0.12))
+	for col in range(2):
+		var wx := (float(col) - 0.5) * w * 0.48
+		_box(building, Vector3(1.15, 1.15, 0.08), Vector3(wx, minf(3.45, h * 0.58), d * 0.505), Color(0.12, 0.29, 0.38))
+		_box(building, Vector3(1.28, 0.09, 0.12), Vector3(wx, minf(4.05, h * 0.58 + 0.62), d * 0.52), Color(0.92, 0.88, 0.78))
 	if seed_value % 3 == 0:
-		_box(building, Vector3(w * 0.72, 0.18, 1.15), Vector3(0, 2.55, d * 0.78), Color(0.12, 0.43, 0.39))
-		_box(building, Vector3(w * 0.72, 0.42, 0.12), Vector3(0, 3.05, d * 0.51), Color(0.18, 0.31, 0.39))
-	else:
-		_box(building, Vector3(1.55, 0.16, 0.34), Vector3(0, 2.28, d * 0.68), Color(0.72, 0.42, 0.22))
+		_box(building, Vector3(w * 0.66, 0.18, 0.9), Vector3(0, 2.42, d * 0.72), Color(0.12, 0.40, 0.36))
 	var collision := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
 	shape.size = size
