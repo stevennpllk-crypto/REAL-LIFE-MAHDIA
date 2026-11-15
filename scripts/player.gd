@@ -8,6 +8,7 @@ class_name MahdiaPlayer
 @export var input_deadzone := 0.14
 @export var jump_velocity := 4.5
 @export var mouse_sensitivity := 0.0020
+@export var build_visuals := true
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var move_vector := Vector2.ZERO
 var running := false
@@ -32,7 +33,8 @@ func _ready() -> void:
 	_add_action("run", KEY_SHIFT)
 	_add_action("jump", KEY_SPACE)
 	_add_action("interact", KEY_E)
-	_build_human_figure()
+	if build_visuals:
+		_build_human_figure()
 	var collider := CollisionShape3D.new()
 	var shape := CapsuleShape3D.new()
 	shape.radius = 0.31
