@@ -354,7 +354,7 @@ func _spawn_residents() -> void:
 		npc.display_name = resident_names[i]
 		npc.personality = personalities[i]
 		npc.occupation = jobs[i]
-		var work_spot := sidewalk_positions[i] + Vector3(0, 0, 5.0 if i % 2 == 0 else -5.0)
+		var work_spot: Vector3 = sidewalk_positions[i] + Vector3(0, 0, 5.0 if i % 2 == 0 else -5.0)
 		npc.set_ai_context(player, world_systems, work_spot, i, save_manager)
 		add_child(npc)
 
