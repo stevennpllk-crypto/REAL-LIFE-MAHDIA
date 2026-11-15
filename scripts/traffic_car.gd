@@ -53,10 +53,19 @@ func _build_visuals() -> void:
 	var glass := StandardMaterial3D.new()
 	glass.albedo_color = Color(0.10, 0.20, 0.25)
 	glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	body_mesh = _add_box(Vector3(1.62, 0.55, 3.05), Vector3(0, 0.68, 0), paint)
-	_add_box(Vector3(1.38, 0.65, 1.55), Vector3(0, 1.18, -0.12), glass)
-	_add_box(Vector3(1.42, 0.10, 0.12), Vector3(0, 0.48, -1.52), paint)
-	_add_box(Vector3(1.42, 0.10, 0.12), Vector3(0, 0.48, 1.52), paint)
+	body_mesh = _add_ellipsoid(Vector3(1.72, 0.62, 3.20), Vector3(0, 0.66, 0), paint)
+	_add_ellipsoid(Vector3(1.34, 0.68, 1.72), Vector3(0, 1.08, -0.12), glass)
+	_add_ellipsoid(Vector3(1.52, 0.25, 0.82), Vector3(0, 0.82, -1.18), paint)
+	_add_ellipsoid(Vector3(1.52, 0.22, 0.62), Vector3(0, 0.82, 1.28), paint)
+	var lamp_material := StandardMaterial3D.new()
+	lamp_material.albedo_color = Color(1.0, 0.88, 0.58)
+	lamp_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var tail_material := StandardMaterial3D.new()
+	tail_material.albedo_color = Color(0.72, 0.08, 0.045)
+	tail_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	for side in [-1.0, 1.0]:
+		_add_ellipsoid(Vector3(0.22, 0.13, 0.10), Vector3(side * 0.58, 0.72, -1.57), lamp_material)
+		_add_ellipsoid(Vector3(0.20, 0.12, 0.10), Vector3(side * 0.58, 0.72, 1.57), tail_material)
 	for side in [-1.0, 1.0]:
 		for z in [-1.0, 1.0]:
 			var wheel := MeshInstance3D.new()
@@ -73,11 +82,15 @@ func _build_visuals() -> void:
 			wheel.material_override = rubber
 			add_child(wheel)
 
-func _add_box(size: Vector3, pos: Vector3, material: Material) -> MeshInstance3D:
+func _add_ellipsoid(size: Vector3, pos: Vector3, material: Material) -> MeshInstance3D:
 	var item := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.5
+	mesh.height = 1.0
+	mesh.radial_segments = 16
+	mesh.rings = 8
 	item.mesh = mesh
+	item.scale = size
 	item.position = pos
 	item.material_override = material
 	add_child(item)
