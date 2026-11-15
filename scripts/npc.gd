@@ -347,7 +347,6 @@ func _update_social_awareness() -> void:
 		if now_msec - last_encounter >= 20000:
 			social_encounter_cooldowns[other_id] = now_msec
 			# Store the encounter on both sides: relationships are reciprocal.
-			other.set("social_encounter_cooldowns", other.get("social_encounter_cooldowns"))
 			var other_cooldowns: Dictionary = other.get("social_encounter_cooldowns")
 			other_cooldowns[memory_id] = now_msec
 			other.set("social_encounter_cooldowns", other_cooldowns)
