@@ -102,6 +102,8 @@ func _create_station(title: String, kind: String, at: Vector3, tint: Color) -> v
 	var building := Node3D.new()
 	building.name = kind.capitalize() + "Interior"
 	building.position = at
+	if kind == "cafe":
+		building.add_to_group("resident_food_stations")
 	var wall_color := tint
 	_make_wall(building, Vector3(4.0, 0.18, 3.0), Vector3(0, -0.12, 0), Color(0.64, 0.59, 0.49))
 	_make_wall(building, Vector3(4.0, 2.8, 0.22), Vector3(0, 1.4, -1.5), wall_color)
