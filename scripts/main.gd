@@ -353,14 +353,16 @@ func _build_hud() -> void:
 	hint_label.position = Vector2(16, 78)
 	layer.add_child(hint_label)
 	var message_panel := PanelContainer.new()
-	message_panel.anchor_left = 0.5
-	message_panel.anchor_right = 0.5
+	# Keep the message strip in the central safe zone: mobile action buttons
+	# occupy the lower-right corner and the movement stick occupies lower-left.
+	message_panel.anchor_left = 0.28
+	message_panel.anchor_right = 0.72
 	message_panel.anchor_top = 1.0
 	message_panel.anchor_bottom = 1.0
-	message_panel.offset_left = -250
-	message_panel.offset_right = 250
-	message_panel.offset_top = -82
-	message_panel.offset_bottom = -28
+	message_panel.offset_left = 0
+	message_panel.offset_right = 0
+	message_panel.offset_top = -112
+	message_panel.offset_bottom = -72
 	layer.add_child(message_panel)
 	var message_label := Label.new()
 	message_label.name = "LifeMessage"
@@ -371,12 +373,14 @@ func _build_hud() -> void:
 
 	# Lightweight chat input for the currently selected resident.
 	var chat_row := HBoxContainer.new()
-	chat_row.anchor_left = 0.08
-	chat_row.anchor_right = 0.92
+	# A compact center-bottom composer avoids covering the joystick and
+	# the three touch action buttons on 16:9 phones.
+	chat_row.anchor_left = 0.28
+	chat_row.anchor_right = 0.72
 	chat_row.anchor_top = 1.0
 	chat_row.anchor_bottom = 1.0
-	chat_row.offset_top = -132
-	chat_row.offset_bottom = -88
+	chat_row.offset_top = -64
+	chat_row.offset_bottom = -18
 	layer.add_child(chat_row)
 	chat_input = LineEdit.new()
 	chat_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
