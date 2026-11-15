@@ -78,4 +78,10 @@ func _run_tests() -> void:
 	_check(str(weather_system.get("weather")) == "ممطر", "weather system rejects unsupported weather")
 
 	print("Gameplay tests: ", 18 - failures, "/18 passed")
+	# Release scene resources before shutting down the headless renderer.
+	car.queue_free()
+	player.queue_free()
+	saver.queue_free()
+	weather_system.queue_free()
+	await process_frame
 	quit(0 if failures == 0 else 1)
