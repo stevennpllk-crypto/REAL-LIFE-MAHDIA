@@ -129,7 +129,8 @@ jobs:
           ram-size: 1536M
           heap-size: 384M
           emulator-boot-timeout: 900
-          disable-linux-hw-accel: true
+          # Keep KVM acceleration enabled on GitHub-hosted Linux runners.
+          # SwiftShader remains the graphics backend for GLES/Vulkan smoke tests.
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
           disable-animations: true
           script: bash .github/scripts/android-emulator-smoke-test.sh
