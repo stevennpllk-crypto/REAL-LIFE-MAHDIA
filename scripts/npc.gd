@@ -41,6 +41,17 @@ var left_leg: Node3D
 var right_leg: Node3D
 var visual_root: Node3D
 var clock := 0.0
+# Cognitive simulation: persistent episodic memories, learned preferences and self-review.
+var long_term_memories: Array[Dictionary] = []
+var learned_preferences: Dictionary = {}
+var stress := 0.0
+var confidence := 0.5
+var current_goal := "استكشاف الحي"
+var reflection_elapsed := 0.0
+var memory_save_elapsed := 0.0
+var autonomy_cycles := 0
+var last_experience_tag := ""
+var last_experience_time := -1000.0
 
 func set_ai_context(player_node: CharacterBody3D, clock_node: Node, work_spot: Vector3, identity: int, saver: Node = null) -> void:
 	player = player_node
@@ -194,8 +205,15 @@ func _choose_daily_goal(hour: float) -> void:
 	var food_score := hunger * 1.45
 	var work_score := 0.78 + personal_schedule_offset if occupation != "resident" and is_work_hours else 0.12
 	var home_score := (0.92 + personal_schedule_offset if is_evening else 0.48 if is_night else 0.08)
+	# Past outcomes influence future choices; residents gradually develop individual habits.
+	food_score *= 1.0 + float(learned_preferences.get("food", 0.0))
+	rest_score *= 1.0 + float(learned_preferences.get("rest", 0.0))
+	social_score *= 1.0 + float(learned_preferences.get("social", 0.0))
+	explore_score *= 1.0 + float(learned_preferences.get("explore", 0.0))
+	work_score *= 1.0 + float(learned_preferences.get("work", 0.0))
 	var best_score := maxf(food_score, maxf(rest_score, maxf(social_score, maxf(explore_score, maxf(work_score, home_score)))))
 	if best_score == food_score:
+		current_goal = "الطعام"
 		var food_station := _nearest_food_station()
 		if is_instance_valid(food_station):
 			ai_state = "seeking_food"
@@ -207,10 +225,12 @@ func _choose_daily_goal(hour: float) -> void:
 			target_position = _random_near(home_position)
 			decision_reason = "أبحث عن مكان يقدم الطعام"
 	elif best_score == rest_score:
+		current_goal = "الراحة"
 		ai_state = "resting"
 		target_position = rest_position
 		decision_reason = "أحتاج إلى الراحة"
 	elif best_score == social_score:
+		current_goal = "التواصل"
 		ai_state = "socializing"
 		var known_resident := _nearest_resident(10.0)
 		if is_instance_valid(known_resident):
@@ -219,19 +239,65 @@ func _choose_daily_goal(hour: float) -> void:
 			target_position = rest_position + _random_near(Vector3.ZERO) * 0.35
 		decision_reason = "أبحث عن رفقة وحديث"
 	elif best_score == work_score:
+		current_goal = "العمل"
 		ai_state = "commuting"
 		target_position = work_position
 		decision_reason = "حان وقت العمل"
 	elif best_score == home_score:
+		current_goal = "العودة إلى المنزل"
 		ai_state = "going_home"
 		target_position = home_position
 		decision_reason = "أريد العودة إلى المنزل"
 	else:
+		current_goal = "استكشاف الحي"
 		ai_state = "wandering"
 		target_position = _random_near(home_position)
 		decision_reason = "أستكشف الحي"
 	wait_time = randf_range(0.5, 2.0)
 
+
+func _record_experience(tag: String, detail: String, emotional_weight: float) -> void:
+	var now := Time.get_unix_time_from_system()
+	if tag == last_experience_tag and now - last_experience_time < 45.0:
+		return
+	last_experience_tag = tag
+	last_experience_time = now
+	long_term_memories.append({
+		"tag": tag,
+		"detail": detail,
+		"weight": clampf(emotional_weight, -1.0, 1.0),
+		"hour": _current_hour(),
+		"time": now
+	})
+	while long_term_memories.size() > 16:
+		long_term_memories.pop_front()
+
+func _reflect_on_experiences() -> void:
+	# Periodic reflection turns repeated experiences into persistent preferences.
+	if long_term_memories.is_empty():
+		return
+	var recent_count := mini(8, long_term_memories.size())
+	var total_weight := 0.0
+	var counts: Dictionary = {}
+	for i in range(long_term_memories.size() - recent_count, long_term_memories.size()):
+		var memory: Dictionary = long_term_memories[i]
+		total_weight += float(memory.get("weight", 0.0))
+		var tag := str(memory.get("tag", ""))
+		if not tag.is_empty():
+			counts[tag] = int(counts.get(tag, 0)) + 1
+	mood = clampf(mood + total_weight * 0.025, 0.0, 1.0)
+	for tag in counts:
+		var preference := clampf(float(learned_preferences.get(tag, 0.0)), -0.25, 0.35)
+		learned_preferences[tag] = clampf(preference + minf(float(counts[tag]) * 0.008, 0.025), -0.25, 0.35)
+	confidence = clampf(confidence + 0.004, 0.0, 1.0)
+	autonomy_cycles += 1
+	if counts.has("social") and int(counts["social"]) >= 2:
+		decision_reason = "أتذكر أن لقاء الجيران يجعل يومي أفضل"
+	elif counts.has("explore") and int(counts["explore"]) >= 2:
+		decision_reason = "أحب اكتشاف أماكن جديدة في الحي"
+	elif stress > 0.7:
+		decision_reason = "أشعر بالضغط وأحتاج إلى تغيير روتيني"
+	_save_memory()
 
 func _nearest_food_station() -> Node3D:
 	var nearest: Node3D
@@ -269,6 +335,7 @@ func _update_social_awareness() -> void:
 	var familiarity := clampf(float(resident_relationships.get(other_id, 0.0)), 0.0, 1.0)
 	var distance := global_position.distance_to(other.global_position)
 	if distance <= 2.4:
+		_record_experience("social", "قضيت وقتاً مع %s" % str(other.get("display_name")), 0.04)
 		familiarity = clampf(familiarity + 0.012, 0.0, 1.0)
 		resident_relationships[other_id] = familiarity
 		if ai_state == "socializing" or social_need > 0.72:
@@ -280,6 +347,8 @@ func _update_social_awareness() -> void:
 				wait_time = maxf(wait_time, 1.0)
 
 func _update_needs(delta: float) -> void:
+	# Emotional state is simulated as a changing internal variable, not a claim of sentience.
+	stress = clampf(stress + (0.00008 if hunger > 0.75 or energy < 0.2 else -0.00004) * delta, 0.0, 1.0)
 	hunger = clampf(hunger + delta * 0.00032, 0.0, 1.0)
 	energy = clampf(energy - delta * (0.00020 if ai_state != "resting" else -0.00085), 0.0, 1.0)
 	social_need = clampf(social_need + delta * 0.00024, 0.0, 1.0)
@@ -303,6 +372,7 @@ func _choose_target() -> void:
 	ai_state = "wander"
 
 func on_player_interacted() -> void:
+	_record_experience("player", "التقيت باللاعب وتحدثت معه", 0.10)
 	memory_meetings += 1
 	last_player_interaction = Time.get_ticks_msec() / 1000.0
 	mood = clampf(mood + 0.12, 0.0, 1.0)
@@ -319,6 +389,13 @@ func _load_memory() -> void:
 	var memories: Dictionary = all_data.get("mahdia_npc_memory", {})
 	var memory: Dictionary = memories.get(memory_id, {})
 	memory_meetings = maxi(0, int(memory.get("meetings", 0)))
+	long_term_memories.clear()
+	for entry in memory.get("episodic_memories", []):
+		if entry is Dictionary:
+			long_term_memories.append(entry.duplicate(true))
+	learned_preferences = memory.get("preferences", {}).duplicate(true)
+	stress = clampf(float(memory.get("stress", 0.0)), 0.0, 1.0)
+	confidence = clampf(float(memory.get("confidence", 0.5)), 0.0, 1.0)
 	mood = clampf(float(memory.get("mood", 0.5)), 0.0, 1.0)
 	trust = clampf(float(memory.get("trust", 0.0)), 0.0, 1.0)
 	hunger = clampf(float(memory.get("hunger", 0.18)), 0.0, 1.0)
@@ -332,7 +409,7 @@ func _save_memory() -> void:
 		return
 	var all_data: Dictionary = memory_manager.load_progress()
 	var memories: Dictionary = all_data.get("mahdia_npc_memory", {})
-	memories[memory_id] = {"meetings": memory_meetings, "mood": mood, "trust": trust, "hunger": hunger, "energy": energy, "social_need": social_need, "curiosity": curiosity, "relationships": resident_relationships}
+	memories[memory_id] = {"meetings": memory_meetings, "mood": mood, "trust": trust, "hunger": hunger, "energy": energy, "social_need": social_need, "curiosity": curiosity, "relationships": resident_relationships, "episodic_memories": long_term_memories, "preferences": learned_preferences, "stress": stress, "confidence": confidence, "current_goal": current_goal}
 	all_data["mahdia_npc_memory"] = memories
 	var result: Error = memory_manager.save_progress(all_data)
 	if result != OK:
@@ -352,6 +429,10 @@ func get_ai_context() -> Dictionary:
 		"curiosity": curiosity,
 		"relationships": resident_relationships.duplicate(true),
 		"meetings": memory_meetings,
+		"memories": long_term_memories.duplicate(true),
+		"stress": stress,
+		"confidence": confidence,
+		"goal": current_goal,
 		"reason": decision_reason
 	}
 
@@ -430,6 +511,14 @@ func _physics_process(delta: float) -> void:
 	if social_scan_elapsed >= 2.0:
 		social_scan_elapsed = 0.0
 		_update_social_awareness()
+	reflection_elapsed += delta
+	memory_save_elapsed += delta
+	if reflection_elapsed >= 15.0:
+		reflection_elapsed = 0.0
+		_reflect_on_experiences()
+	if memory_save_elapsed >= 25.0:
+		memory_save_elapsed = 0.0
+		_save_memory()
 	decision_elapsed += delta
 	if decision_elapsed >= 4.0:
 		decision_elapsed = 0.0
@@ -453,10 +542,12 @@ func _physics_process(delta: float) -> void:
 			decision_reason = "وصلت إلى مكان الطعام وأتناول وجبتي"
 			wait_time = randf_range(5.0, 9.0)
 		elif ai_state == "eating":
+			_record_experience("food", "تناولت الطعام وشعرت بتحسن", 0.08)
 			hunger = maxf(0.08, hunger - 0.68)
 			decision_reason = "أنهيت وجبتي وأشعر بتحسن"
 			_choose_daily_goal(_current_hour())
 		elif ai_state == "commuting":
+			_record_experience("work", "وصلت إلى عملي", 0.025)
 			ai_state = "working"
 			wait_time = randf_range(8.0, 16.0)
 		elif ai_state == "going_home":
