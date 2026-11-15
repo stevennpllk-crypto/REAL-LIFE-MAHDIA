@@ -15,6 +15,7 @@ func _check(condition: bool, label: String) -> void:
 func _run_tests() -> void:
 	var player := CharacterBody3D.new()
 	player.set_script(load("res://scripts/player.gd"))
+	player.set("build_visuals", false)
 	root.add_child(player)
 	await process_frame
 
