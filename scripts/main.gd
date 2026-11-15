@@ -25,6 +25,10 @@ var planet_navigation: Node
 var terrain_streamer: Node3D
 var material_cache: Dictionary = {}
 var autosave_elapsed := 0.0
+var quality_level := 0
+var quality_button: Button
+var restored_vehicle_position := Vector3(5, 0.1, 10)
+var restore_vehicle_driver := false
 const AUTOSAVE_INTERVAL := 12.0
 const WORLD_SAVE_KEY := "mahdia_world"
 
@@ -220,9 +224,11 @@ func _spawn_residents() -> void:
 func _spawn_vehicle() -> void:
 	vehicle = CharacterBody3D.new()
 	vehicle.set_script(VEHICLE_SCRIPT)
-	vehicle.position = Vector3(5, 0.1, 10)
+	vehicle.position = restored_vehicle_position
 	vehicle.name = "MahdiaCar"
 	add_child(vehicle)
+	if restore_vehicle_driver:
+		vehicle.enter_vehicle(player)
 
 func _setup_systems() -> void:
 	world_systems = Node.new()
@@ -248,6 +254,7 @@ func _setup_systems() -> void:
 	add_child(life_manager)
 	life_manager.setup(player, save_manager)
 	_restore_world_progress()
+	_apply_graphics_quality()
 
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
@@ -258,7 +265,19 @@ func _build_hud() -> void:
 	layer.add_child(panel)
 	status_label = Label.new()
 	status_label.text = "MAHDIA • 08:00 • Prototype"
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(status_label)
+	quality_button = Button.new()
+	quality_button.text = "الرسوم: منخفضة"
+	quality_button.anchor_left = 1.0
+	quality_button.anchor_right = 1.0
+	quality_button.offset_left = -170.0
+	quality_button.offset_right = -16.0
+	quality_button.offset_top = 14.0
+	quality_button.offset_bottom = 62.0
+	quality_button.focus_mode = Control.FOCUS_NONE
+	quality_button.pressed.connect(_cycle_graphics_quality)
+	layer.add_child(quality_button)
 	hint_label = Label.new()
 	hint_label.text = "عصا اللمس للحركة • اسحب يمين الشاشة لتحريك الكاميرا • تفاعل • جري • قفز"
 	hint_label.position = Vector2(16, 78)
@@ -318,15 +337,28 @@ func _restore_world_progress() -> void:
 		player.global_position = Vector3(float(p[0]), float(p[1]), float(p[2]))
 	if world.has("player_rotation_y"):
 		player.rotation.y = float(world.player_rotation_y)
+	if world.has("vehicle_position") and world.vehicle_position is Array and world.vehicle_position.size() == 3:
+		var car: Array = world.vehicle_position
+		restored_vehicle_position = Vector3(float(car[0]), float(car[1]), float(car[2]))
+	restore_vehicle_driver = bool(world.get("was_driving", false))
+	quality_level = clampi(int(world.get("graphics_quality", 0)), 0, 2)
 	print("MAHDIA_WORLD_PROGRESS_RESTORED")
 
 func _save_world_progress() -> void:
 	if not is_instance_valid(save_manager) or not is_instance_valid(player):
 		return
 	var data: Dictionary = save_manager.load_progress()
+	var car_position := restored_vehicle_position
+	var was_driving := false
+	if is_instance_valid(vehicle):
+		car_position = vehicle.global_position
+		was_driving = vehicle.driver == player
 	data[WORLD_SAVE_KEY] = {
 		"player_position": [player.global_position.x, player.global_position.y, player.global_position.z],
-		"player_rotation_y": player.rotation.y
+		"player_rotation_y": player.rotation.y,
+		"vehicle_position": [car_position.x, car_position.y, car_position.z],
+		"was_driving": was_driving,
+		"graphics_quality": quality_level
 	}
 	var result: Error = save_manager.save_progress(data)
 	if result != OK:
@@ -335,3 +367,18 @@ func _save_world_progress() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
 		_save_world_progress()
+
+func _cycle_graphics_quality() -> void:
+	quality_level = (quality_level + 1) % 3
+	_apply_graphics_quality()
+	_save_world_progress()
+
+func _apply_graphics_quality() -> void:
+	var labels := ["منخفضة", "متوسطة", "عالية"]
+	if is_instance_valid(quality_button):
+		quality_button.text = "الرسوم: " + labels[quality_level]
+	Engine.max_fps = [30, 45, 60][quality_level]
+	if is_instance_valid(sun):
+		sun.shadow_enabled = quality_level == 2
+	if is_instance_valid(world_environment):
+		world_environment.ambient_light_energy = [0.58, 0.78, 0.95][quality_level]
