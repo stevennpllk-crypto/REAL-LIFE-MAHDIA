@@ -381,6 +381,7 @@ func _build_hud() -> void:
 	chat_input = LineEdit.new()
 	chat_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	chat_input.placeholder_text = "اكتب للمواطن القريب..."
+	chat_input.max_length = 1200
 	chat_input.text_submitted.connect(_on_chat_submitted)
 	chat_row.add_child(chat_input)
 	var send_button := Button.new()
