@@ -39,5 +39,17 @@ func _run_tests() -> void:
 	player.call("set_mobile_run", false)
 	_check(player.get("running") == false, "run button release is accepted")
 
-	print("Mobile movement tests: ", 6 - failures, "/6 passed")
+	var saver := Node.new()
+	saver.set_script(load("res://scripts/save_manager.gd"))
+	root.add_child(saver)
+	var sample_progress := {"mahdia_world": {"player_position": [12.5, 0.0, -7.25], "player_rotation_y": 1.2}, "mahdia_life": {"money": 135, "hunger": 72.0}}
+	var save_result: Error = saver.call("save_progress", sample_progress)
+	_check(save_result == OK, "world progress save returns success")
+	var loaded_progress: Dictionary = saver.call("load_progress")
+	var loaded_world: Dictionary = loaded_progress.get("mahdia_world", {})
+	var loaded_life: Dictionary = loaded_progress.get("mahdia_life", {})
+	_check(loaded_world.get("player_position", []) == [12.5, 0.0, -7.25], "player position survives save and load")
+	_check(is_equal_approx(float(loaded_world.get("player_rotation_y", 0.0)), 1.2), "player rotation survives save and load")
+	_check(int(loaded_life.get("money", 0)) == 135 and is_equal_approx(float(loaded_life.get("hunger", 0.0)), 72.0), "life progress remains in the same save file")
+	print("Gameplay tests: ", 10 - failures, "/10 passed")
 	quit(0 if failures == 0 else 1)
