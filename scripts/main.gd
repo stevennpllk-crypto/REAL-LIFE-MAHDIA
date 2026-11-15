@@ -46,6 +46,8 @@ func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
 	mat.roughness = roughness
+	# Unshaded keeps low-poly geometry visible on devices with tight shader uniform limits.
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material_cache[key] = mat
 	return mat
 
@@ -62,17 +64,12 @@ func _box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInst
 func _build_environment() -> void:
 	var world_env := WorldEnvironment.new()
 	world_environment = Environment.new()
-	world_environment.background_mode = Environment.BG_SKY
-	var sky := Sky.new()
-	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.12, 0.34, 0.62)
-	sky_mat.sky_horizon_color = Color(0.68, 0.79, 0.86)
-	sky_mat.ground_bottom_color = Color(0.12, 0.14, 0.17)
-	sky_mat.ground_horizon_color = Color(0.48, 0.53, 0.55)
-	sky.sky_material = sky_mat
-	world_environment.sky = sky
-	world_environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	world_environment.ambient_light_energy = 0.85
+	world_environment.background_mode = Environment.BG_COLOR
+	world_environment.background_color = Color(0.48, 0.69, 0.86)
+	# Avoid procedural-sky shader variants on low-limit GLES3/SwiftShader devices.
+	world_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	world_environment.ambient_light_color = Color(0.78, 0.82, 0.90)
+	world_environment.ambient_light_energy = 0.9
 	world_env.environment = world_environment
 	add_child(world_env)
 	sun = DirectionalLight3D.new()
@@ -302,12 +299,16 @@ func _build_hud() -> void:
 	controls.setup(player)
 
 func _process(_delta: float) -> void:
-	if (Input.is_action_just_pressed("interact") or player.interact_requested) and is_instance_valid(vehicle):
+	# _process continues while _ready() yields during town generation.
+	if not is_instance_valid(player):
+		return
+	var interact_pressed := InputMap.has_action("interact") and Input.is_action_just_pressed("interact")
+	if (interact_pressed or player.interact_requested) and is_instance_valid(vehicle):
 		if vehicle.driver == player:
 			vehicle.exit_vehicle()
 		elif player.global_position.distance_to(vehicle.global_position) < 4.0:
 			vehicle.enter_vehicle(player)
-		else:
+		elif is_instance_valid(life_manager):
 			life_manager.try_interact()
 		player.interact_requested = false
 	if is_instance_valid(planet_navigation) and is_instance_valid(player):
