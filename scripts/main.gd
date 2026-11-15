@@ -35,6 +35,7 @@ var planet_navigation: Node
 var terrain_streamer: Node3D
 var material_cache: Dictionary = {}
 var water_waves: Array[MeshInstance3D] = []
+var water_wave_origins: Array[Vector3] = []
 var water_clock := 0.0
 var autosave_elapsed := 0.0
 var quality_level := 0
@@ -237,6 +238,7 @@ func _create_coastal_scenery() -> void:
 		wave.material_override = _material(Color(0.42, 0.76, 0.82))
 		add_child(wave)
 		water_waves.append(wave)
+		water_wave_origins.append(wave.position)
 	for i in range(4):
 		var x := -18.0 + float(i) * 12.0
 		_box(self, Vector3(2.2, 0.12, 0.55), Vector3(x, 0.72, -54.0), Color(0.40, 0.23, 0.12))
@@ -730,9 +732,9 @@ func _process(delta: float) -> void:
 	for wave_index in range(water_waves.size()):
 		var wave := water_waves[wave_index]
 		if is_instance_valid(wave):
-			wave.position.x += sin(water_clock * 0.22 + float(wave_index)) * delta * 0.32
-			wave.position.z = -62.0 - float(wave_index) * 2.5 + sin(water_clock * 0.65 + float(wave_index) * 0.8) * 0.22
-			autosave_elapsed += 0.0
+			var origin := water_wave_origins[wave_index]
+			wave.position.x = origin.x + sin(water_clock * 0.22 + float(wave_index)) * 0.32
+			wave.position.z = origin.z + sin(water_clock * 0.65 + float(wave_index) * 0.8) * 0.22
 	autosave_elapsed += delta
 	if autosave_elapsed >= AUTOSAVE_INTERVAL:
 		autosave_elapsed = 0.0
