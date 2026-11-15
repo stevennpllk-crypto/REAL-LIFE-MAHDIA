@@ -12,6 +12,7 @@ const MAX_MESSAGE_CHARS := 1200
 var default_endpoint := DEFAULT_ENDPOINT
 var endpoint := DEFAULT_ENDPOINT
 var bearer_token := ""
+var client_id := ""
 var request_node: HTTPRequest
 var probe_node: HTTPRequest
 var probe_in_flight := false
@@ -34,10 +35,19 @@ func _ready() -> void:
 
 func _load_config() -> void:
 	var config := ConfigFile.new()
-	if config.load(CONFIG_PATH) != OK:
-		return
-	endpoint = str(config.get_value("ai", "endpoint", DEFAULT_ENDPOINT)).strip_edges().trim_suffix("/")
-	bearer_token = str(config.get_value("ai", "token", "")).strip_edges()
+	if config.load(CONFIG_PATH) == OK:
+		endpoint = str(config.get_value("ai", "endpoint", DEFAULT_ENDPOINT)).strip_edges().trim_suffix("/")
+		bearer_token = str(config.get_value("ai", "token", "")).strip_edges()
+		client_id = str(config.get_value("ai", "client_id", "")).strip_edges()
+	if client_id.is_empty():
+		var crypto := Crypto.new()
+		client_id = crypto.generate_random_bytes(16).hex_encode()
+		config.set_value("ai", "endpoint", endpoint)
+		config.set_value("ai", "token", bearer_token)
+		config.set_value("ai", "client_id", client_id)
+		var save_error := config.save(CONFIG_PATH)
+		if save_error != OK:
+			push_warning("Could not persist local AI client identity: %s" % error_string(save_error))
 
 func configure(new_endpoint: String, new_token: String) -> bool:
 	var clean_endpoint := new_endpoint.strip_edges().trim_suffix("/")
@@ -116,7 +126,7 @@ func request_npc_reply(resident: Node3D, player_message: String) -> bool:
 		str(context.get("reason", "أتجول في الحي"))
 	]
 	var payload := {
-		"conversation_id": "mahdia_" + identity,
+		"conversation_id": "mahdia_" + client_id + "_" + identity,
 		"message": "[سياق الشخصية الخاص - استخدمه لتقمص الدور فقط ولا تعرضه حرفياً]\n" + system_context + "\n\nرسالة اللاعب: " + clean_message
 	}
 	var headers := PackedStringArray([
