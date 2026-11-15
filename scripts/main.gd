@@ -321,16 +321,35 @@ func _spawn_player() -> void:
 	add_child(player)
 
 func _spawn_residents() -> void:
-	var personalities := ["friendly", "shy", "busy", "curious", "grumpy", "friendly", "curious", "busy"]
-	var jobs := ["fisher", "shopkeeper", "mechanic", "student", "resident", "cook", "driver", "resident"]
-	for i in range(personalities.size()):
+	# Place residents on public sidewalks rather than random points that may
+	# intersect buildings or spawn directly inside traffic lanes.
+	var personalities := [
+		"friendly", "shy", "busy", "curious", "grumpy", "friendly",
+		"curious", "busy", "friendly", "shy", "curious", "busy"
+	]
+	var jobs := [
+		"fisher", "shopkeeper", "mechanic", "student", "resident", "cook",
+		"driver", "resident", "shopkeeper", "student", "fisher", "mechanic"
+	]
+	var resident_names := [
+		"سامي", "مريم", "أيمن", "ليلى", "منير", "آمنة",
+		"يوسف", "سارة", "حاتم", "نجلاء", "وليد", "ريم"
+	]
+	var sidewalk_positions := [
+		Vector3(-30, 0, -6.6), Vector3(-20, 0, -6.6), Vector3(-10, 0, -6.6),
+		Vector3(10, 0, -6.6), Vector3(20, 0, -6.6), Vector3(30, 0, -6.6),
+		Vector3(-30, 0, 6.6), Vector3(-20, 0, 6.6), Vector3(-10, 0, 6.6),
+		Vector3(10, 0, 6.6), Vector3(20, 0, 6.6), Vector3(30, 0, 6.6)
+	]
+	for i in range(sidewalk_positions.size()):
 		var npc := CharacterBody3D.new()
 		npc.set_script(NPC_SCRIPT)
-		npc.position = Vector3(randf_range(-24, 24), 0, randf_range(-20, 20))
-		npc.display_name = ["سامي", "مريم", "أيمن", "ليلى", "منير", "آمنة", "يوسف", "سارة"][i]
+		npc.position = sidewalk_positions[i]
+		npc.display_name = resident_names[i]
 		npc.personality = personalities[i]
 		npc.occupation = jobs[i]
-		npc.set_ai_context(player, world_systems, Vector3(-28.0 + float(i) * 8.0, 0, -15.0 + float(i % 3) * 10.0), i, save_manager)
+		var work_spot := sidewalk_positions[i] + Vector3(0, 0, 5.0 if i % 2 == 0 else -5.0)
+		npc.set_ai_context(player, world_systems, work_spot, i, save_manager)
 		add_child(npc)
 
 func _spawn_vehicle() -> void:
