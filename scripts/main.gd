@@ -211,27 +211,74 @@ func _build_town() -> void:
 	_create_city_details()
 
 func _create_building(origin: Vector3, size: Vector3, wall_color: Color, seed_value: int) -> void:
-	# Keep each building intentionally lightweight: one body, one roof, one door,
-	# and a small number of windows. The previous facade generated hundreds of
-	# tiny mesh nodes and delayed first-frame rendering on mobile GPUs.
+	# Mediterranean/Mahdia-inspired low-rise architecture. Keep geometry static
+	# and deliberately bounded so the richer street remains usable on 3 GB phones.
 	var building := StaticBody3D.new()
 	building.position = origin
 	var w := size.x
 	var h := size.y
 	var d := size.z
+	var window_y := minf(3.45, h * 0.58)
+	var window_color := Color(0.10, 0.23, 0.30)
+	var trim_color := Color(0.91, 0.87, 0.77)
+	var frame_color := Color(0.29, 0.23, 0.18)
+
 	_box(building, size, Vector3(0, h * 0.5, 0), wall_color)
-	_box(building, Vector3(w + 0.2, 0.22, d + 0.2), Vector3(0, h + 0.11, 0), Color(0.70, 0.66, 0.58))
+	_box(building, Vector3(w + 0.32, 0.24, d + 0.32), Vector3(0, h + 0.12, 0), Color(0.70, 0.66, 0.58))
+	# Roof parapet gives flat Tunisian rooftops a recognisable silhouette.
+	for side in [-1.0, 1.0]:
+		_box(building, Vector3(w + 0.12, 0.42, 0.12), Vector3(0, h + 0.40, side * (d * 0.5)), trim_color)
+		_box(building, Vector3(0.12, 0.42, d + 0.12), Vector3(side * (w * 0.5), h + 0.40, 0), trim_color)
+
+	# Ground-floor entrance, raised step and occasional shopfront.
 	_box(building, Vector3(1.05, 2.05, 0.10), Vector3(0, 1.03, d * 0.501), Color(0.25, 0.17, 0.12))
-	for col in range(2):
-		var wx := (float(col) - 0.5) * w * 0.48
-		_box(building, Vector3(1.15, 1.15, 0.08), Vector3(wx, minf(3.45, h * 0.58), d * 0.505), Color(0.12, 0.29, 0.38))
-		_box(building, Vector3(1.28, 0.09, 0.12), Vector3(wx, minf(4.05, h * 0.58 + 0.62), d * 0.52), Color(0.92, 0.88, 0.78))
-		_box(building, Vector3(0.12, 1.18, 0.12), Vector3(wx - 0.62, minf(3.45, h * 0.58), d * 0.54), Color(0.30, 0.23, 0.18))
-		_box(building, Vector3(0.12, 1.18, 0.12), Vector3(wx + 0.62, minf(3.45, h * 0.58), d * 0.54), Color(0.30, 0.23, 0.18))
-		_box(building, Vector3(1.38, 0.12, 0.12), Vector3(wx, minf(3.45, h * 0.58) + 0.48, d * 0.54), Color(0.30, 0.23, 0.18))
-		_box(building, Vector3(1.42, 0.16, 0.68), Vector3(wx, minf(3.45, h * 0.58) - 0.64, d * 0.70), Color(0.68, 0.61, 0.49))
+	_box(building, Vector3(1.42, 0.16, 0.72), Vector3(0, 0.10, d * 0.69), Color(0.66, 0.59, 0.48))
 	if seed_value % 3 == 0:
-		_box(building, Vector3(w * 0.66, 0.18, 0.9), Vector3(0, 2.42, d * 0.72), Color(0.12, 0.40, 0.36))
+		_box(building, Vector3(w * 0.62, 1.55, 0.07), Vector3(0, 1.38, d * 0.505), Color(0.12, 0.24, 0.27))
+		_box(building, Vector3(w * 0.68, 0.16, 0.92), Vector3(0, 2.25, d * 0.72), [Color(0.76, 0.22, 0.16), Color(0.88, 0.78, 0.58), Color(0.16, 0.40, 0.43)][posmod(seed_value, 3)])
+	else:
+		_box(building, Vector3(1.15, 1.15, 0.08), Vector3(0, window_y, d * 0.505), window_color)
+
+	# Repeated upper-floor windows with stone sills and simple wooden frames.
+	var window_count := 2 if w < 8.2 else 3
+	for floor_index in range(1, 3):
+		var y := minf(float(floor_index) * 2.65 + 0.9, h - 1.15)
+		for col in range(window_count):
+			var wx := (float(col) - float(window_count - 1) * 0.5) * (w * 0.72 / float(window_count))
+			_box(building, Vector3(1.08, 1.12, 0.075), Vector3(wx, y, d * 0.505), window_color)
+			_box(building, Vector3(1.20, 0.10, 0.13), Vector3(wx, y + 0.62, d * 0.53), trim_color)
+			_box(building, Vector3(1.24, 0.12, 0.20), Vector3(wx, y - 0.62, d * 0.56), Color(0.68, 0.61, 0.49))
+			_box(building, Vector3(0.09, 1.16, 0.11), Vector3(wx - 0.57, y, d * 0.54), frame_color)
+			_box(building, Vector3(0.09, 1.16, 0.11), Vector3(wx + 0.57, y, d * 0.54), frame_color)
+			if (seed_value + floor_index + col) % 3 == 0:
+				# Small projecting balcony and rail.
+				_box(building, Vector3(1.38, 0.12, 0.66), Vector3(wx, y - 0.58, d * 0.78), Color(0.67, 0.62, 0.53))
+				_box(building, Vector3(1.30, 0.10, 0.08), Vector3(wx, y - 0.08, d * 0.98), Color(0.24, 0.27, 0.27))
+				for rail_x in [-0.58, -0.20, 0.20, 0.58]:
+					_box(building, Vector3(0.055, 0.48, 0.055), Vector3(wx + rail_x, y - 0.32, d * 0.98), Color(0.24, 0.27, 0.27))
+
+	# A few side windows and wall-mounted air-conditioning units.
+	for side in [-1.0, 1.0]:
+		for floor_index in range(2):
+			var side_y := 2.0 + float(floor_index) * 2.6
+			_box(building, Vector3(0.075, 0.92, 1.0), Vector3(side * (w * 0.505), side_y, -d * 0.12), window_color)
+		if (seed_value + int(side)) % 2 == 0:
+			_box(building, Vector3(0.42, 0.34, 0.42), Vector3(side * (w * 0.505), 2.65, d * 0.12), Color(0.78, 0.79, 0.75))
+			_box(building, Vector3(0.28, 0.10, 0.08), Vector3(side * (w * 0.53), 2.65, d * 0.12), Color(0.35, 0.38, 0.38))
+
+	# Rooftop water tank and a small service shed on selected buildings.
+	if seed_value % 2 == 0:
+		var tank := MeshInstance3D.new()
+		var tank_mesh := CylinderMesh.new()
+		tank_mesh.top_radius = 0.48
+		tank_mesh.bottom_radius = 0.48
+		tank_mesh.height = 0.95
+		tank.mesh = tank_mesh
+		tank.position = Vector3(w * 0.25, h + 0.78, -d * 0.20)
+		tank.material_override = _material(Color(0.78, 0.82, 0.80))
+		building.add_child(tank)
+		_box(building, Vector3(1.8, 1.25, 1.6), Vector3(-w * 0.22, h + 0.75, -d * 0.18), Color(0.82, 0.78, 0.68))
+
 	var collision := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
 	shape.size = size
