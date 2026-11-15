@@ -51,7 +51,7 @@ func _load_config() -> void:
 
 func configure(new_endpoint: String, new_token: String) -> bool:
 	var clean_endpoint := new_endpoint.strip_edges().trim_suffix("/")
-	if not (clean_endpoint.begins_with("https://") or clean_endpoint.begins_with("http://")):
+	if not clean_endpoint.begins_with("https://"):
 		return false
 	if clean_endpoint.contains(" ") or clean_endpoint.ends_with("/api/chat"):
 		return false
