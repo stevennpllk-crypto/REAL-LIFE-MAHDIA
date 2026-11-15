@@ -34,22 +34,37 @@ test -s build/REAL_LIFE_MAHDIA-debug.apk
 adb shell cmd package list packages >/dev/null
 adb install -r build/REAL_LIFE_MAHDIA-debug.apk
 adb logcat -c
-adb shell monkey -p com.jassim.reallifemahdia 1
+adb shell am force-stop com.jassim.reallifemahdia
+adb shell am start -W -n com.jassim.reallifemahdia/com.godot.game.GodotApp
 
-# A resumed Android Activity is not proof that Godot loaded the game scene.
-# Wait for the explicit marker printed at the end of Main.gd::_ready().
+# Require the first playable frame before waiting for the complete city.
+player_ready=false
+for attempt in $(seq 1 24); do
+  if adb logcat -d | grep -q "MAHDIA_PLAYER_READY"; then
+    player_ready=true
+    echo "Playable player/camera/HUD initialized on attempt $attempt."
+    break
+  fi
+  sleep 5
+done
+if [[ "$player_ready" != "true" ]]; then
+  echo "Player scene did not initialize. Recent Godot log:"
+  adb logcat -d -s godot:I godot:E GodotActivity:V | tail -n 120 || true
+  exit 1
+fi
+
 scene_ready=false
-for attempt in $(seq 1 36); do
+for attempt in $(seq 1 48); do
   if adb logcat -d | grep -q "MAHDIA_WORLD_READY"; then
     scene_ready=true
     echo "Main world scene reported ready on attempt $attempt."
     break
   fi
-  echo "Waiting for Mahdia world scene... attempt $attempt/36"
   sleep 5
 done
 if [[ "$scene_ready" != "true" ]]; then
-  echo "Game did not finish initializing its main world scene."
+  echo "City scene did not finish initializing. Recent Godot log:"
+  adb logcat -d -s godot:I godot:E GodotActivity:V | tail -n 160 || true
   exit 1
 fi
 
