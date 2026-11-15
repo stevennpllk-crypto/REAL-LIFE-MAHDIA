@@ -119,6 +119,18 @@ jobs:
       - name: Select Mobile Vulkan APK for emulator rendering test
         run: cp build/REAL_LIFE_MAHDIA-mobile.apk build/REAL_LIFE_MAHDIA-debug.apk
 
+      - name: Prepare KVM and ADB for emulator
+        run: |
+          set -euxo pipefail
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+            ls -l /dev/kvm
+          else
+            echo "KVM device is not exposed by this runner; emulator will use software acceleration."
+          fi
+          adb start-server
+          adb version
+
       - name: Test APK on cloud Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -129,8 +141,8 @@ jobs:
           ram-size: 1536M
           heap-size: 384M
           emulator-boot-timeout: 900
-          # Keep KVM acceleration enabled on GitHub-hosted Linux runners.
-          # SwiftShader remains the graphics backend for GLES/Vulkan smoke tests.
+          disable-linux-hw-accel: false
+          # Prefer KVM when the runner exposes it; SwiftShader remains the graphics backend.
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
           disable-animations: true
           script: bash .github/scripts/android-emulator-smoke-test.sh
