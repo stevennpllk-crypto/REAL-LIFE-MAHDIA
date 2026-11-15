@@ -128,8 +128,9 @@ jobs:
           else
             echo "KVM device is not exposed by this runner; emulator will use software acceleration."
           fi
-          adb start-server
-          adb version
+          "$ANDROID_HOME/platform-tools/adb" start-server
+          "$ANDROID_HOME/platform-tools/adb" version
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
 
       - name: Test APK on cloud Android emulator
         uses: reactivecircus/android-emulator-runner@v2
