@@ -123,6 +123,8 @@ func _terrain_material() -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = Color(0.42, 0.48, 0.30)
 	material.roughness = 1.0
+	# Match the mobile city/player materials: avoid GLES3 light-uniform shader variants.
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return material
 
 func get_stream_status() -> String:
