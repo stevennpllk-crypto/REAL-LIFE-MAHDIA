@@ -10,6 +10,8 @@ class_name MahdiaNPC
 
 var player: CharacterBody3D
 var world_clock: Node
+var memory_manager: Node
+var memory_id := ""
 var home_position := Vector3.ZERO
 var work_position := Vector3.ZERO
 var rest_position := Vector3.ZERO
@@ -29,9 +31,12 @@ var right_leg: Node3D
 var visual_root: Node3D
 var clock := 0.0
 
-func set_ai_context(player_node: CharacterBody3D, clock_node: Node, work_spot: Vector3, identity: int) -> void:
+func set_ai_context(player_node: CharacterBody3D, clock_node: Node, work_spot: Vector3, identity: int, saver: Node = null) -> void:
 	player = player_node
 	world_clock = clock_node
+	memory_manager = saver
+	memory_id = "resident_%02d" % identity
+	_load_memory()
 	work_position = work_spot
 	personal_seed = identity
 	rest_position = work_spot + Vector3(3.0, 0, 2.5)
@@ -143,6 +148,27 @@ func on_player_interacted() -> void:
 	memory_meetings += 1
 	last_player_interaction = Time.get_ticks_msec() / 1000.0
 	mood = clampf(mood + 0.12, 0.0, 1.0)
+	_save_memory()
+
+func _load_memory() -> void:
+	if not is_instance_valid(memory_manager) or memory_id.is_empty():
+		return
+	var all_data: Dictionary = memory_manager.load_progress()
+	var memories: Dictionary = all_data.get("mahdia_npc_memory", {})
+	var memory: Dictionary = memories.get(memory_id, {})
+	memory_meetings = maxi(0, int(memory.get("meetings", 0)))
+	mood = clampf(float(memory.get("mood", 0.5)), 0.0, 1.0)
+
+func _save_memory() -> void:
+	if not is_instance_valid(memory_manager) or memory_id.is_empty():
+		return
+	var all_data: Dictionary = memory_manager.load_progress()
+	var memories: Dictionary = all_data.get("mahdia_npc_memory", {})
+	memories[memory_id] = {"meetings": memory_meetings, "mood": mood}
+	all_data["mahdia_npc_memory"] = memories
+	var result: Error = memory_manager.save_progress(all_data)
+	if result != OK:
+		push_warning("Could not save resident memory: %s" % error_string(result))
 
 func get_dialogue() -> String:
 	var remembered := "أهلاً، تذكرتك!" if memory_meetings > 1 else "أهلاً بك."
