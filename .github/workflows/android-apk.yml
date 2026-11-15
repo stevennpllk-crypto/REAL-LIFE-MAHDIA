@@ -87,6 +87,38 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # Keep the GLES Compatibility APK for older devices, but test a
+      # Vulkan Mobile-renderer build separately. SwiftShader GLES has a known
+      # 261-uniform linker failure unrelated to this project's light settings.
+      - name: Export Android Mobile Vulkan variant
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("project.godot")
+          s = p.read_text()
+          s = s.replace('config/features=PackedStringArray("4.3", "GL Compatibility")', 'config/features=PackedStringArray("4.3", "Mobile")')
+          s = s.replace('renderer/rendering_method="gl_compatibility"', 'renderer/rendering_method="mobile"')
+          s = s.replace('renderer/rendering_method.mobile="gl_compatibility"', 'renderer/rendering_method.mobile="mobile"')
+          assert 'renderer/rendering_method.mobile="mobile"' in s
+          p.write_text(s)
+          PY
+          godot --headless --editor --path . --quit
+          godot --headless --path . --export-debug "Android" build/REAL_LIFE_MAHDIA-mobile.apk
+          test -s build/REAL_LIFE_MAHDIA-mobile.apk
+          file build/REAL_LIFE_MAHDIA-mobile.apk
+
+      - name: Upload Android Mobile Vulkan APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: REAL-LIFE-MAHDIA-Android-Mobile-Vulkan-APK
+          path: build/REAL_LIFE_MAHDIA-mobile.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Select Mobile Vulkan APK for emulator rendering test
+        run: cp build/REAL_LIFE_MAHDIA-mobile.apk build/REAL_LIFE_MAHDIA-debug.apk
+
       - name: Test APK on cloud Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
