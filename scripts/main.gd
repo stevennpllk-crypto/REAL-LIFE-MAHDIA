@@ -4,6 +4,7 @@ const PLAYER_SCRIPT = preload("res://scripts/player.gd")
 const NPC_SCRIPT = preload("res://scripts/npc.gd")
 const MOBILE_CONTROLS = preload("res://scripts/mobile_controls.gd")
 const VEHICLE_SCRIPT = preload("res://scripts/vehicle.gd")
+const TRAFFIC_SCRIPT = preload("res://scripts/traffic_car.gd")
 const WORLD_SYSTEMS = preload("res://scripts/world_systems.gd")
 const NETWORK_SCRIPT = preload("res://scripts/multiplayer_manager.gd")
 const SAVE_SCRIPT = preload("res://scripts/save_manager.gd")
@@ -53,6 +54,7 @@ func _ready() -> void:
 	print("MAHDIA_TOWN_READY")
 	_spawn_residents()
 	_spawn_vehicle()
+	_spawn_traffic()
 	print("MAHDIA_WORLD_READY")
 
 func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
@@ -362,6 +364,23 @@ func _spawn_vehicle() -> void:
 	add_child(vehicle)
 	if restore_vehicle_driver:
 		vehicle.enter_vehicle(player)
+
+func _spawn_traffic() -> void:
+	# Four lightweight autonomous vehicles use the two existing main-road axes.
+	# They stay inside the asphalt lanes and wrap at the distant road ends.
+	var traffic_specs := [
+		[true, -1.65, -52.0, 1.0, 4.0],
+		[true, 1.65, 34.0, -1.0, 3.6],
+		[false, -1.65, -40.0, 1.0, 3.8],
+		[false, 1.65, 48.0, -1.0, 4.2]
+	]
+	for i in range(traffic_specs.size()):
+		var spec: Array = traffic_specs[i]
+		var car := CharacterBody3D.new()
+		car.set_script(TRAFFIC_SCRIPT)
+		car.name = "TrafficCar_%02d" % (i + 1)
+		car.call("configure_traffic", bool(spec[0]), float(spec[1]), float(spec[2]), float(spec[3]), float(spec[4]))
+		add_child(car)
 
 func _setup_systems() -> void:
 	world_systems = Node.new()
