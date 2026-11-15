@@ -33,6 +33,9 @@ func _run_tests() -> void:
 	_check(is_equal_approx(full_strength, 1.0), "full joystick tilt reaches full input")
 
 	_check(half_strength < full_strength, "movement input scales progressively")
+	_check(float(player.get("acceleration")) < 8.0 and float(player.get("deceleration")) < 13.0, "player movement uses gentler acceleration and braking")
+	player.call("set_mobile_move", Vector2(4.0, 0.0))
+	_check(is_equal_approx(Vector2(player.get("move_vector")).length(), 1.0), "joystick input is clamped at full tilt")
 	player.call("set_mobile_move", Vector2(0.0, 1.0))
 	var vertical: Vector2 = player.get("move_vector")
 	_check(vertical.x == 0.0 and vertical.y > 0.0, "joystick direction is preserved")
