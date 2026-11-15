@@ -51,5 +51,25 @@ func _run_tests() -> void:
 	_check(loaded_world.get("player_position", []) == [12.5, 0.0, -7.25], "player position survives save and load")
 	_check(is_equal_approx(float(loaded_world.get("player_rotation_y", 0.0)), 1.2), "player rotation survives save and load")
 	_check(int(loaded_life.get("money", 0)) == 135 and is_equal_approx(float(loaded_life.get("hunger", 0.0)), 72.0), "life progress remains in the same save file")
-	print("Gameplay tests: ", 10 - failures, "/10 passed")
+
+	var car := CharacterBody3D.new()
+	car.set_script(load("res://scripts/vehicle.gd"))
+	root.add_child(car)
+	await process_frame
+	car.call("enter_vehicle", player)
+	_check(car.get("driver") == player, "player can enter the vehicle")
+	_check(not player.is_physics_processing(), "player movement is suspended while driving")
+	car.call("exit_vehicle")
+	_check(car.get("driver") == null, "player can exit the vehicle")
+	_check(player.is_physics_processing() and player.visible, "player control and visibility return after exiting")
+
+	var weather_system := Node.new()
+	weather_system.set_script(load("res://scripts/world_systems.gd"))
+	root.add_child(weather_system)
+	weather_system.call("set_weather", "ممطر")
+	_check(str(weather_system.get("weather")) == "ممطر", "weather system accepts supported weather")
+	weather_system.call("set_weather", "ثلوج")
+	_check(str(weather_system.get("weather")) == "ممطر", "weather system rejects unsupported weather")
+
+	print("Gameplay tests: ", 16 - failures, "/16 passed")
 	quit(0 if failures == 0 else 1)
