@@ -30,6 +30,8 @@ var decision_reason := "أبحث عن شيء أفعله"
 var need_update_elapsed := 0.0
 var social_scan_elapsed := 0.0
 var resident_relationships: Dictionary = {}
+# Prevent two nearby residents from rapidly maxing out familiarity every scan.
+var social_encounter_cooldowns: Dictionary = {}
 var ai_state := "wander"
 var personal_seed := 0
 var turn_bias := 1.0
@@ -339,17 +341,23 @@ func _update_social_awareness() -> void:
 	var familiarity := clampf(float(resident_relationships.get(other_id, 0.0)), 0.0, 1.0)
 	var distance := global_position.distance_to(other.global_position)
 	if distance <= 2.4:
-		_record_experience("social", "قضيت وقتاً مع %s" % str(other.get("display_name")), 0.04)
-		familiarity = clampf(familiarity + 0.012, 0.0, 1.0)
-		resident_relationships[other_id] = familiarity
-		memory_dirty = true
-		if ai_state == "socializing" or social_need > 0.72:
-			social_need = clampf(social_need - 0.035, 0.0, 1.0)
-			other.set("social_need", clampf(float(other.get("social_need")) - 0.02, 0.0, 1.0))
-			decision_reason = "أتحدث مع %s وأتعرف إليه أكثر" % str(other.get("display_name"))
-			if ai_state != "working" and ai_state != "resting":
-				ai_state = "socializing"
-				wait_time = maxf(wait_time, 1.0)
+		var now_msec := Time.get_ticks_msec()
+		var last_encounter := int(social_encounter_cooldowns.get(other_id, -20000))
+		# A pair can deepen its relationship at most once every 20 seconds.
+		if now_msec - last_encounter >= 20000:
+			social_encounter_cooldowns[other_id] = now_msec
+			_record_experience("social", "قضيت وقتاً مع %s" % str(other.get("display_name")), 0.04)
+			familiarity = clampf(familiarity + 0.004, 0.0, 1.0)
+			resident_relationships[other_id] = familiarity
+			memory_dirty = true
+			if ai_state == "socializing" or social_need > 0.72:
+				social_need = clampf(social_need - 0.035, 0.0, 1.0)
+				other.set("social_need", clampf(float(other.get("social_need")) - 0.02, 0.0, 1.0))
+				other.set("memory_dirty", true)
+				decision_reason = "أتحدث مع %s وأتعرف إليه أكثر" % str(other.get("display_name"))
+				if ai_state != "working" and ai_state != "resting":
+					ai_state = "socializing"
+					wait_time = maxf(wait_time, 1.0)
 
 func _update_needs(delta: float) -> void:
 	# Emotional state is simulated as a changing internal variable, not a claim of sentience.
