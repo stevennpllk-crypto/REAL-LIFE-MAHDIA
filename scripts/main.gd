@@ -24,6 +24,9 @@ var life_manager: Node
 var planet_navigation: Node
 var terrain_streamer: Node3D
 var material_cache: Dictionary = {}
+var autosave_elapsed := 0.0
+const AUTOSAVE_INTERVAL := 12.0
+const WORLD_SAVE_KEY := "mahdia_world"
 
 func _ready() -> void:
 	randomize()
@@ -244,6 +247,7 @@ func _setup_systems() -> void:
 	life_manager.set_script(LIFE_SCRIPT)
 	add_child(life_manager)
 	life_manager.setup(player, save_manager)
+	_restore_world_progress()
 
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
@@ -280,8 +284,12 @@ func _build_hud() -> void:
 	layer.add_child(controls)
 	controls.setup(player)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	# _process continues while _ready() yields during town generation.
+	autosave_elapsed += delta
+	if autosave_elapsed >= AUTOSAVE_INTERVAL:
+		autosave_elapsed = 0.0
+		_save_world_progress()
 	if not is_instance_valid(player):
 		return
 	var interact_pressed := InputMap.has_action("interact") and Input.is_action_just_pressed("interact")
@@ -298,3 +306,32 @@ func _process(_delta: float) -> void:
 	if is_instance_valid(status_label):
 		var hour_value: float = world_systems.hour if is_instance_valid(world_systems) else 8.0
 		status_label.text = "%s • %s • %02d:%02d • %s • %d د.ت • طاقة %d%% • جوع %d%%" % [planet_navigation.get_region_name(), planet_navigation.get_coordinate_text(), int(hour_value), int(fposmod(hour_value * 60.0, 60.0)), world_systems.weather, life_manager.money, int(life_manager.energy), int(life_manager.hunger)]
+
+
+func _restore_world_progress() -> void:
+	if not is_instance_valid(save_manager) or not is_instance_valid(player):
+		return
+	var data: Dictionary = save_manager.load_progress()
+	var world: Dictionary = data.get(WORLD_SAVE_KEY, {})
+	if world.has("player_position") and world.player_position is Array and world.player_position.size() == 3:
+		var p: Array = world.player_position
+		player.global_position = Vector3(float(p[0]), float(p[1]), float(p[2]))
+	if world.has("player_rotation_y"):
+		player.rotation.y = float(world.player_rotation_y)
+	print("MAHDIA_WORLD_PROGRESS_RESTORED")
+
+func _save_world_progress() -> void:
+	if not is_instance_valid(save_manager) or not is_instance_valid(player):
+		return
+	var data: Dictionary = save_manager.load_progress()
+	data[WORLD_SAVE_KEY] = {
+		"player_position": [player.global_position.x, player.global_position.y, player.global_position.z],
+		"player_rotation_y": player.rotation.y
+	}
+	var result: Error = save_manager.save_progress(data)
+	if result != OK:
+		push_warning("Could not save Mahdia world progress: %s" % error_string(result))
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
+		_save_world_progress()
