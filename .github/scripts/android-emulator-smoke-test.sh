@@ -122,7 +122,7 @@ for _y in range(height):
             scan[i] = (scan[i] + predictor) & 255
         elif filt != 0:
             raise SystemExit(f"Unsupported PNG filter: {filt}")
-    for i in range(0, stride, channels * 4):
+    for i in range(0, stride, channels):
         if max(scan[i:i + 3]) > 40:
             bright += 1
         total += 1
