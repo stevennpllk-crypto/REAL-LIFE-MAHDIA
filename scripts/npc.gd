@@ -50,6 +50,10 @@ var left_arm: Node3D
 var right_arm: Node3D
 var left_leg: Node3D
 var right_leg: Node3D
+var left_elbow: Node3D
+var right_elbow: Node3D
+var left_knee: Node3D
+var right_knee: Node3D
 var visual_root: Node3D
 var head_visual: Node3D
 var body_visual: Node3D
@@ -365,25 +369,52 @@ func _part(mesh: Mesh, pos: Vector3, color: Color) -> MeshInstance3D:
 	return item
 
 func _limb(pos: Vector3, color: Color, length: float, radius: float) -> Node3D:
+	# Two articulated segments instead of one rigid capsule: shoulder/hip,
+	# elbow/knee, forearm/shin and a distinct hand or shoe.
 	var pivot := Node3D.new()
 	pivot.position = pos
 	visual_root.add_child(pivot)
-	var item := MeshInstance3D.new()
-	item.mesh = _capsule(radius, length)
-	item.position = Vector3(0, -length * 0.34, 0)
-	item.material_override = _mat(color)
-	pivot.add_child(item)
-	var extremity := MeshInstance3D.new()
-	if length < 0.7:
-		extremity.mesh = _sphere(0.075, 0.14)
-		extremity.position = Vector3(0, -length * 0.72, -0.005)
-		extremity.material_override = _mat(Color(0.60, 0.39, 0.28))
+	var is_arm := length < 0.7
+	var upper_length := length * (0.56 if is_arm else 0.53)
+	var lower_length := length - upper_length
+	var upper := MeshInstance3D.new()
+	upper.mesh = _capsule(radius, upper_length)
+	upper.position = Vector3(0, -upper_length * 0.48, 0)
+	upper.material_override = _mat(color)
+	pivot.add_child(upper)
+	var joint := Node3D.new()
+	joint.position = Vector3(0, -upper_length * 0.92, 0)
+	pivot.add_child(joint)
+	var joint_mesh := MeshInstance3D.new()
+	joint_mesh.mesh = _sphere(radius * 0.94, radius * 1.9)
+	joint_mesh.material_override = _mat(color.darkened(0.035))
+	joint.add_child(joint_mesh)
+	var lower := MeshInstance3D.new()
+	lower.mesh = _capsule(radius * (0.82 if is_arm else 0.88), lower_length)
+	lower.position = Vector3(0, -lower_length * 0.48, 0)
+	lower.material_override = _mat(color)
+	joint.add_child(lower)
+	if is_arm:
+		var hand := MeshInstance3D.new()
+		hand.mesh = _sphere(0.065, 0.12)
+		hand.position = Vector3(0, -lower_length * 0.92, -0.008)
+		hand.material_override = _mat(Color(0.60, 0.39, 0.28))
+		joint.add_child(hand)
+		if pos.x < 0.0:
+			left_elbow = joint
+		else:
+			right_elbow = joint
 	else:
-		extremity.mesh = _capsule(0.105, 0.30)
-		extremity.position = Vector3(0, -length * 0.76, -0.035)
-		extremity.rotation.x = deg_to_rad(90.0)
-		extremity.material_override = _mat(Color(0.045, 0.05, 0.06))
-	pivot.add_child(extremity)
+		var shoe := MeshInstance3D.new()
+		shoe.mesh = _capsule(0.105, 0.30)
+		shoe.position = Vector3(0, -lower_length * 0.94, -0.055)
+		shoe.rotation.x = deg_to_rad(90.0)
+		shoe.material_override = _mat(Color(0.045, 0.05, 0.06))
+		joint.add_child(shoe)
+		if pos.x < 0.0:
+			left_knee = joint
+		else:
+			right_knee = joint
 	return pivot
 
 func _current_hour() -> float:
@@ -863,6 +894,10 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 		right_arm.rotation.x = -swing * (0.92 + turn_bias * 0.035)
 		left_leg.rotation.x = -swing * 1.12
 		right_leg.rotation.x = swing * 1.12
+		if is_instance_valid(left_elbow): left_elbow.rotation.x = -0.12 - maxf(0.0, swing) * 0.30
+		if is_instance_valid(right_elbow): right_elbow.rotation.x = -0.12 + minf(0.0, swing) * 0.30
+		if is_instance_valid(left_knee): left_knee.rotation.x = maxf(0.0, swing) * 0.48
+		if is_instance_valid(right_knee): right_knee.rotation.x = maxf(0.0, -swing) * 0.48
 		left_arm.rotation.z = lerpf(left_arm.rotation.z, -0.035, delta * 2.5)
 		right_arm.rotation.z = lerpf(right_arm.rotation.z, 0.035, delta * 2.5)
 	else:
@@ -875,6 +910,13 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 		right_arm.rotation.z = lerpf(right_arm.rotation.z, 0.10 if conversational else 0.0, delta * 2.5)
 		left_leg.rotation.x = lerpf(left_leg.rotation.x, 0.0, delta * 5.0)
 		right_leg.rotation.x = lerpf(right_leg.rotation.x, 0.0, delta * 5.0)
+		if is_instance_valid(left_elbow): left_elbow.rotation.x = lerpf(left_elbow.rotation.x, -0.08 if conversational else 0.0, delta * 3.0)
+		if is_instance_valid(right_elbow): right_elbow.rotation.x = lerpf(right_elbow.rotation.x, -0.08 if conversational else 0.0, delta * 3.0)
+		if is_instance_valid(left_knee): left_knee.rotation.x = lerpf(left_knee.rotation.x, 0.0, delta * 5.0)
+		if is_instance_valid(right_knee): right_knee.rotation.x = lerpf(right_knee.rotation.x, 0.0, delta * 5.0)
+	# Subtle breathing keeps a standing resident from looking frozen.
+	if is_instance_valid(body_visual):
+		body_visual.scale.y = 1.0 + sin(idle_phase * 1.65 + float(personal_seed)) * 0.012
 	if is_instance_valid(head_visual):
 		var look_target := Vector3.ZERO
 		if is_instance_valid(player) and global_position.distance_to(player.global_position) < 6.0:
