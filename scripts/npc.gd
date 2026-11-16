@@ -579,6 +579,7 @@ func _load_memory() -> void:
 	learned_preferences = memory.get("preferences", {}).duplicate(true)
 	stress = clampf(float(memory.get("stress", 0.0)), 0.0, 1.0)
 	current_goal = str(memory.get("current_goal", "استكشاف الحي"))
+	ai_thought = str(memory.get("ai_thought", "أراقب ما يحدث حولي"))
 	confidence = clampf(float(memory.get("confidence", 0.5)), 0.0, 1.0)
 	mood = clampf(float(memory.get("mood", 0.5)), 0.0, 1.0)
 	trust = clampf(float(memory.get("trust", 0.0)), 0.0, 1.0)
@@ -593,7 +594,7 @@ func _save_memory() -> void:
 		return
 	var all_data: Dictionary = memory_manager.load_progress()
 	var memories: Dictionary = all_data.get("mahdia_npc_memory", {})
-	memories[memory_id] = {"meetings": memory_meetings, "mood": mood, "trust": trust, "hunger": hunger, "energy": energy, "social_need": social_need, "curiosity": curiosity, "relationships": resident_relationships, "episodic_memories": long_term_memories, "preferences": learned_preferences, "stress": stress, "confidence": confidence, "current_goal": current_goal}
+	memories[memory_id] = {"meetings": memory_meetings, "mood": mood, "trust": trust, "hunger": hunger, "energy": energy, "social_need": social_need, "curiosity": curiosity, "relationships": resident_relationships, "episodic_memories": long_term_memories, "preferences": learned_preferences, "stress": stress, "confidence": confidence, "current_goal": current_goal, "ai_thought": ai_thought}
 	all_data["mahdia_npc_memory"] = memories
 	var result: Error = memory_manager.save_progress(all_data)
 	if result == OK:
@@ -619,7 +620,8 @@ func get_ai_context() -> Dictionary:
 		"stress": stress,
 		"confidence": confidence,
 		"goal": current_goal,
-		"reason": decision_reason
+		"reason": decision_reason,
+		"last_thought": ai_thought
 	}
 
 func get_dialogue() -> String:
