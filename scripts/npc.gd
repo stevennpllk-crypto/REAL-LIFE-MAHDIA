@@ -903,11 +903,23 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 	else:
 		idle_phase += delta
 		var conversational := ai_state == "socializing" or ai_state == "greeting" or ai_state == "acknowledging"
+		var working := ai_state == "working"
+		var eating := ai_state == "eating"
+		var resting := ai_state == "resting"
 		var gesture := sin(idle_phase * 2.1 + float(personal_seed)) * (0.18 if conversational else 0.025)
-		left_arm.rotation.x = lerpf(left_arm.rotation.x, gesture, delta * (3.4 if conversational else 2.8))
-		right_arm.rotation.x = lerpf(right_arm.rotation.x, -gesture * 0.7, delta * (3.0 if conversational else 2.8))
-		left_arm.rotation.z = lerpf(left_arm.rotation.z, -0.10 if conversational else 0.0, delta * 2.5)
-		right_arm.rotation.z = lerpf(right_arm.rotation.z, 0.10 if conversational else 0.0, delta * 2.5)
+		var work_motion := sin(idle_phase * 3.2 + float(personal_seed)) * 0.11 if working else 0.0
+		left_arm.rotation.x = lerpf(left_arm.rotation.x, gesture + work_motion, delta * (3.4 if conversational or working else 2.8))
+		var right_pose := -gesture * 0.7 - 0.62 if eating else -gesture * 0.7 + work_motion
+		right_arm.rotation.x = lerpf(right_arm.rotation.x, right_pose, delta * (3.0 if conversational or working or eating else 2.8))
+		left_arm.rotation.z = lerpf(left_arm.rotation.z, -0.10 if conversational else -0.035 if working else 0.0, delta * 2.5)
+		right_arm.rotation.z = lerpf(right_arm.rotation.z, 0.10 if conversational else 0.035 if working else 0.0, delta * 2.5)
+		if is_instance_valid(left_elbow):
+			left_elbow.rotation.x = lerpf(left_elbow.rotation.x, -0.12 if working else 0.0, delta * 3.0)
+		if is_instance_valid(right_elbow):
+			right_elbow.rotation.x = lerpf(right_elbow.rotation.x, -0.38 if eating else -0.12 if working else 0.0, delta * 3.0)
+		if is_instance_valid(body_visual):
+			var posture := 0.055 if resting else -0.025 if working else 0.0
+			body_visual.rotation.x = lerpf(body_visual.rotation.x, posture + sin(idle_phase * 0.8 + float(personal_seed)) * 0.008, delta * 2.0)
 		left_leg.rotation.x = lerpf(left_leg.rotation.x, 0.0, delta * 5.0)
 		right_leg.rotation.x = lerpf(right_leg.rotation.x, 0.0, delta * 5.0)
 		if is_instance_valid(left_elbow): left_elbow.rotation.x = lerpf(left_elbow.rotation.x, -0.08 if conversational else 0.0, delta * 3.0)
