@@ -113,6 +113,17 @@ func _run_tests() -> void:
 	root.add_child(resident)
 	await process_frame
 	_check(not str(resident.get("ai_state")).is_empty(), "NPC starts with an autonomous AI state")
+	# Build one rendered resident to verify the new articulated skeleton is present.
+	var visual_resident := CharacterBody3D.new()
+	visual_resident.set_script(load("res://scripts/npc.gd"))
+	visual_resident.set("build_visuals", true)
+	visual_resident.call("set_ai_context", player, null, Vector3(8, 0, 0), 12, saver)
+	root.add_child(visual_resident)
+	await process_frame
+	_check(is_instance_valid(visual_resident.get("left_elbow")) and is_instance_valid(visual_resident.get("right_elbow")), "resident arms contain independent elbow joints")
+	_check(is_instance_valid(visual_resident.get("left_knee")) and is_instance_valid(visual_resident.get("right_knee")), "resident legs contain independent knee joints")
+	_check(is_instance_valid(visual_resident.get("eye_white_left")) and is_instance_valid(visual_resident.get("mouth_visual")), "resident face contains layered eyes and an animated mouth")
+	visual_resident.queue_free()
 	player.global_position = Vector3(100, 0, 100)
 	resident.set("target_position", Vector3(22, 0, 0))
 	resident.set("ai_state", "commuting")
