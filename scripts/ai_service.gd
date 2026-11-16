@@ -4,6 +4,7 @@ class_name MahdiaAIService
 signal npc_reply(resident: Node3D, reply: String, success: bool)
 signal connection_status(ready: bool, message: String)
 signal auth_completed(success: bool, message: String)
+signal npc_thought(resident: Node3D, thought: String, decision: Dictionary, success: bool)
 
 const CONFIG_PATH := "user://mahdia_ai.cfg"
 const DEFAULT_ENDPOINT := "https://jassim-ai-core-final-production.up.railway.app"
@@ -15,6 +16,11 @@ var endpoint := DEFAULT_ENDPOINT
 var bearer_token := ""
 var client_id := ""
 var request_node: HTTPRequest
+var thought_request_node: HTTPRequest
+var thought_queue: Array[Dictionary] = []
+var active_thought_resident: Node3D
+var active_thought_identity := ""
+var thought_request_in_flight := false
 var auth_request_node: HTTPRequest
 var auth_in_flight := false
 var probe_node: HTTPRequest
@@ -28,6 +34,11 @@ func _ready() -> void:
 	request_node.body_size_limit = 1024 * 1024
 	add_child(request_node)
 	request_node.request_completed.connect(_on_request_completed)
+	thought_request_node = HTTPRequest.new()
+	thought_request_node.timeout = REQUEST_TIMEOUT
+	thought_request_node.body_size_limit = 256 * 1024
+	add_child(thought_request_node)
+	thought_request_node.request_completed.connect(_on_thought_completed)
 	auth_request_node = HTTPRequest.new()
 	auth_request_node.timeout = 20.0
 	auth_request_node.body_size_limit = 65536
@@ -213,6 +224,82 @@ func request_npc_reply(resident: Node3D, player_message: String) -> bool:
 	request_in_flight = true
 	connection_status.emit(false, "جارٍ الاتصال بنموذج الذكاء الاصطناعي...")
 	return true
+
+
+func request_npc_thought(resident: Node3D, observation: Dictionary) -> bool:
+	# Each resident gets an independent conversation identity and its own queued
+	# inference. A single serialized worker prevents request bursts on mobile data.
+	if not is_configured() or not is_instance_valid(resident) or not resident.has_method("get_ai_context"):
+		return false
+	var identity := str(resident.get("memory_id"))
+	if identity.is_empty():
+		return false
+	for queued in thought_queue:
+		if str(queued.get("identity", "")) == identity:
+			return false
+	if thought_request_in_flight and active_thought_identity == identity:
+		return false
+	thought_queue.append({"resident": resident, "identity": identity, "observation": observation.duplicate(true)})
+	_start_next_npc_thought()
+	return true
+
+func _start_next_npc_thought() -> void:
+	if thought_request_in_flight or thought_queue.is_empty() or not is_configured():
+		return
+	var item: Dictionary = thought_queue.pop_front()
+	var resident := item.get("resident") as Node3D
+	if not is_instance_valid(resident) or resident.is_queued_for_deletion():
+		_start_next_npc_thought()
+		return
+	var identity := str(item.get("identity", "resident"))
+	var context: Dictionary = resident.call("get_ai_context")
+	var memories := JSON.stringify(context.get("memories", []))
+	if memories.length() > 650:
+		memories = memories.substr(memories.length() - 650, 650)
+	var prompt := "أنت محرك اتخاذ قرار لشخصية مستقلة في محاكاة مدينة المهدية. حلل الموقف الحالي بناء على الملاحظة والذاكرة والاحتياجات، ثم أخرج JSON فقط دون Markdown وبالمفاتيح التالية: thought (جملة عربية قصيرة تصف استنتاجك الداخلي)، goal (هدف مختصر)، action (واحد فقط من: explore, socialize, rest, work, eat, greet, observe)، reason (سبب القرار). لا تخترع أحداثاً ولا تدّع وعياً حقيقياً. لا تغير المال أو المخزون أو الفيزياء أو بيانات العالم. اختر قراراً آمناً ومنطقياً ولا تكرر تغيير الهدف إذا لم يتغير الموقف.\nهوية الشخصية: %s، المهنة: %s، الطباع: %s. الحالة والاحتياجات: %s. الذكريات: %s. الملاحظة الحية للعالم الآن: %s. أعد JSON صالحاً فقط." % [
+		str(context.get("name", "مواطن")), str(context.get("occupation", "مقيم")),
+		str(context.get("personality", "ودود")), JSON.stringify({
+			"mood": context.get("mood", 0.5), "hunger": context.get("hunger", 0.2),
+			"energy": context.get("energy", 0.8), "social_need": context.get("social_need", 0.4),
+			"curiosity": context.get("curiosity", 0.5), "stress": context.get("stress", 0.0),
+			"current_goal": context.get("goal", ""), "relationships": context.get("relationships", {})
+		}), memories, JSON.stringify(item.get("observation", {}))
+	]
+	var payload := {
+		"conversation_id": "mahdia_think_" + client_id + "_" + identity,
+		"context": "game_npc_autonomous_reasoning",
+		"message": prompt
+	}
+	var headers := PackedStringArray(["Content-Type: application/json", "Authorization: Bearer " + bearer_token])
+	var error := thought_request_node.request(endpoint + "/api/chat", headers, HTTPClient.METHOD_POST, JSON.stringify(payload))
+	if error != OK:
+		npc_thought.emit(resident, "", {}, false)
+		_start_next_npc_thought()
+		return
+	active_thought_resident = resident
+	active_thought_identity = identity
+	thought_request_in_flight = true
+
+func _on_thought_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	thought_request_in_flight = false
+	var resident := active_thought_resident
+	active_thought_resident = null
+	active_thought_identity = ""
+	var success := false
+	var thought := ""
+	var decision: Dictionary = {}
+	if result == HTTPRequest.RESULT_SUCCESS and response_code == 200:
+		var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
+		if parsed is Dictionary:
+			var answer := str(parsed.get("answer", parsed.get("reply", ""))).strip_edges()
+			var decoded: Variant = JSON.parse_string(answer)
+			if decoded is Dictionary:
+				decision = decoded
+				thought = str(decision.get("thought", decision.get("reason", ""))).strip_edges()
+				success = not thought.is_empty()
+	if is_instance_valid(resident):
+		npc_thought.emit(resident, thought, decision, success)
+	_start_next_npc_thought()
 
 func _on_request_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	request_in_flight = false
