@@ -70,8 +70,8 @@ func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
 	mat.roughness = roughness
-	# Unshaded keeps low-poly geometry visible on devices with tight shader uniform limits.
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	# Physically based lighting gives surfaces real form; the low tier disables shadows instead.
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	material_cache[key] = mat
 	return mat
 
@@ -156,7 +156,7 @@ func _plaster_material(color: Color) -> StandardMaterial3D:
 	material.albedo_texture = plaster_texture
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 	material.roughness = 1.0
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	return material
 
 func _plaster_box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInstance3D:
@@ -175,17 +175,18 @@ func _build_environment() -> void:
 	# Avoid procedural-sky shader variants on low-limit GLES3/SwiftShader devices.
 	world_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	world_environment.ambient_light_color = Color(0.78, 0.82, 0.90)
-	world_environment.ambient_light_energy = 0.9
+	world_environment.ambient_light_energy = 0.82
+	world_environment.tonemap_mode = Environment.TONE_MAPPER_ACES
 	world_env.environment = world_environment
 	add_child(world_env)
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48, -32, 0)
 	sun.light_energy = 1.1
-	# The entire scene uses unshaded, vertex-coloured geometry. A scene light
-	# adds no visible quality but can exceed GLES3 uniform limits on mobile GPUs.
-	# Keep the time-of-day controller node, but exclude it from rendering.
-	sun.shadow_enabled = false
-	sun.visible = false
+	# One directional sun provides real surface shading. Shadows are quality-tiered.
+	sun.shadow_enabled = quality_level >= 1
+	sun.directional_shadow_max_distance = 55.0
+	sun.shadow_opacity = 0.62
+	sun.visible = true
 	add_child(sun)
 	# Explicitly disable costly environment passes for broad GLES3 compatibility.
 	world_environment.glow_enabled = false
@@ -822,11 +823,11 @@ func _apply_graphics_quality() -> void:
 	Engine.physics_ticks_per_second = [30, 45, 60][quality_level]
 	get_viewport().scaling_3d_scale = [0.72, 0.86, 1.0][quality_level]
 	if is_instance_valid(sun):
-		# All quality tiers remain on the GLES3-safe unlit path.
-		sun.shadow_enabled = false
-		sun.visible = false
+		# Keep real lighting at every tier; only the expensive shadow map is optional.
+		sun.visible = true
+		sun.shadow_enabled = quality_level >= 1
 	if is_instance_valid(world_environment):
-		world_environment.ambient_light_energy = [0.58, 0.78, 0.95][quality_level]
+		world_environment.ambient_light_energy = [0.72, 0.84, 0.94][quality_level]
 
 
 func _surface_texture(kind: String) -> ImageTexture:
@@ -855,7 +856,7 @@ func _textured_box(parent: Node3D, size: Vector3, pos: Vector3, tint: Color, tex
 	material.uv1_scale = uv_scale
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 	material.roughness = 1.0
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	item.material_override = material
 	parent.add_child(item)
 	return item
@@ -898,7 +899,7 @@ func _create_realistic_street_layer() -> void:
 	# Utility poles and subtly sagging overhead cables; no physics or dynamic lights.
 	var cable_material := StandardMaterial3D.new()
 	cable_material.albedo_color = Color(0.12, 0.13, 0.14)
-	cable_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	cable_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	for pole_index in range(4):
 		var px := -45.0 + float(pole_index) * 30.0
 		var pole := MeshInstance3D.new()

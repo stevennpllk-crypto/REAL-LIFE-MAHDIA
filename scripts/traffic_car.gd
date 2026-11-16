@@ -50,20 +50,20 @@ func _build_visuals() -> void:
 	]
 	var paint := StandardMaterial3D.new()
 	paint.albedo_color = paint_colors[posmod(get_instance_id(), paint_colors.size())]
-	paint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	paint.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	var glass := StandardMaterial3D.new()
 	glass.albedo_color = Color(0.10, 0.20, 0.25)
-	glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glass.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	body_mesh = _add_ellipsoid(Vector3(1.72, 0.62, 3.20), Vector3(0, 0.66, 0), paint)
 	_add_ellipsoid(Vector3(1.34, 0.68, 1.72), Vector3(0, 1.08, -0.12), glass)
 	_add_ellipsoid(Vector3(1.52, 0.25, 0.82), Vector3(0, 0.82, -1.18), paint)
 	_add_ellipsoid(Vector3(1.52, 0.22, 0.62), Vector3(0, 0.82, 1.28), paint)
 	var lamp_material := StandardMaterial3D.new()
 	lamp_material.albedo_color = Color(1.0, 0.88, 0.58)
-	lamp_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	lamp_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	var tail_material := StandardMaterial3D.new()
 	tail_material.albedo_color = Color(0.72, 0.08, 0.045)
-	tail_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	tail_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	for side in [-1.0, 1.0]:
 		_add_ellipsoid(Vector3(0.22, 0.13, 0.10), Vector3(side * 0.58, 0.72, -1.57), lamp_material)
 		_add_ellipsoid(Vector3(0.20, 0.12, 0.10), Vector3(side * 0.58, 0.72, 1.57), tail_material)
@@ -79,7 +79,7 @@ func _build_visuals() -> void:
 			wheel.rotation_degrees.z = 90
 			var rubber := StandardMaterial3D.new()
 			rubber.albedo_color = Color(0.035, 0.04, 0.045)
-			rubber.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			rubber.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 			wheel.material_override = rubber
 			add_child(wheel)
 
@@ -93,13 +93,13 @@ func _build_visuals() -> void:
 			hub.rotation_degrees.z = 90
 			var hub_material := StandardMaterial3D.new()
 			hub_material.albedo_color = Color(0.52, 0.55, 0.57)
-			hub_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			hub_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 			hub.material_override = hub_material
 			add_child(hub)
 	# Bumpers, grille, plates, mirrors and side glass add a recognisable car silhouette.
 	var trim := StandardMaterial3D.new()
 	trim.albedo_color = Color(0.12, 0.14, 0.15)
-	trim.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	trim.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	_add_ellipsoid(Vector3(1.58, 0.14, 0.16), Vector3(0, 0.43, -1.60), trim)
 	_add_ellipsoid(Vector3(1.58, 0.14, 0.16), Vector3(0, 0.43, 1.60), trim)
 	_add_ellipsoid(Vector3(0.72, 0.18, 0.055), Vector3(0, 0.67, -1.63), trim)
