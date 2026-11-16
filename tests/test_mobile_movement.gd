@@ -168,6 +168,8 @@ func _run_tests() -> void:
 	resident.call("_on_ai_thought", resident, "لاحظت أن جاري قريب وأريد التحدث إليه", {"goal": "التواصل مع الجيران", "action": "work", "reason": "حان وقت عملي"}, true)
 	_check(str(resident.get("ai_thought")).contains("جاري قريب"), "resident stores an inference returned by the AI model")
 	_check(str(resident.get("ai_state")) == "commuting" and resident.get("target_position") == resident.get("work_position"), "AI-selected safe action changes the resident's autonomous destination")
+	resident.call("_save_memory")
+	_check(str(saver.call("load_progress").get("mahdia_npc_memory", {}).get("resident_07", {}).get("ai_thought", "")).contains("جاري قريب"), "resident preserves its last real-AI thought across sessions")
 	player.global_position = Vector3.ZERO
 	resident.call("_save_memory")
 	_check(saver.call("load_progress").get("mahdia_npc_memory", {}).get("resident_07", {}).get("relationships", {}).has("resident_08"), "NPC-to-NPC familiarity persists in saved memory")
