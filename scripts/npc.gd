@@ -11,6 +11,10 @@ class_name MahdiaNPC
 var player: CharacterBody3D
 var world_clock: Node
 var memory_manager: Node
+var ai_service: Node
+var ai_think_elapsed := 0.0
+var ai_think_interval := 90.0
+var ai_thought := "أراقب ما يحدث حولي"
 var memory_id := ""
 var home_position := Vector3.ZERO
 var work_position := Vector3.ZERO
@@ -78,6 +82,92 @@ func set_ai_context(player_node: CharacterBody3D, clock_node: Node, work_spot: V
 	memory_save_elapsed = float(posmod(identity, 8)) * 5.0
 	rest_position = work_spot + Vector3(3.0, 0, 2.5)
 	turn_bias = -1.0 if identity % 2 == 0 else 1.0
+
+
+func set_ai_service(service: Node) -> void:
+	ai_service = service
+	if is_instance_valid(ai_service) and ai_service.has_signal("npc_thought"):
+		var callback := Callable(self, "_on_ai_thought")
+		if not ai_service.is_connected("npc_thought", callback):
+			ai_service.connect("npc_thought", callback)
+	ai_think_elapsed = float(posmod(personal_seed, 8)) * 11.0
+
+func get_world_observation() -> Dictionary:
+	var nearby_people: Array[Dictionary] = []
+	for person in get_tree().get_nodes_in_group("mahdia_residents"):
+		if person == self or not is_instance_valid(person) or person.is_queued_for_deletion():
+			continue
+		var distance := global_position.distance_to(person.global_position)
+		if distance <= 14.0:
+			nearby_people.append({"name": str(person.get("display_name")), "distance_m": snappedf(distance, 0.1), "activity": str(person.get("ai_state")), "mood": snappedf(float(person.get("mood")), 0.05)})
+	var nearby_traffic := 0
+	for car in get_tree().get_nodes_in_group("mahdia_traffic"):
+		if is_instance_valid(car) and global_position.distance_to(car.global_position) <= 18.0:
+			nearby_traffic += 1
+	var player_distance := -1.0
+	var player_activity := "غير موجود"
+	if is_instance_valid(player) and not player.is_queued_for_deletion():
+		player_distance = snappedf(global_position.distance_to(player.global_position), 0.1)
+		player_activity = "قريب" if player_distance <= 8.0 else "بعيد"
+	var weather := "غير معروف"
+	if is_instance_valid(world_clock):
+		weather = str(world_clock.get("weather"))
+	return {"time_hour": snappedf(_current_hour(), 0.1), "weather": weather, "player": {"presence": player_activity, "distance_m": player_distance}, "nearby_residents": nearby_people, "nearby_traffic_count": nearby_traffic, "my_activity": ai_state, "my_goal": current_goal, "position": [snappedf(global_position.x, 0.5), snappedf(global_position.z, 0.5)]}
+
+func _request_ai_thought() -> void:
+	if not is_instance_valid(ai_service) or not ai_service.has_method("request_npc_thought"):
+		return
+	if not bool(ai_service.call("is_configured")):
+		return
+	ai_service.call("request_npc_thought", self, get_world_observation())
+
+func _on_ai_thought(resident: Node3D, thought: String, decision: Dictionary, success: bool) -> void:
+	if resident != self or not success or thought.strip_edges().is_empty():
+		return
+	ai_thought = thought.strip_edges().substr(0, 220)
+	var reason := str(decision.get("reason", ai_thought)).strip_edges()
+	if not reason.is_empty():
+		decision_reason = reason.substr(0, 180)
+	var goal := str(decision.get("goal", current_goal)).strip_edges()
+	if not goal.is_empty():
+		current_goal = goal.substr(0, 80)
+	var action := str(decision.get("action", "observe")).to_lower()
+	if is_instance_valid(player) and global_position.distance_to(player.global_position) < 3.5 and ai_state in ["greeting", "socializing", "acknowledging"]:
+		memory_dirty = true
+		return
+	match action:
+		"rest":
+			ai_state = "resting"
+			target_position = rest_position
+		"work":
+			ai_state = "commuting"
+			target_position = work_position
+		"eat":
+			var station := _nearest_food_station()
+			if is_instance_valid(station):
+				ai_state = "seeking_food"
+				target_position = station.global_position + Vector3(0, 0, 2.7)
+		"socialize":
+			var partner := _nearest_resident(12.0)
+			if is_instance_valid(partner):
+				ai_state = "socializing"
+				target_position = partner.global_position + Vector3(1.2, 0, 0.8)
+		"explore":
+			ai_state = "wandering"
+			target_position = _random_near(global_position)
+		"greet":
+			if is_instance_valid(player) and global_position.distance_to(player.global_position) <= 8.0:
+				ai_state = "greeting"
+				target_position = player.global_position + (global_position - player.global_position).normalized() * 1.7
+			else:
+				ai_state = "wandering"
+		"observe":
+			pass
+		_:
+			return
+	wait_time = maxf(wait_time, 0.4)
+	_record_experience("ai_reflection", ai_thought, 0.015)
+	memory_dirty = true
 
 func _ready() -> void:
 	add_to_group("mahdia_residents")
@@ -656,6 +746,10 @@ func _physics_process(delta: float) -> void:
 	if social_scan_elapsed >= 2.0:
 		social_scan_elapsed = 0.0
 		_update_social_awareness()
+	ai_think_elapsed += delta
+	if ai_think_elapsed >= ai_think_interval:
+		ai_think_elapsed = 0.0
+		_request_ai_thought()
 	reflection_elapsed += delta
 	memory_save_elapsed += delta
 	if reflection_elapsed >= 15.0:
