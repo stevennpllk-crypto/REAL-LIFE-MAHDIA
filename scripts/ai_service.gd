@@ -267,7 +267,7 @@ func _start_next_npc_thought() -> void:
 	]
 	var payload := {
 		"conversation_id": "mahdia_think_" + client_id + "_" + identity,
-		"context": "game_npc_autonomous_reasoning",
+		"context": "game_npc",
 		"message": prompt
 	}
 	var headers := PackedStringArray(["Content-Type: application/json", "Authorization: Bearer " + bearer_token])
