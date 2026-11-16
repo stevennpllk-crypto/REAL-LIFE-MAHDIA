@@ -218,8 +218,9 @@ func _build_character() -> void:
 	visual_root.scale = Vector3(1.0, height_variation, 1.0)
 	# Tailored torso: a tapered body, collar, waist and subtle clothing panels.
 	var torso := CylinderMesh.new()
-	torso.top_radius = 0.19
-	torso.bottom_radius = 0.275
+	var body_width := 0.94 + float(posmod(personal_seed * 11, 7)) * 0.02
+	torso.top_radius = 0.19 * body_width
+	torso.bottom_radius = 0.275 * body_width
 	torso.height = 0.78
 	torso.radial_segments = 12
 	body_visual = _part(torso, Vector3(0, 1.18, 0), shirt)
@@ -237,7 +238,11 @@ func _build_character() -> void:
 		head_visual.add_child(head)
 	# Hair cap, side locks, ears, nose, brows and eyes give faces readable depth.
 	var cap := _head_part(_sphere(0.195, 0.22), Vector3(0, 0.145, 0.015), hair)
-	cap.scale = Vector3(1.0, 0.62, 1.0)
+	cap.scale = Vector3(1.0 + float(posmod(personal_seed, 4)) * 0.025, 0.62, 1.0)
+	if posmod(personal_seed, 4) == 1:
+		_head_part(_sphere(0.105, 0.14), Vector3(0, 0.105, 0.12), hair.darkened(0.06))
+	elif posmod(personal_seed, 4) == 2:
+		_head_part(_capsule(0.055, 0.18), Vector3(0, 0.12, 0.04), hair)
 	_head_part(_sphere(0.055, 0.16), Vector3(-0.174, 0, 0), hair)
 	_head_part(_sphere(0.055, 0.16), Vector3(0.174, 0, 0), hair)
 	_head_part(_sphere(0.035, 0.055), Vector3(-0.184, -0.02, 0), skin)
@@ -256,6 +261,13 @@ func _build_character() -> void:
 	_head_part(_sphere(0.026, 0.045), Vector3(0, -0.02, -0.187), skin.lightened(0.04))
 	mouth_visual = _head_part(_capsule(0.008, 0.052), Vector3(0, -0.105, -0.174), Color(0.22, 0.075, 0.065))
 	mouth_visual.rotation.z = deg_to_rad(90.0)
+	# Some adult residents have subtle moustaches or short beards for identity variety.
+	if posmod(personal_seed * 7, 5) == 0:
+		var moustache := _head_part(_capsule(0.012, 0.085), Vector3(0, -0.065, -0.188), hair)
+		moustache.rotation.z = deg_to_rad(90.0)
+	elif posmod(personal_seed * 7, 5) == 1:
+		var beard := _head_part(_sphere(0.105, 0.13), Vector3(0, -0.145, -0.075), hair)
+		beard.scale = Vector3(1.0, 0.72, 0.62)
 	_head_part(_sphere(0.026, 0.018), Vector3(-0.115, -0.055, -0.15), skin.darkened(0.04))
 	_head_part(_sphere(0.026, 0.018), Vector3(0.115, -0.055, -0.15), skin.darkened(0.04))
 	# Clothing details and individual face expression without expensive shaders.
@@ -902,6 +914,10 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 		if is_instance_valid(eye_left) and is_instance_valid(eye_right):
 			eye_left.scale.y = 0.12
 			eye_right.scale.y = 0.12
+		if is_instance_valid(eye_white_left): eye_white_left.scale.y = 0.12
+		if is_instance_valid(eye_white_right): eye_white_right.scale.y = 0.12
 	else:
 		if is_instance_valid(eye_left): eye_left.scale.y = move_toward(eye_left.scale.y, 1.0, delta * 12.0)
 		if is_instance_valid(eye_right): eye_right.scale.y = move_toward(eye_right.scale.y, 1.0, delta * 12.0)
+		if is_instance_valid(eye_white_left): eye_white_left.scale.y = move_toward(eye_white_left.scale.y, 1.0, delta * 12.0)
+		if is_instance_valid(eye_white_right): eye_white_right.scale.y = move_toward(eye_white_right.scale.y, 1.0, delta * 12.0)
