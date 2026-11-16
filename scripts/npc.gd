@@ -14,6 +14,7 @@ var memory_manager: Node
 var ai_service: Node
 var ai_think_elapsed := 0.0
 var ai_think_interval := 90.0
+var ai_request_cooldown := 0.0
 var ai_thought := "أراقب ما يحدث حولي"
 var memory_id := ""
 var home_position := Vector3.ZERO
@@ -119,7 +120,10 @@ func _request_ai_thought() -> void:
 		return
 	if not bool(ai_service.call("is_configured")):
 		return
-	ai_service.call("request_npc_thought", self, get_world_observation())
+	if ai_request_cooldown > 0.0:
+		return
+	if bool(ai_service.call("request_npc_thought", self, get_world_observation())):
+		ai_request_cooldown = 45.0
 
 func _on_ai_thought(resident: Node3D, thought: String, decision: Dictionary, success: bool) -> void:
 	if resident != self or not success or thought.strip_edges().is_empty():
@@ -524,6 +528,7 @@ func _update_social_awareness() -> void:
 				other.set("social_need", clampf(float(other.get("social_need")) - 0.02, 0.0, 1.0))
 				other.set("memory_dirty", true)
 				decision_reason = "أتحدث مع %s وأتعرف إليه أكثر" % str(other.get("display_name"))
+				_request_ai_thought()
 				if ai_state != "working" and ai_state != "resting":
 					ai_state = "socializing"
 					wait_time = maxf(wait_time, 1.0)
@@ -564,6 +569,7 @@ func on_player_interacted() -> void:
 	decision_reason = "تحدثت مع اللاعب وأتذكر اللقاء"
 	memory_dirty = true
 	_save_memory()
+	_request_ai_thought()
 
 func _load_memory() -> void:
 	if not is_instance_valid(memory_manager) or memory_id.is_empty():
@@ -749,6 +755,7 @@ func _physics_process(delta: float) -> void:
 		social_scan_elapsed = 0.0
 		_update_social_awareness()
 	ai_think_elapsed += delta
+	ai_request_cooldown = maxf(0.0, ai_request_cooldown - delta)
 	if ai_think_elapsed >= ai_think_interval:
 		ai_think_elapsed = 0.0
 		_request_ai_thought()
