@@ -55,7 +55,13 @@ var head_visual: Node3D
 var body_visual: Node3D
 var eye_left: MeshInstance3D
 var eye_right: MeshInstance3D
+var eye_white_left: MeshInstance3D
+var eye_white_right: MeshInstance3D
+var mouth_visual: MeshInstance3D
+var brow_left: MeshInstance3D
+var brow_right: MeshInstance3D
 var blink_timer := 2.5
+var expression_phase := 0.0
 var idle_phase := 0.0
 var clock := 0.0
 # Cognitive simulation: persistent episodic memories, learned preferences and self-review.
@@ -236,11 +242,26 @@ func _build_character() -> void:
 	_head_part(_sphere(0.055, 0.16), Vector3(0.174, 0, 0), hair)
 	_head_part(_sphere(0.035, 0.055), Vector3(-0.184, -0.02, 0), skin)
 	_head_part(_sphere(0.035, 0.055), Vector3(0.184, -0.02, 0), skin)
-	eye_left = _head_part(_sphere(0.022, 0.03), Vector3(-0.068, 0.02, -0.175), Color(0.035, 0.025, 0.02))
-	eye_right = _head_part(_sphere(0.022, 0.03), Vector3(0.068, 0.02, -0.175), Color(0.035, 0.025, 0.02))
+	# Layered eyes: sclera, iris and pupil remain readable on small screens.
+	eye_white_left = _head_part(_sphere(0.034, 0.045), Vector3(-0.068, 0.018, -0.169), Color(0.94, 0.91, 0.83))
+	eye_white_right = _head_part(_sphere(0.034, 0.045), Vector3(0.068, 0.018, -0.169), Color(0.94, 0.91, 0.83))
+	eye_left = _head_part(_sphere(0.016, 0.024), Vector3(-0.068, 0.018, -0.199), Color(0.12, 0.075, 0.045))
+	eye_right = _head_part(_sphere(0.016, 0.024), Vector3(0.068, 0.018, -0.199), Color(0.12, 0.075, 0.045))
+	_head_part(_sphere(0.007, 0.012), Vector3(-0.072, 0.024, -0.216), Color(0.025, 0.02, 0.018))
+	_head_part(_sphere(0.007, 0.012), Vector3(0.064, 0.024, -0.216), Color(0.025, 0.02, 0.018))
+	brow_left = _head_part(_capsule(0.012, 0.075), Vector3(-0.068, 0.073, -0.177), hair.darkened(0.08))
+	brow_right = _head_part(_capsule(0.012, 0.075), Vector3(0.068, 0.073, -0.177), hair.darkened(0.08))
+	brow_left.rotation.z = deg_to_rad(-7.0)
+	brow_right.rotation.z = deg_to_rad(7.0)
 	_head_part(_sphere(0.026, 0.045), Vector3(0, -0.02, -0.187), skin.lightened(0.04))
-	_head_part(_capsule(0.014, 0.075), Vector3(-0.068, 0.065, -0.174), hair)
-	_head_part(_capsule(0.014, 0.075), Vector3(0.068, 0.065, -0.174), hair)
+	mouth_visual = _head_part(_capsule(0.008, 0.052), Vector3(0, -0.105, -0.174), Color(0.22, 0.075, 0.065))
+	mouth_visual.rotation.z = deg_to_rad(90.0)
+	_head_part(_sphere(0.026, 0.018), Vector3(-0.115, -0.055, -0.15), skin.darkened(0.04))
+	_head_part(_sphere(0.026, 0.018), Vector3(0.115, -0.055, -0.15), skin.darkened(0.04))
+	# Clothing details and individual face expression without expensive shaders.
+	_part(_capsule(0.075, 0.22), Vector3(0, 1.63, 0), skin)
+	_part(_torus(0.205, 0.025), Vector3(0, 0.82, 0), Color(0.12, 0.085, 0.055))
+	_part(_sphere(0.035, 0.035), Vector3(0, 0.82, -0.225), Color(0.72, 0.58, 0.28))
 	_build_occupation_details()
 	left_arm = _limb(Vector3(-0.30, 1.43, 0), shirt, 0.62, 0.10)
 	right_arm = _limb(Vector3(0.30, 1.43, 0), shirt, 0.62, 0.10)
@@ -821,12 +842,17 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 	if not is_instance_valid(left_arm) or not is_instance_valid(right_arm) or not is_instance_valid(left_leg) or not is_instance_valid(right_leg):
 		return
 	if moving:
-		clock += delta * (4.8 + pace * 1.35)
-		var swing := sin(clock) * 0.31
+		# Individual stride rhythm and gait amplitude for each resident.
+		var gait_rate := 4.8 + pace * 1.35 + float(posmod(personal_seed, 5)) * 0.11
+		clock += delta * gait_rate
+		var stride := 0.27 + float(posmod(personal_seed * 3, 6)) * 0.018
+		var swing := sin(clock) * stride
 		left_arm.rotation.x = swing
-		right_arm.rotation.x = -swing
-		left_leg.rotation.x = -swing
-		right_leg.rotation.x = swing
+		right_arm.rotation.x = -swing * (0.92 + turn_bias * 0.035)
+		left_leg.rotation.x = -swing * 1.12
+		right_leg.rotation.x = swing * 1.12
+		left_arm.rotation.z = lerpf(left_arm.rotation.z, -0.035, delta * 2.5)
+		right_arm.rotation.z = lerpf(right_arm.rotation.z, 0.035, delta * 2.5)
 	else:
 		idle_phase += delta
 		var conversational := ai_state == "socializing" or ai_state == "greeting" or ai_state == "acknowledging"
@@ -851,8 +877,19 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 				look_target.y = sin(idle_phase * 0.34 + float(personal_seed)) * 0.10
 		else:
 			look_target.y = sin(idle_phase * 0.34 + float(personal_seed)) * 0.10
-		head_visual.rotation.y = lerp_angle(head_visual.rotation.y, look_target.y, 1.0 - exp(-2.2 * delta))
-		head_visual.rotation.x = lerpf(head_visual.rotation.x, sin(idle_phase * 0.55) * 0.025, delta * 2.0)
+		expression_phase += delta
+		var curious_look := sin(expression_phase * 0.73 + float(personal_seed)) * 0.035
+		head_visual.rotation.y = lerp_angle(head_visual.rotation.y, look_target.y + curious_look, 1.0 - exp(-2.2 * delta))
+		var head_tilt := 0.035 if personality == "curious" else -0.018 if personality == "shy" else 0.0
+		head_visual.rotation.x = lerpf(head_visual.rotation.x, sin(idle_phase * 0.55) * 0.025 + head_tilt, delta * 2.0)
+		if is_instance_valid(brow_left) and is_instance_valid(brow_right):
+			var concern := clampf(stress * 0.12, 0.0, 0.09)
+			var friendly_lift := 0.025 if personality == "friendly" and mood > 0.55 else 0.0
+			brow_left.rotation.z = lerpf(brow_left.rotation.z, deg_to_rad(-7.0) - concern + friendly_lift, delta * 2.4)
+			brow_right.rotation.z = lerpf(brow_right.rotation.z, deg_to_rad(7.0) + concern - friendly_lift, delta * 2.4)
+		if is_instance_valid(mouth_visual):
+			var smile := clampf((mood - 0.45) * 0.07, -0.025, 0.025)
+			mouth_visual.position.y = lerpf(mouth_visual.position.y, -0.105 + smile, delta * 2.0)
 	if is_instance_valid(visual_root):
 		var bob := (absf(sin(clock)) * 0.025) if moving else sin(idle_phase * 1.35 + float(personal_seed)) * 0.008
 		visual_root.position.y = lerpf(visual_root.position.y, bob, delta * 5.0)
