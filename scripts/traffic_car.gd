@@ -12,6 +12,7 @@ var lane_progress := 0.0
 var body_mesh: MeshInstance3D
 
 func _ready() -> void:
+	add_to_group("mahdia_traffic")
 	collision_layer = 0
 	collision_mask = 0
 	if build_visuals:
