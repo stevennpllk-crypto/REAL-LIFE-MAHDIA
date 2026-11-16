@@ -2,9 +2,22 @@ extends SceneTree
 
 var failures := 0
 var total_checks := 0
+var test_stage := "تهيئة الاختبارات"
+var test_completed := false
 
 func _initialize() -> void:
 	call_deferred("_run_tests")
+	call_deferred("_watch_test_timeout")
+
+func _watch_test_timeout() -> void:
+	await create_timer(120.0).timeout
+	if not test_completed:
+		push_error("Gameplay test timed out at stage: " + test_stage)
+		quit(124)
+
+func _stage(label: String) -> void:
+	test_stage = label
+	print("TEST STAGE: ", label)
 
 func _check(condition: bool, label: String) -> void:
 	total_checks += 1
@@ -15,6 +28,7 @@ func _check(condition: bool, label: String) -> void:
 		push_error("FAIL: " + label)
 
 func _run_tests() -> void:
+	_stage("اختبار حركة اللاعب والحفظ")
 	var player := CharacterBody3D.new()
 	player.set_script(load("res://scripts/player.gd"))
 	player.set("build_visuals", false)
@@ -62,6 +76,7 @@ func _run_tests() -> void:
 	_check(is_equal_approx(float(loaded_world.get("player_rotation_y", 0.0)), 1.2), "player rotation survives save and load")
 	_check(int(loaded_life.get("money", 0)) == 135 and is_equal_approx(float(loaded_life.get("hunger", 0.0)), 72.0), "life progress remains in the same save file")
 
+	_stage("اختبار المركبات واللياقة")
 	# Exercise the vehicle lifecycle without constructing render meshes in headless CI.
 	var car := CharacterBody3D.new()
 	car.set_script(load("res://scripts/vehicle.gd"))
@@ -104,6 +119,7 @@ func _run_tests() -> void:
 	life.call("_apply_stamina", 2.0, false)
 	_check(is_equal_approx(float(life.get("energy")), 10.0) and is_equal_approx(float(stamina_player.get("run_speed")), 4.8), "resting restores energy and sprint speed")
 
+	_stage("اختبار السكان والذاكرة والسلوك")
 	var resident := CharacterBody3D.new()
 	resident.set_script(load("res://scripts/npc.gd"))
 	resident.set("build_visuals", false)
@@ -113,6 +129,7 @@ func _run_tests() -> void:
 	root.add_child(resident)
 	await process_frame
 	_check(not str(resident.get("ai_state")).is_empty(), "NPC starts with an autonomous AI state")
+	_stage("إنشاء شخصية مرئية وفحص مفاصلها")
 	# Build one rendered resident to verify the new articulated skeleton is present.
 	var visual_resident := CharacterBody3D.new()
 	visual_resident.set_script(load("res://scripts/npc.gd"))
@@ -186,6 +203,7 @@ func _run_tests() -> void:
 	_check(saver.call("load_progress").get("mahdia_npc_memory", {}).get("resident_07", {}).get("relationships", {}).has("resident_08"), "NPC-to-NPC familiarity persists in saved memory")
 	nearby_resident.queue_free()
 
+	_stage("اختبار الطقس وحركة المرور")
 	var weather_system := Node.new()
 	weather_system.set_script(load("res://scripts/world_systems.gd"))
 	root.add_child(weather_system)
@@ -210,6 +228,8 @@ func _run_tests() -> void:
 	_check(float(traffic.global_position.x) < -70.0, "traffic car wraps safely at the end of the road")
 	traffic.queue_free()
 
+	test_completed = true
+	_stage("اكتملت جميع الاختبارات")
 	print("Gameplay tests: ", total_checks - failures, "/", total_checks, " passed")
 	# Release scene resources before shutting down the headless renderer.
 	car.queue_free()
