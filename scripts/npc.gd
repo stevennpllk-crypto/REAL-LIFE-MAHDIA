@@ -18,6 +18,8 @@ var rest_position := Vector3.ZERO
 var target_position := Vector3.ZERO
 var wait_time := 0.0
 var decision_elapsed := 0.0
+var player_scan_elapsed := 0.0
+var goal_refresh_elapsed := 0.0
 var memory_meetings := 0
 var last_player_interaction := -1000.0
 var mood := 0.5
@@ -629,6 +631,20 @@ func _avoid_resident_crowding(direction: Vector3) -> Vector3:
 	crowd_steering = (direction.normalized() + separation.normalized() * 0.95).normalized()
 	return crowd_steering
 
+func _update_autonomous_decisions(delta: float) -> void:
+	# Keep player reactions responsive while allowing residents enough time to
+	# actually reach destinations before selecting a new daily goal.
+	player_scan_elapsed += delta
+	if player_scan_elapsed >= 0.75:
+		player_scan_elapsed = 0.0
+		_player_decision()
+	goal_refresh_elapsed += delta
+	if goal_refresh_elapsed >= 30.0:
+		goal_refresh_elapsed = 0.0
+		var player_nearby := is_instance_valid(player) and not player.is_queued_for_deletion() and global_position.distance_to(player.global_position) <= 8.0
+		if not player_nearby:
+			_choose_daily_goal(_current_hour())
+
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= 9.8 * delta
@@ -649,11 +665,7 @@ func _physics_process(delta: float) -> void:
 		memory_save_elapsed = 0.0
 		if memory_dirty:
 			_save_memory()
-	decision_elapsed += delta
-	if decision_elapsed >= 4.0:
-		decision_elapsed = 0.0
-		if not _player_decision():
-			_choose_daily_goal(_current_hour())
+	_update_autonomous_decisions(delta)
 	if wait_time > 0.0:
 		wait_time -= delta
 		velocity.x = move_toward(velocity.x, 0.0, walk_speed * delta * 4.0)
