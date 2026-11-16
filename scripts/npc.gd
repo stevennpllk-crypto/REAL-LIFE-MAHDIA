@@ -37,6 +37,8 @@ var personal_seed := 0
 var turn_bias := 1.0
 var obstacle_check_elapsed := 0.0
 var obstacle_steering := Vector3.ZERO
+var crowd_check_elapsed := 0.0
+var crowd_steering := Vector3.ZERO
 var left_arm: Node3D
 var right_arm: Node3D
 var left_leg: Node3D
@@ -600,6 +602,33 @@ func _avoid_obstacle(direction: Vector3, delta: float) -> Vector3:
 	obstacle_steering = (direction + side * 1.8).normalized()
 	return obstacle_steering
 
+func _avoid_resident_crowding(direction: Vector3) -> Vector3:
+	if direction.length_squared() < 0.01:
+		return direction
+	# A short staggered scan keeps pedestrians from clipping through one another
+	# without adding physics bodies, navigation meshes, or per-frame raycasts.
+	crowd_check_elapsed += get_physics_process_delta_time()
+	if crowd_check_elapsed < 0.30:
+		return direction
+	crowd_check_elapsed = 0.0
+	var separation := Vector3.ZERO
+	var nearby_count := 0
+	for resident in get_tree().get_nodes_in_group("mahdia_residents"):
+		if resident == self or not is_instance_valid(resident):
+			continue
+		var offset := global_position - resident.global_position
+		offset.y = 0.0
+		var distance := offset.length()
+		if distance > 0.05 and distance < 1.55:
+			var strength := (1.55 - distance) / 1.55
+			separation += offset.normalized() * strength
+			nearby_count += 1
+	if nearby_count == 0 or separation.length_squared() < 0.001:
+		crowd_steering = direction.normalized()
+		return direction
+	crowd_steering = (direction.normalized() + separation.normalized() * 0.95).normalized()
+	return crowd_steering
+
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= 9.8 * delta
@@ -664,6 +693,7 @@ func _physics_process(delta: float) -> void:
 		_animate(delta, false)
 		return
 	direction = _avoid_obstacle(direction.normalized(), delta)
+	direction = _avoid_resident_crowding(direction)
 	var pace := walk_speed * (0.72 if ai_state == "avoiding" else 1.0)
 	# Residents accelerate and brake like people instead of snapping to a fixed velocity.
 	velocity.x = move_toward(velocity.x, direction.x * pace, delta * 3.2)
