@@ -778,13 +778,14 @@ func _avoid_resident_crowding(direction: Vector3) -> Vector3:
 	var separation := Vector3.ZERO
 	var nearby_count := 0
 	for resident in get_tree().get_nodes_in_group("mahdia_residents"):
-		if resident == self or not is_instance_valid(resident):
+		var resident_node := resident as Node3D
+		if resident_node == null or resident_node == self or not is_instance_valid(resident_node):
 			continue
-		var offset := global_position - resident.global_position
+		var offset: Vector3 = global_position - resident_node.global_position
 		offset.y = 0.0
-		var distance := offset.length()
+		var distance: float = offset.length()
 		if distance > 0.05 and distance < 1.55:
-			var strength := (1.55 - distance) / 1.55
+			var strength: float = (1.55 - distance) / 1.55
 			separation += offset.normalized() * strength
 			nearby_count += 1
 	if nearby_count == 0 or separation.length_squared() < 0.001:
