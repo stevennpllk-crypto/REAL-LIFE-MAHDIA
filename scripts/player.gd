@@ -29,6 +29,7 @@ var left_knee: Node3D
 var right_knee: Node3D
 var animation_clock := 0.0
 var idle_clock := 0.0
+var gait_intensity := 0.0
 var camera_drag_finger := -1
 var is_swimming := false
 var crouching := false

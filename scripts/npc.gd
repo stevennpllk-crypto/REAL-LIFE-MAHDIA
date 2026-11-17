@@ -915,6 +915,7 @@ func _physics_process(delta: float) -> void:
 	_animate(delta, true, pace)
 
 func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
+	var conversational := ai_state == "socializing" or ai_state == "greeting" or ai_state == "acknowledging"
 	if not is_instance_valid(left_arm) or not is_instance_valid(right_arm) or not is_instance_valid(left_leg) or not is_instance_valid(right_leg):
 		return
 	if moving:
@@ -935,7 +936,6 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 		right_arm.rotation.z = lerpf(right_arm.rotation.z, 0.035, delta * 2.5)
 	else:
 		idle_phase += delta
-		var conversational := ai_state == "socializing" or ai_state == "greeting" or ai_state == "acknowledging"
 		var working := ai_state == "working"
 		var eating := ai_state == "eating"
 		var resting := ai_state == "resting"
