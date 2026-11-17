@@ -36,10 +36,10 @@ func _physics_process(delta: float) -> void:
 
 func _update_transform() -> void:
 	if horizontal:
-		global_position = Vector3(lane_progress, 0.05, lane_offset)
+		position = Vector3(lane_progress, 0.05, lane_offset)
 		rotation.y = -PI * 0.5 if direction > 0.0 else PI * 0.5
 	else:
-		global_position = Vector3(lane_offset, 0.05, lane_progress)
+		position = Vector3(lane_offset, 0.05, lane_progress)
 		rotation.y = PI if direction > 0.0 else 0.0
 
 func _build_visuals() -> void:
