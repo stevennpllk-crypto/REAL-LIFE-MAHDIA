@@ -10,6 +10,7 @@ class_name MahdiaTrafficCar
 const ROAD_LIMIT := 78.0
 var lane_progress := 0.0
 var body_mesh: MeshInstance3D
+var rear_lamp_materials: Array[StandardMaterial3D] = []
 
 func _ready() -> void:
 	add_to_group("mahdia_traffic")
@@ -62,8 +63,11 @@ func _build_visuals() -> void:
 	lamp_material.albedo_color = Color(1.0, 0.88, 0.58)
 	lamp_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	var tail_material := StandardMaterial3D.new()
-	tail_material.albedo_color = Color(0.72, 0.08, 0.045)
+	tail_material.albedo_color = Color(0.58, 0.025, 0.018)
 	tail_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	tail_material.emission_enabled = true
+	tail_material.emission = Color(0.8, 0.012, 0.008)
+	tail_material.emission_energy_multiplier = 0.16
 	for side in [-1.0, 1.0]:
 		_add_ellipsoid(Vector3(0.22, 0.13, 0.10), Vector3(side * 0.58, 0.72, -1.57), lamp_material)
 		_add_ellipsoid(Vector3(0.20, 0.12, 0.10), Vector3(side * 0.58, 0.72, 1.57), tail_material)

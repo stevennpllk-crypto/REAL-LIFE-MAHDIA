@@ -11,6 +11,11 @@ var speed := 0.0
 var steering_input := 0.0
 var wheels: Array[MeshInstance3D] = []
 var rounded_mesh_cache: Dictionary = {}
+var headlamp_materials: Array[StandardMaterial3D] = []
+var brake_lamp_materials: Array[StandardMaterial3D] = []
+var indicator_materials: Array[StandardMaterial3D] = []
+var indicator_clock := 0.0
+var indicator_on := false
 
 func _rounded_mesh(size: Vector3) -> ArrayMesh:
 	var key := "%.2f_%.2f_%.2f" % [size.x, size.y, size.z]
@@ -97,8 +102,27 @@ func _build_car() -> void:
 	_box(Vector3(2.0, 0.16, 0.18), Vector3(0, 0.48, -1.83), Color(0.22, 0.23, 0.24), 0.5)
 	_box(Vector3(2.0, 0.16, 0.18), Vector3(0, 0.48, 1.83), Color(0.22, 0.23, 0.24), 0.5)
 	for side in [-1.0, 1.0]:
-		_box(Vector3(0.32, 0.18, 0.42), Vector3(side * 0.66, 0.91, -1.78), Color(0.96, 0.88, 0.63), 0.2)
-		_box(Vector3(0.32, 0.18, 0.42), Vector3(side * 0.66, 0.91, 1.78), Color(0.72, 0.025, 0.018))
+		var headlamp := _box(Vector3(0.32, 0.18, 0.42), Vector3(side * 0.66, 0.91, -1.78), Color(0.96, 0.88, 0.63), 0.2)
+		var head_mat := _mat(Color(0.92, 0.86, 0.68), 0.15)
+		head_mat.emission_enabled = true
+		head_mat.emission = Color(0.65, 0.56, 0.34)
+		head_mat.emission_energy_multiplier = 0.12
+		headlamp.material_override = head_mat
+		headlamp_materials.append(head_mat)
+		var brake := _box(Vector3(0.32, 0.18, 0.42), Vector3(side * 0.66, 0.91, 1.78), Color(0.42, 0.015, 0.01))
+		var brake_mat := _mat(Color(0.35, 0.012, 0.008))
+		brake_mat.emission_enabled = true
+		brake_mat.emission = Color(0.8, 0.015, 0.008)
+		brake_mat.emission_energy_multiplier = 0.08
+		brake.material_override = brake_mat
+		brake_lamp_materials.append(brake_mat)
+		var indicator := _box(Vector3(0.13, 0.12, 0.12), Vector3(side * 0.82, 0.92, -1.78), Color(0.95, 0.48, 0.08))
+		var indicator_mat := _mat(Color(0.5, 0.18, 0.015))
+		indicator_mat.emission_enabled = true
+		indicator_mat.emission = Color(1.0, 0.24, 0.015)
+		indicator_mat.emission_energy_multiplier = 0.05
+		indicator.material_override = indicator_mat
+		indicator_materials.append(indicator_mat)
 		_box(Vector3(0.10, 0.10, 0.22), Vector3(side * 1.0, 1.03, -0.15), Color(0.88, 0.88, 0.82))
 		for z in [-1.22, 1.22]:
 			var wheel := MeshInstance3D.new()
@@ -152,6 +176,18 @@ func _physics_process(delta: float) -> void:
 		throttle = -touch_input.y
 		steering = touch_input.x
 	var target_speed := throttle * (max_speed if throttle >= 0.0 else reverse_speed)
+	var braking := absf(speed) > 0.65 and absf(target_speed) < absf(speed) - 0.2
+	indicator_clock += delta
+	if indicator_clock >= 0.42:
+		indicator_clock = 0.0
+		indicator_on = not indicator_on
+	var indicator_left := steering < -0.28 and indicator_on
+	var indicator_right := steering > 0.28 and indicator_on
+	for mat in brake_lamp_materials:
+		mat.emission_energy_multiplier = 1.1 if braking else 0.08
+	for i in range(indicator_materials.size()):
+		var active := indicator_left if i == 0 else indicator_right
+		indicator_materials[i].emission_energy_multiplier = 1.25 if active else 0.05
 	speed = move_toward(speed, target_speed, acceleration * delta)
 	steering_input = move_toward(steering_input, steering, delta * 5.0)
 	var steering_factor := clampf(absf(speed) / 2.0, 0.0, 1.0)
