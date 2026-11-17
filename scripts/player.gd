@@ -66,7 +66,7 @@ func _mat(color: Color, roughness := 0.82) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
 	m.roughness = roughness
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	return m
 
 func _part(parent: Node3D, mesh: Mesh, pos: Vector3, color: Color) -> MeshInstance3D:
@@ -88,6 +88,22 @@ func _build_human_figure() -> void:
 	torso.height = 0.82
 	torso.radial_segments = 16
 	_part(visual_root, torso, Vector3(0, 1.22, 0), Color(0.035, 0.045, 0.065))
+	# Add a fitted collar, front zip, cuffs and subtle fabric panels.
+	var collar := TorusMesh.new()
+	collar.inner_radius = 0.09
+	collar.outer_radius = 0.12
+	collar.rings = 16
+	collar.ring_segments = 8
+	_part(visual_root, collar, Vector3(0, 1.59, -0.012), Color(0.10, 0.12, 0.15))
+	var zip := BoxMesh.new()
+	zip.size = Vector3(0.012, 0.34, 0.012)
+	_part(visual_root, zip, Vector3(0, 1.23, -0.252), Color(0.32, 0.34, 0.37))
+	var shirt_panel := BoxMesh.new()
+	shirt_panel.size = Vector3(0.12, 0.15, 0.014)
+	_part(visual_root, shirt_panel, Vector3(-0.14, 1.30, -0.246), Color(0.07, 0.085, 0.11))
+	var shirt_panel_right := BoxMesh.new()
+	shirt_panel_right.size = Vector3(0.12, 0.15, 0.014)
+	_part(visual_root, shirt_panel_right, Vector3(0.14, 1.30, -0.246), Color(0.07, 0.085, 0.11))
 	var neck := CylinderMesh.new()
 	neck.top_radius = 0.105
 	neck.bottom_radius = 0.12
@@ -97,6 +113,10 @@ func _build_human_figure() -> void:
 	head.radius = 0.205
 	head.height = 0.43
 	_part(visual_root, head, Vector3(0, 1.88, 0), Color(0.69, 0.48, 0.35))
+	var neck_shadow := SphereMesh.new()
+	neck_shadow.radius = 0.11
+	neck_shadow.height = 0.16
+	_part(visual_root, neck_shadow, Vector3(0, 1.70, -0.005), Color(0.62, 0.40, 0.29))
 	var hair := SphereMesh.new()
 	hair.radius = 0.211
 	hair.height = 0.18
@@ -120,16 +140,41 @@ func _build_human_figure() -> void:
 	eye_mesh.height = 0.035
 	_part(visual_root, eye_mesh, Vector3(-0.073, 1.90, -0.188), Color(0.045, 0.035, 0.03))
 	_part(visual_root, eye_mesh, Vector3(0.073, 1.90, -0.188), Color(0.045, 0.035, 0.03))
+	var eye_white := SphereMesh.new()
+	eye_white.radius = 0.027
+	eye_white.height = 0.038
+	_part(visual_root, eye_white, Vector3(-0.073, 1.90, -0.181), Color(0.92, 0.88, 0.80))
+	_part(visual_root, eye_white, Vector3(0.073, 1.90, -0.181), Color(0.92, 0.88, 0.80))
+	var iris := SphereMesh.new()
+	iris.radius = 0.013
+	iris.height = 0.022
+	_part(visual_root, iris, Vector3(-0.073, 1.90, -0.205), Color(0.18, 0.11, 0.07))
+	_part(visual_root, iris, Vector3(0.073, 1.90, -0.205), Color(0.18, 0.11, 0.07))
 	var nose := SphereMesh.new()
 	nose.radius = 0.035
 	nose.height = 0.07
 	_part(visual_root, nose, Vector3(0, 1.84, -0.205), Color(0.62, 0.40, 0.29))
+	var mouth := CapsuleMesh.new()
+	mouth.radius = 0.008
+	mouth.height = 0.05
+	var mouth_item := _part(visual_root, mouth, Vector3(0, 1.78, -0.194), Color(0.25, 0.09, 0.075))
+	mouth_item.rotation.z = PI * 0.5
 	left_arm = _make_limb(Vector3(-0.31, 1.48, 0), Color(0.055, 0.24, 0.78), 0.66, 0.105)
 	right_arm = _make_limb(Vector3(0.31, 1.48, 0), Color(0.055, 0.24, 0.78), 0.66, 0.105)
 	left_leg = _make_limb(Vector3(-0.145, 0.78, 0), Color(0.10, 0.12, 0.17), 0.76, 0.125)
 	right_leg = _make_limb(Vector3(0.145, 0.78, 0), Color(0.10, 0.12, 0.17), 0.76, 0.125)
 	_make_shoe(Vector3(-0.145, 0.095, -0.075))
 	_make_shoe(Vector3(0.145, 0.095, -0.075))
+	# Visible hands and a wrist watch break the mannequin silhouette.
+	var hand_mesh := SphereMesh.new()
+	hand_mesh.radius = 0.065
+	hand_mesh.height = 0.12
+	_part(visual_root, hand_mesh, Vector3(-0.31, 1.00, -0.01), Color(0.69, 0.48, 0.35))
+	_part(visual_root, hand_mesh, Vector3(0.31, 1.00, -0.01), Color(0.69, 0.48, 0.35))
+	var watch := TorusMesh.new()
+	watch.inner_radius = 0.075
+	watch.outer_radius = 0.09
+	_part(visual_root, watch, Vector3(-0.31, 1.14, 0), Color(0.58, 0.54, 0.42))
 
 func _make_limb(pos: Vector3, color: Color, length: float, radius: float) -> Node3D:
 	var pivot := Node3D.new()

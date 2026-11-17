@@ -57,6 +57,7 @@ var right_knee: Node3D
 var visual_root: Node3D
 var head_visual: Node3D
 var body_visual: Node3D
+var character_skin := Color(0.62, 0.39, 0.28)
 var eye_left: MeshInstance3D
 var eye_right: MeshInstance3D
 var eye_white_left: MeshInstance3D
@@ -217,6 +218,7 @@ func _build_character() -> void:
 	var hair_palette := [Color(0.045, 0.035, 0.03), Color(0.13, 0.075, 0.045), Color(0.22, 0.15, 0.09), Color(0.34, 0.25, 0.16)]
 	var shirt: Color = palette[posmod(personal_seed, palette.size())]
 	var skin: Color = skin_palette[posmod(personal_seed * 3 + 1, skin_palette.size())]
+	character_skin = skin
 	var hair: Color = hair_palette[posmod(personal_seed * 5 + 2, hair_palette.size())]
 	var height_variation := 0.94 + float(posmod(personal_seed * 7, 13)) * 0.01
 	visual_root.scale = Vector3(1.0, height_variation, 1.0)
@@ -230,6 +232,13 @@ func _build_character() -> void:
 	body_visual = _part(torso, Vector3(0, 1.18, 0), shirt)
 	_part(_torus(0.105, 0.025), Vector3(0, 1.56, -0.005), shirt.darkened(0.18))
 	_part(_capsule(0.045, 0.16), Vector3(0, 1.49, -0.19), shirt.lightened(0.16))
+	# Layered everyday clothing: collar, placket, hem, seams and pockets.
+	_part(_torus(0.205, 0.018), Vector3(0, 1.55, 0), shirt.lightened(0.24))
+	_part(_capsule(0.012, 0.30), Vector3(0, 1.25, -0.245), shirt.darkened(0.12))
+	for button_index in range(3):
+		_part(_sphere(0.009, 0.009), Vector3(0, 1.34 - float(button_index) * 0.075, -0.257), Color(0.78, 0.70, 0.52))
+	_part(_box_mesh(Vector3(0.105, 0.12, 0.012)), Vector3(-0.15, 1.29, -0.245), shirt.darkened(0.10))
+	_part(_box_mesh(Vector3(0.105, 0.12, 0.012)), Vector3(0.15, 1.29, -0.245), shirt.darkened(0.10))
 	head_visual = get_node_or_null("ResidentVisual/HeadPivot") as Node3D
 	if not is_instance_valid(head_visual):
 		head_visual = Node3D.new()
@@ -244,9 +253,19 @@ func _build_character() -> void:
 	var cap := _head_part(_sphere(0.195, 0.22), Vector3(0, 0.145, 0.015), hair)
 	cap.scale = Vector3(1.0 + float(posmod(personal_seed, 4)) * 0.025, 0.62, 1.0)
 	if posmod(personal_seed, 4) == 1:
+		# Short textured curls / close-cut hair silhouette.
 		_head_part(_sphere(0.105, 0.14), Vector3(0, 0.105, 0.12), hair.darkened(0.06))
+		for curl_index in range(5):
+			var angle := TAU * float(curl_index) / 5.0
+			_head_part(_sphere(0.045, 0.055), Vector3(cos(angle) * 0.13, 0.17, sin(angle) * 0.11), hair)
 	elif posmod(personal_seed, 4) == 2:
+		# Longer back hair, kept close to the neck for mobile readability.
 		_head_part(_capsule(0.055, 0.18), Vector3(0, 0.12, 0.04), hair)
+		_head_part(_capsule(0.045, 0.22), Vector3(-0.145, -0.07, 0.015), hair)
+		_head_part(_capsule(0.045, 0.22), Vector3(0.145, -0.07, 0.015), hair)
+	elif posmod(personal_seed, 4) == 3:
+		var side_part := _head_part(_sphere(0.10, 0.16), Vector3(0.10, 0.10, 0.015), hair)
+		side_part.scale = Vector3(0.8, 0.65, 1.0)
 	_head_part(_sphere(0.055, 0.16), Vector3(-0.174, 0, 0), hair)
 	_head_part(_sphere(0.055, 0.16), Vector3(0.174, 0, 0), hair)
 	_head_part(_sphere(0.035, 0.055), Vector3(-0.184, -0.02, 0), skin)
@@ -278,6 +297,12 @@ func _build_character() -> void:
 	_part(_capsule(0.075, 0.22), Vector3(0, 1.63, 0), skin)
 	_part(_torus(0.205, 0.025), Vector3(0, 0.82, 0), Color(0.12, 0.085, 0.055))
 	_part(_sphere(0.035, 0.035), Vector3(0, 0.82, -0.225), Color(0.72, 0.58, 0.28))
+	# Wrist/hand skin and footwear are separate from the cloth meshes.
+	_part(_sphere(0.055, 0.10), Vector3(-0.30, 1.02, 0), skin)
+	_part(_sphere(0.055, 0.10), Vector3(0.30, 1.02, 0), skin)
+	_part(_capsule(0.105, 0.25), Vector3(-0.14, 0.10, -0.035), Color(0.055, 0.06, 0.065))
+	_part(_capsule(0.105, 0.25), Vector3(0.14, 0.10, -0.035), Color(0.055, 0.06, 0.065))
+	_part(_torus(0.105, 0.012), Vector3(0, 0.82, 0), Color(0.42, 0.34, 0.22))
 	_build_occupation_details()
 	left_arm = _limb(Vector3(-0.30, 1.43, 0), shirt, 0.62, 0.10)
 	right_arm = _limb(Vector3(0.30, 1.43, 0), shirt, 0.62, 0.10)
@@ -319,6 +344,11 @@ func _build_occupation_details() -> void:
 			_detail_box(details, Vector3(0.44, 0.06, 0.26), Vector3(0, 1.99, -0.06), Color(0.16, 0.20, 0.25))
 		_:
 			_detail_box(details, Vector3(0.42, 0.12, 0.30), Vector3(0, 1.66, 0), Color(0.78, 0.68, 0.48))
+
+func _box_mesh(size: Vector3) -> BoxMesh:
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	return mesh
 
 func _detail_box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> void:
 	var mesh := BoxMesh.new()
@@ -398,7 +428,7 @@ func _limb(pos: Vector3, color: Color, length: float, radius: float) -> Node3D:
 		var hand := MeshInstance3D.new()
 		hand.mesh = _sphere(0.065, 0.12)
 		hand.position = Vector3(0, -lower_length * 0.92, -0.008)
-		hand.material_override = _mat(Color(0.60, 0.39, 0.28))
+		hand.material_override = _mat(character_skin)
 		joint.add_child(hand)
 		if pos.x < 0.0:
 			left_elbow = joint
