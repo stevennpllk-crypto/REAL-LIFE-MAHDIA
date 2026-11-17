@@ -27,6 +27,8 @@ var animation_clock := 0.0
 var idle_clock := 0.0
 var camera_drag_finger := -1
 var is_swimming := false
+var crouching := false
+var attack_time := 0.0
 
 func _ready() -> void:
 	_add_action("move_forward", KEY_W)
@@ -85,7 +87,7 @@ func _build_human_figure() -> void:
 	torso.bottom_radius = 0.285
 	torso.height = 0.82
 	torso.radial_segments = 16
-	_part(visual_root, torso, Vector3(0, 1.22, 0), Color(0.055, 0.24, 0.78))
+	_part(visual_root, torso, Vector3(0, 1.22, 0), Color(0.035, 0.045, 0.065))
 	var neck := CylinderMesh.new()
 	neck.top_radius = 0.105
 	neck.bottom_radius = 0.12
@@ -193,6 +195,12 @@ func request_jump() -> void:
 func request_interact() -> void:
 	interact_requested = true
 
+func request_attack() -> void:
+	attack_time = 0.42
+
+func toggle_crouch() -> void:
+	crouching = not crouching
+
 func is_in_water() -> bool:
 	return global_position.z < -59.0 and absf(global_position.x) < 90.0
 
@@ -222,6 +230,9 @@ func _physics_process(delta: float) -> void:
 	direction.y = 0.0
 	direction = direction.normalized()
 	var speed := (2.8 if (running or Input.is_action_pressed("run")) else 1.8) if is_swimming else (run_speed if (running or Input.is_action_pressed("run")) else walk_speed)
+	if crouching:
+		speed *= 0.48
+	attack_time = maxf(0.0, attack_time - delta)
 	var target_speed := speed * strength
 	var moving := strength > 0.01
 	if moving:
@@ -241,6 +252,10 @@ func _physics_process(delta: float) -> void:
 
 func _animate_figure(delta: float, moving: bool, speed: float) -> void:
 	if not is_instance_valid(visual_root):
+		return
+	if attack_time > 0.0:
+		right_arm.rotation.x = lerpf(right_arm.rotation.x, -1.45, delta * 16.0)
+		left_arm.rotation.x = lerpf(left_arm.rotation.x, -0.22, delta * 10.0)
 		return
 	if moving:
 		animation_clock += delta * (9.0 if speed > walk_speed + 0.2 else 6.0)

@@ -10,6 +10,8 @@ var stick_base: Control
 var run_button: Button
 var jump_button: Button
 var interact_button: Button
+var attack_button: Button
+var crouch_button: Button
 var stick_max_radius := 62.0
 
 func setup(player: CharacterBody3D) -> void:
@@ -39,27 +41,32 @@ func setup(player: CharacterBody3D) -> void:
 	stick_base.gui_input.connect(_on_stick_input)
 	root.add_child(stick_base)
 
-	run_button = _make_button(root, "جري", Vector2(-218, -112))
-	jump_button = _make_button(root, "قفز", Vector2(-112, -112))
-	interact_button = _make_button(root, "تفاعل", Vector2(-112, -194))
+	run_button = _make_button(root, "🏃", Vector2(-112, -218))
+	jump_button = _make_button(root, "⬆", Vector2(-112, -112))
+	interact_button = _make_button(root, "💬", Vector2(-218, -112))
+	attack_button = _make_button(root, "✊", Vector2(-218, -218))
+	crouch_button = _make_button(root, "🧎", Vector2(-218, -324))
 
 	run_button.button_down.connect(func(): target.set_mobile_run(true))
 	run_button.button_up.connect(func(): target.set_mobile_run(false))
 	jump_button.pressed.connect(func(): target.request_jump())
 	interact_button.pressed.connect(func(): target.request_interact())
+	attack_button.pressed.connect(func(): target.request_attack())
+	crouch_button.pressed.connect(func(): target.toggle_crouch())
 
 func _make_button(parent: Control, caption: String, offset: Vector2) -> Button:
 	var button := Button.new()
 	button.text = caption
-	button.custom_minimum_size = Vector2(96, 72)
+	button.custom_minimum_size = Vector2(76, 76)
+	button.add_theme_font_size_override("font_size", 28)
 	button.anchor_left = 1.0
 	button.anchor_right = 1.0
 	button.anchor_top = 1.0
 	button.anchor_bottom = 1.0
 	button.offset_left = offset.x
-	button.offset_right = offset.x + 96.0
+	button.offset_right = offset.x + 76.0
 	button.offset_top = offset.y
-	button.offset_bottom = offset.y + 72.0
+	button.offset_bottom = offset.y + 76.0
 	button.focus_mode = Control.FOCUS_NONE
 	button.add_theme_font_size_override("font_size", 20)
 	parent.add_child(button)

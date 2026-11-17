@@ -250,6 +250,40 @@ func _create_coastal_scenery() -> void:
 		canopy.rotation.z = 0.08
 		for side in [-1.0, 1.0]:
 			_box(self, Vector3(0.10, 2.5, 0.10), Vector3(x + side * 1.35, 1.25, -50.5), Color(0.35, 0.26, 0.18))
+	for i in range(7):
+		_create_palm(Vector3(-42.0 + float(i) * 14.0, 0, -47.0))
+	_create_borj_el_kebir_landmark()
+
+func _create_borj_el_kebir_landmark() -> void:
+	var stone := Color(0.69, 0.62, 0.49)
+	var pale := Color(0.82, 0.75, 0.62)
+	_box(self, Vector3(19.0, 7.0, 1.25), Vector3(37.0, 3.5, -51.0), stone)
+	_box(self, Vector3(1.25, 7.0, 10.0), Vector3(28.2, 3.5, -56.0), stone)
+	_box(self, Vector3(1.25, 7.0, 10.0), Vector3(45.8, 3.5, -56.0), stone)
+	_box(self, Vector3(3.0, 3.8, 0.12), Vector3(37.0, 1.9, -50.32), Color(0.12, 0.11, 0.10))
+	_box(self, Vector3(4.2, 0.55, 0.42), Vector3(37.0, 4.0, -50.15), pale)
+	for x in [28.5, 45.5]:
+		var tower := MeshInstance3D.new()
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = 1.55
+		mesh.bottom_radius = 2.0
+		mesh.height = 10.0 if x < 30.0 else 13.0
+		mesh.radial_segments = 16
+		tower.mesh = mesh
+		tower.position = Vector3(x, mesh.height * 0.5, -54.0)
+		tower.material_override = _material(stone)
+		add_child(tower)
+		for j in range(10):
+			var a := TAU * float(j) / 10.0
+			_box(self, Vector3(0.42, 0.58, 0.42), Vector3(x + cos(a) * 1.58, mesh.height + 0.28, -54.0 + sin(a) * 1.58), pale)
+	_box(self, Vector3(0.10, 10.0, 0.10), Vector3(25.0, 5.0, -49.5), Color(0.30, 0.27, 0.22))
+	_box(self, Vector3(2.6, 1.55, 0.08), Vector3(26.25, 8.45, -49.5), Color(0.82, 0.08, 0.12))
+	_box(self, Vector3(180.0, 0.78, 0.42), Vector3(0, 0.55, -55.2), pale)
+	for i in range(31):
+		var x := -88.0 + float(i) * 5.85
+		_box(self, Vector3(0.18, 0.95, 0.24), Vector3(x, 0.98, -55.2), stone)
+	_box(self, Vector3(180.0, 0.16, 0.56), Vector3(0, 1.48, -55.2), pale)
+
 
 func _build_town() -> void:
 	# Main asphalt streets crossing a compact Mahdia-inspired neighborhood.
@@ -669,11 +703,70 @@ func _build_hud() -> void:
 	close_ai_button.pressed.connect(func(): ai_setup_panel.visible = false)
 	setup_col.add_child(close_ai_button)
 
+	_build_reference_hud(layer)
+
 	var controls := Node.new()
 	controls.set_script(MOBILE_CONTROLS)
 	layer.add_child(controls)
 	controls.setup(player)
 
+
+
+func _build_reference_hud(layer: CanvasLayer) -> void:
+	var minimap := Control.new()
+	minimap.position = Vector2(18, 16)
+	minimap.custom_minimum_size = Vector2(112, 112)
+	minimap.draw.connect(func():
+		var center := Vector2(56, 56)
+		minimap.draw_circle(center, 54.0, Color(0.035, 0.07, 0.09, 0.82))
+		minimap.draw_arc(center, 53.0, 0.0, TAU, 64, Color(0.86, 0.89, 0.86), 3.0)
+		for road in range(-2, 3):
+			var offset := float(road) * 20.0
+			minimap.draw_line(Vector2(8, 56 + offset), Vector2(104, 56 + offset), Color(0.58, 0.65, 0.61, 0.42), 3.0)
+			minimap.draw_line(Vector2(56 + offset, 8), Vector2(56 + offset, 104), Color(0.58, 0.65, 0.61, 0.42), 3.0)
+		minimap.draw_circle(center, 4.0, Color(1.0, 0.82, 0.18))
+		minimap.draw_colored_polygon(PackedVector2Array([Vector2(56, 24), Vector2(48, 42), Vector2(64, 42)]), Color.WHITE)
+	)
+	layer.add_child(minimap)
+	var location := Label.new()
+	location.text = "📍 المهدية"
+	location.position = Vector2(24, 130)
+	location.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35))
+	layer.add_child(location)
+	var mission := PanelContainer.new()
+	mission.anchor_left = 0.5
+	mission.anchor_right = 0.5
+	mission.offset_left = -142
+	mission.offset_right = 142
+	mission.offset_top = 14
+	mission.offset_bottom = 72
+	layer.add_child(mission)
+	var mission_label := Label.new()
+	mission_label.text = "◆ المهمة الحالية\nاستكشف كورنيش المهدية وتعرّف إلى المدينة"
+	mission_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mission.add_child(mission_label)
+	var wallet := PanelContainer.new()
+	wallet.anchor_left = 1.0
+	wallet.anchor_right = 1.0
+	wallet.offset_left = -190
+	wallet.offset_right = -14
+	wallet.offset_top = 14
+	wallet.offset_bottom = 52
+	layer.add_child(wallet)
+	var wallet_label := Label.new()
+	wallet_label.text = "💵  $ 12,560   ＋"
+	wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wallet.add_child(wallet_label)
+	var level := Label.new()
+	level.text = "Lv. 8   ━━━━━━━━━"
+	level.anchor_left = 1.0
+	level.anchor_right = 1.0
+	level.offset_left = -184
+	level.offset_right = -16
+	level.offset_top = 56
+	level.offset_bottom = 82
+	level.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layer.add_child(level)
 
 func _on_ai_connection_status(ready: bool, message: String) -> void:
 	if not is_instance_valid(ai_status_label):
