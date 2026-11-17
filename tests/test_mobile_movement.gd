@@ -144,9 +144,10 @@ func _run_tests() -> void:
 	player.global_position = Vector3(100, 0, 100)
 	resident.set("target_position", Vector3(22, 0, 0))
 	resident.set("ai_state", "commuting")
+	var previous_goal_elapsed := float(resident.get("goal_refresh_elapsed"))
 	resident.call("_update_autonomous_decisions", 4.0)
 	_check(resident.get("target_position") == Vector3(22, 0, 0), "resident keeps a long-distance destination instead of replacing it every few seconds")
-	_check(is_equal_approx(float(resident.get("goal_refresh_elapsed")), 4.0), "daily goal refresh waits for a longer interval while player awareness remains responsive")
+	_check(is_equal_approx(float(resident.get("goal_refresh_elapsed")) - previous_goal_elapsed, 4.0), "daily goal refresh waits for a longer interval while player awareness remains responsive")
 	player.global_position = Vector3.ZERO
 	resident.call("on_player_interacted")
 	_check(int(resident.get("memory_meetings")) == 1, "NPC remembers an individual player meeting")

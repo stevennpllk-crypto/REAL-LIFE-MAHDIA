@@ -708,7 +708,7 @@ func get_dialogue() -> String:
 		return remembered + " يومي مزدحم قليلاً، أحتاج إلى استراحة."
 	if ai_state == "working" or ai_state == "commuting":
 		return greeting + "، أنا في طريقي إلى عملي كـ%s." % occupation
-	if ai_state == "socializing" and memory_meetings > 0:
+	if ai_state == "socializing" and memory_meetings > 0 and personality != "curious":
 		return remembered + " كنت أتحدث مع الجيران. كيف حالك؟"
 	match personality:
 		"shy":
