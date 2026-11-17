@@ -190,8 +190,9 @@ func _run_tests() -> void:
 	nearby_resident.set("build_visuals", false)
 	nearby_resident.set("display_name", "سامي")
 	nearby_resident.call("set_ai_context", player, null, Vector3(5, 0, 0), 8, saver)
-	nearby_resident.global_position = Vector3(0.8, 0, 0.8)
 	root.add_child(nearby_resident)
+	await process_frame
+	nearby_resident.global_position = Vector3(0.8, 0, 0.8)
 	resident.set("ai_state", "socializing")
 	resident.set("social_need", 0.8)
 	resident.call("_update_social_awareness")
