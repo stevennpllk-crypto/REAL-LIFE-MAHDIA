@@ -341,17 +341,27 @@ func _animate_figure(delta: float, moving: bool, speed: float) -> void:
 		left_arm.rotation.x = lerpf(left_arm.rotation.x, -0.22, delta * 10.0)
 		return
 	if moving:
-		animation_clock += delta * (9.0 if speed > walk_speed + 0.2 else 6.0)
-		var swing := sin(animation_clock) * 0.42
+		animation_clock += delta * (10.0 if running or Input.is_action_pressed("run") else 6.2)
+		gait_intensity = move_toward(gait_intensity, 1.0, delta * 3.5)
+		var actual_speed := Vector2(velocity.x, velocity.z).length()
+		var gait_scale := clampf(actual_speed / maxf(speed, 0.1), 0.35, 1.0)
+		var swing := sin(animation_clock) * 0.42 * gait_intensity * gait_scale
 		left_arm.rotation.x = swing
 		right_arm.rotation.x = -swing
-		left_leg.rotation.x = -swing * 0.85
-		right_leg.rotation.x = swing * 0.85
+		left_leg.rotation.x = -swing * (0.92 if not is_swimming else 0.35)
+		right_leg.rotation.x = swing * (0.92 if not is_swimming else 0.35)
+		if is_instance_valid(visual_root):
+			var run_lean := -0.055 if running else -0.018
+			var swim_lean := 0.20 if is_swimming else 0.0
+			var crouch_lean := 0.13 if crouching else 0.0
+			visual_root.rotation.x = lerpf(visual_root.rotation.x, run_lean + swim_lean + crouch_lean, delta * 5.0)
+			visual_root.scale.y = lerpf(visual_root.scale.y, 0.84 if crouching else 1.0, delta * 6.0)
 		if is_instance_valid(left_elbow): left_elbow.rotation.x = -0.10 - maxf(0.0, swing) * 0.18
 		if is_instance_valid(right_elbow): right_elbow.rotation.x = -0.10 + minf(0.0, swing) * 0.18
 		if is_instance_valid(left_knee): left_knee.rotation.x = maxf(0.0, swing) * 0.38
 		if is_instance_valid(right_knee): right_knee.rotation.x = maxf(0.0, -swing) * 0.38
 	else:
+		gait_intensity = move_toward(gait_intensity, 0.0, delta * 5.0)
 		idle_clock += delta
 		var breath := sin(idle_clock * 1.35) * 0.018
 		left_arm.rotation.x = lerpf(left_arm.rotation.x, breath, delta * 5.0)
@@ -362,4 +372,6 @@ func _animate_figure(delta: float, moving: bool, speed: float) -> void:
 		if is_instance_valid(right_elbow): right_elbow.rotation.x = lerpf(right_elbow.rotation.x, -0.08, delta * 4.0)
 		if is_instance_valid(left_knee): left_knee.rotation.x = lerpf(left_knee.rotation.x, 0.0, delta * 8.0)
 		if is_instance_valid(right_knee): right_knee.rotation.x = lerpf(right_knee.rotation.x, 0.0, delta * 8.0)
+		visual_root.rotation.x = lerpf(visual_root.rotation.x, 0.0, delta * 4.0)
+		visual_root.scale.y = lerpf(visual_root.scale.y, 1.0, delta * 5.0)
 	visual_root.position.y = lerpf(visual_root.position.y, 0.0 if moving else sin(idle_clock * 1.35) * 0.006, delta * 6.0)

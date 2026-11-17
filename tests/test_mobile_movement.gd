@@ -140,6 +140,8 @@ func _run_tests() -> void:
 	_check(is_instance_valid(visual_resident.get("left_elbow")) and is_instance_valid(visual_resident.get("right_elbow")), "resident arms contain independent elbow joints")
 	_check(is_instance_valid(visual_resident.get("left_knee")) and is_instance_valid(visual_resident.get("right_knee")), "resident legs contain independent knee joints")
 	_check(is_instance_valid(visual_resident.get("eye_white_left")) and is_instance_valid(visual_resident.get("mouth_visual")), "resident face contains layered eyes and an animated mouth")
+	_check(is_instance_valid(visual_resident.get("brow_left")) and is_instance_valid(visual_resident.get("head_visual")), "resident face supports expressive brows and independent head motion")
+	_check(float(visual_resident.get("conversation_gesture_elapsed")) >= 0.0, "resident has an independent conversation gesture clock")
 	visual_resident.queue_free()
 	player.global_position = Vector3(100, 0, 100)
 	resident.set("target_position", Vector3(22, 0, 0))

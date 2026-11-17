@@ -81,6 +81,8 @@ var memory_dirty := false
 var autonomy_cycles := 0
 var last_experience_tag := ""
 var last_experience_time := -1000.0
+var conversation_gesture_elapsed := 0.0
+var conversation_gesture_side := 1.0
 
 func set_ai_context(player_node: CharacterBody3D, clock_node: Node, work_spot: Vector3, identity: int, saver: Node = null) -> void:
 	player = player_node
@@ -986,12 +988,28 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 			brow_right.rotation.z = lerpf(brow_right.rotation.z, deg_to_rad(7.0) + concern - friendly_lift, delta * 2.4)
 		if is_instance_valid(mouth_visual):
 			var smile := clampf((mood - 0.45) * 0.07, -0.025, 0.025)
-			mouth_visual.position.y = lerpf(mouth_visual.position.y, -0.105 + smile, delta * 2.0)
+			var fatigue_drop := 0.012 if energy < 0.2 else 0.0
+			mouth_visual.position.y = lerpf(mouth_visual.position.y, -0.105 + smile - fatigue_drop, delta * 2.0)
+			mouth_visual.scale.x = lerpf(mouth_visual.scale.x, 1.0 + (0.16 if conversational else 0.0), delta * 3.0)
+		var eye_tension := clampf(stress * 0.12 + (0.06 if energy < 0.18 else 0.0), 0.0, 0.16)
+		for eye in [eye_white_left, eye_white_right, eye_left, eye_right]:
+			if is_instance_valid(eye):
+				eye.scale.y = lerpf(eye.scale.y, 1.0 - eye_tension, delta * 2.5)
 	if is_instance_valid(visual_root):
 		var bob := (absf(sin(clock)) * 0.025) if moving else sin(idle_phase * 1.35 + float(personal_seed)) * 0.008
 		visual_root.position.y = lerpf(visual_root.position.y, bob, delta * 5.0)
 		var lean := 0.035 if ai_state == "socializing" or ai_state == "greeting" else -0.025 if ai_state == "resting" else 0.0
 		visual_root.rotation.x = lerpf(visual_root.rotation.x, lean + (sin(clock) * 0.018 if moving else 0.0), delta * 3.0)
+		if ai_state == "socializing":
+			var partner := _nearest_resident(5.5)
+			if is_instance_valid(partner):
+				var to_partner := partner.global_position - global_position
+				to_partner.y = 0.0
+				if to_partner.length_squared() > 0.01:
+					var desired_yaw := atan2(-to_partner.x, -to_partner.z) - rotation.y
+					visual_root.rotation.y = lerp_angle(visual_root.rotation.y, clampf(desired_yaw, -0.65, 0.65), 1.0 - exp(-2.8 * delta))
+		else:
+			visual_root.rotation.y = lerp_angle(visual_root.rotation.y, 0.0, 1.0 - exp(-2.0 * delta))
 	# Residents blink at slightly different natural intervals rather than staring continuously.
 	blink_timer -= delta
 	if blink_timer <= 0.0:
