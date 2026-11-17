@@ -131,6 +131,11 @@ func get_world_observation() -> Dictionary:
 func _request_ai_thought() -> void:
 	if not is_instance_valid(ai_service) or not ai_service.has_method("request_npc_thought"):
 		return
+	# Only ask the remote model to reason about residents near the player.
+	# Distant residents keep using their local needs/routine simulation, reducing
+	# network traffic and server load without freezing their autonomous behaviour.
+	if is_instance_valid(player) and player.is_inside_tree() and global_position.distance_to(player.global_position) > 42.0:
+		return
 	if not bool(ai_service.call("is_configured")):
 		return
 	if ai_request_cooldown > 0.0:
