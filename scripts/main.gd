@@ -178,16 +178,16 @@ func _build_environment() -> void:
 	# Avoid procedural-sky shader variants on low-limit GLES3/SwiftShader devices.
 	world_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	world_environment.ambient_light_color = Color(0.78, 0.82, 0.90)
-	world_environment.ambient_light_energy = 0.82
+	world_environment.ambient_light_energy = 0.72
 	world_environment.tonemap_mode = Environment.TONE_MAPPER_ACES
 	world_env.environment = world_environment
 	add_child(world_env)
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48, -32, 0)
-	sun.light_energy = 1.1
+	sun.light_energy = 1.28
 	# One directional sun provides real surface shading. Shadows are quality-tiered.
 	sun.shadow_enabled = quality_level >= 1
-	sun.directional_shadow_max_distance = 55.0
+	sun.directional_shadow_max_distance = 48.0
 	sun.shadow_opacity = 0.62
 	sun.visible = true
 	add_child(sun)

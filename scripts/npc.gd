@@ -232,6 +232,10 @@ func _build_character() -> void:
 	torso.height = 0.78
 	torso.radial_segments = 12
 	body_visual = _part(torso, Vector3(0, 1.18, 0), shirt)
+	# Rounded shoulder line and layered fabric give the torso a less primitive silhouette.
+	var shoulders := _sphere(0.285, 0.30)
+	var shoulder_mesh := _part(shoulders, Vector3(0, 1.48, 0), shirt)
+	shoulder_mesh.scale = Vector3(1.22, 0.78, 0.92)
 	_part(_torus(0.105, 0.025), Vector3(0, 1.56, -0.005), shirt.darkened(0.18))
 	_part(_capsule(0.045, 0.16), Vector3(0, 1.49, -0.19), shirt.lightened(0.16))
 	# Layered everyday clothing: collar, placket, hem, seams and pockets.
@@ -248,9 +252,11 @@ func _build_character() -> void:
 		head_visual.position = Vector3(0, 1.84, 0)
 		visual_root.add_child(head_visual)
 		var head := MeshInstance3D.new()
-		head.mesh = _sphere(0.19, 0.40)
+		head.mesh = _sphere(0.175, 0.34)
 		head.material_override = _mat(skin)
 		head_visual.add_child(head)
+	# A slightly smaller head-to-body ratio reads much closer to adult human proportions.
+	head_visual.scale = Vector3(0.88, 0.88, 0.88)
 	# Hair cap, side locks, ears, nose, brows and eyes give faces readable depth.
 	var cap := _head_part(_sphere(0.195, 0.22), Vector3(0, 0.145, 0.015), hair)
 	cap.scale = Vector3(1.0 + float(posmod(personal_seed, 4)) * 0.025, 0.62, 1.0)
@@ -302,8 +308,11 @@ func _build_character() -> void:
 	# Wrist/hand skin and footwear are separate from the cloth meshes.
 	_part(_sphere(0.055, 0.10), Vector3(-0.30, 1.02, 0), skin)
 	_part(_sphere(0.055, 0.10), Vector3(0.30, 1.02, 0), skin)
-	_part(_capsule(0.105, 0.25), Vector3(-0.14, 0.10, -0.035), Color(0.055, 0.06, 0.065))
-	_part(_capsule(0.105, 0.25), Vector3(0.14, 0.10, -0.035), Color(0.055, 0.06, 0.065))
+	# Shoes now have a distinct sole, upper and toe instead of reading as bare dark capsules.
+	for foot_x in [-0.14, 0.14]:
+		_part(_box_mesh(Vector3(0.22, 0.055, 0.34)), Vector3(foot_x, 0.045, -0.105), Color(0.035, 0.038, 0.042))
+		_part(_capsule(0.085, 0.22), Vector3(foot_x, 0.12, -0.035), Color(0.075, 0.072, 0.068))
+		_part(_sphere(0.082, 0.12), Vector3(foot_x, 0.12, -0.135), Color(0.075, 0.072, 0.068))
 	_part(_torus(0.105, 0.012), Vector3(0, 0.82, 0), Color(0.42, 0.34, 0.22))
 	_build_occupation_details()
 	left_arm = _limb(Vector3(-0.30, 1.43, 0), shirt, 0.62, 0.10)
