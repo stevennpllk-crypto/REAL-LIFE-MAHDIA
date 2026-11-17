@@ -369,7 +369,7 @@ func _create_outer_district() -> void:
 		Vector3(72, 0, -20), Vector3(72, 0, 5), Vector3(72, 0, 35), Vector3(72, 0, 68),
 		Vector3(-32, 0, 78), Vector3(-10, 0, 78), Vector3(12, 0, 78), Vector3(32, 0, 78)
 	]
-	var count := [8, 12, 16][quality_level]
+	var count: int = [8, 12, 16][clampi(quality_level, 0, 2)]
 	for i in range(mini(count, lots.size())):
 		var height := randf_range(5.8, 10.5)
 		var dimensions := Vector3(randf_range(7.0, 9.5), height, randf_range(7.0, 9.5))
