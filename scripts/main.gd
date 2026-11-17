@@ -338,9 +338,61 @@ func _build_town() -> void:
 	_create_street_lamp(Vector3(6.5, 0, 8))
 	_create_street_lamp(Vector3(-8, 0, 6.5))
 	_create_street_lamp(Vector3(8, 0, -6.5))
+	_create_outer_district()
 	# Extra street props are decorative; keep the low tier focused on smooth play.
 	if quality_level >= 1:
 		_create_city_details()
+
+
+func _create_outer_district() -> void:
+	# Expand the playable city beyond the starter crossroads into three connected
+	# residential/commercial blocks. Geometry is shared and scaled for mobile.
+	var asphalt := Color(0.14, 0.16, 0.17)
+	var curb := Color(0.78, 0.75, 0.68)
+	var lane := Color(0.88, 0.82, 0.67)
+	# Two east-west streets and two north-south streets create a readable grid.
+	for z in [30.0, 58.0]:
+		_textured_box(self, Vector3(180, 0.12, 7.0), Vector3(0, 0.035, z), asphalt, "asphalt", Vector3(4, 30, 1))
+		_box(self, Vector3(180, 0.22, 0.18), Vector3(0, 0.16, z - 3.7), curb)
+		_box(self, Vector3(180, 0.22, 0.18), Vector3(0, 0.16, z + 3.7), curb)
+		for x in range(-84, 85, 12):
+			_box(self, Vector3(4.0, 0.025, 0.13), Vector3(float(x), 0.11, z), lane)
+	for x in [-52.0, 52.0]:
+		_textured_box(self, Vector3(7.0, 0.12, 112.0), Vector3(x, 0.035, 34.0), asphalt, "asphalt", Vector3(1, 30, 4))
+		_box(self, Vector3(0.18, 0.22, 112.0), Vector3(x - 3.7, 0.16, 34.0), curb)
+		_box(self, Vector3(0.18, 0.22, 112.0), Vector3(x + 3.7, 0.16, 34.0), curb)
+	# More homes and small shops; the population/building budget follows device tier.
+	var palette := [Color(0.91, 0.85, 0.74), Color(0.83, 0.79, 0.69), Color(0.94, 0.89, 0.79), Color(0.77, 0.76, 0.70)]
+	var lots := [
+		Vector3(-72, 0, -20), Vector3(-72, 0, 5), Vector3(-72, 0, 35), Vector3(-72, 0, 68),
+		Vector3(-32, 0, 43), Vector3(-10, 0, 43), Vector3(12, 0, 43), Vector3(32, 0, 43),
+		Vector3(72, 0, -20), Vector3(72, 0, 5), Vector3(72, 0, 35), Vector3(72, 0, 68),
+		Vector3(-32, 0, 78), Vector3(-10, 0, 78), Vector3(12, 0, 78), Vector3(32, 0, 78)
+	]
+	var count := [8, 12, 16][quality_level]
+	for i in range(mini(count, lots.size())):
+		var height := randf_range(5.8, 10.5)
+		var dimensions := Vector3(randf_range(7.0, 9.5), height, randf_range(7.0, 9.5))
+		_create_building(lots[i], dimensions, palette[i % palette.size()], 70 + i)
+		if i % 3 == 2:
+			await get_tree().process_frame
+	# A small public square with benches, planted trees and a tiled centre.
+	_textured_box(self, Vector3(18, 0.16, 15), Vector3(0, 0.10, 72), Color(0.70, 0.68, 0.59), "stone", Vector3(4, 4, 1))
+	for x in [-6.0, 6.0]:
+		for z in [67.0, 77.0]:
+			_create_palm(Vector3(x, 0, z))
+	for x in [-4.5, 4.5]:
+		_box(self, Vector3(3.0, 0.14, 0.55), Vector3(x, 0.65, 72), Color(0.40, 0.25, 0.15))
+	# Market awnings add a recognisable coastal-town street frontage.
+	for i in range(4):
+		var x := -24.0 + float(i) * 16.0
+		_box(self, Vector3(5.5, 0.14, 2.0), Vector3(x, 2.75, 35.0), [Color(0.78, 0.23, 0.16), Color(0.88, 0.81, 0.65), Color(0.16, 0.39, 0.42), Color(0.79, 0.65, 0.28)][i])
+		_box(self, Vector3(0.12, 2.6, 0.12), Vector3(x - 2.35, 1.3, 35.0), Color(0.34, 0.25, 0.18))
+		_box(self, Vector3(0.12, 2.6, 0.12), Vector3(x + 2.35, 1.3, 35.0), Color(0.34, 0.25, 0.18))
+	# Street furniture and lighting make the new blocks navigable at night.
+	for x in range(-80, 81, 20):
+		_create_street_lamp(Vector3(float(x), 0, 25.0))
+		_create_street_lamp(Vector3(float(x), 0, 63.0))
 
 func _create_building(origin: Vector3, size: Vector3, wall_color: Color, seed_value: int) -> void:
 	# Mediterranean/Mahdia-inspired low-rise architecture. Keep geometry static
