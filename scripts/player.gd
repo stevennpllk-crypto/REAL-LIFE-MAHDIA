@@ -23,6 +23,10 @@ var left_arm: Node3D
 var right_arm: Node3D
 var left_leg: Node3D
 var right_leg: Node3D
+var left_elbow: Node3D
+var right_elbow: Node3D
+var left_knee: Node3D
+var right_knee: Node3D
 var animation_clock := 0.0
 var idle_clock := 0.0
 var camera_drag_finger := -1
@@ -177,13 +181,47 @@ func _build_human_figure() -> void:
 	_part(visual_root, watch, Vector3(-0.31, 1.14, 0), Color(0.58, 0.54, 0.42))
 
 func _make_limb(pos: Vector3, color: Color, length: float, radius: float) -> Node3D:
+	# Separate upper/lower segments let elbows and knees bend naturally.
 	var pivot := Node3D.new()
 	pivot.position = pos
 	visual_root.add_child(pivot)
-	var limb := CapsuleMesh.new()
-	limb.radius = radius
-	limb.height = length
-	_part(pivot, limb, Vector3(0, -length * 0.34, 0), color)
+	var is_arm := length < 0.7
+	var upper_length := length * (0.54 if is_arm else 0.52)
+	var lower_length := length - upper_length
+	var upper := CapsuleMesh.new()
+	upper.radius = radius
+	upper.height = upper_length
+	_part(pivot, upper, Vector3(0, -upper_length * 0.48, 0), color)
+	var joint := Node3D.new()
+	joint.position = Vector3(0, -upper_length * 0.92, 0)
+	pivot.add_child(joint)
+	var joint_mesh := SphereMesh.new()
+	joint_mesh.radius = radius * 0.94
+	joint_mesh.height = radius * 1.9
+	_part(joint, joint_mesh, Vector3.ZERO, color.darkened(0.025))
+	var lower := CapsuleMesh.new()
+	lower.radius = radius * (0.82 if is_arm else 0.88)
+	lower.height = lower_length
+	_part(joint, lower, Vector3(0, -lower_length * 0.48, 0), color)
+	if is_arm:
+		var hand := SphereMesh.new()
+		hand.radius = 0.065
+		hand.height = 0.12
+		_part(joint, hand, Vector3(0, -lower_length * 0.91, -0.01), Color(0.69, 0.48, 0.35))
+		if pos.x < 0.0:
+			left_elbow = joint
+		else:
+			right_elbow = joint
+	else:
+		var shoe := CapsuleMesh.new()
+		shoe.radius = 0.105
+		shoe.height = 0.25
+		var shoe_item := _part(joint, shoe, Vector3(0, -lower_length * 0.93, -0.045), Color(0.045, 0.05, 0.06))
+		shoe_item.rotation.x = PI * 0.5
+		if pos.x < 0.0:
+			left_knee = joint
+		else:
+			right_knee = joint
 	return pivot
 
 func _make_shoe(pos: Vector3) -> void:
@@ -309,6 +347,10 @@ func _animate_figure(delta: float, moving: bool, speed: float) -> void:
 		right_arm.rotation.x = -swing
 		left_leg.rotation.x = -swing * 0.85
 		right_leg.rotation.x = swing * 0.85
+		if is_instance_valid(left_elbow): left_elbow.rotation.x = -0.10 - maxf(0.0, swing) * 0.18
+		if is_instance_valid(right_elbow): right_elbow.rotation.x = -0.10 + minf(0.0, swing) * 0.18
+		if is_instance_valid(left_knee): left_knee.rotation.x = maxf(0.0, swing) * 0.38
+		if is_instance_valid(right_knee): right_knee.rotation.x = maxf(0.0, -swing) * 0.38
 	else:
 		idle_clock += delta
 		var breath := sin(idle_clock * 1.35) * 0.018
@@ -316,4 +358,8 @@ func _animate_figure(delta: float, moving: bool, speed: float) -> void:
 		right_arm.rotation.x = lerpf(right_arm.rotation.x, breath, delta * 5.0)
 		left_leg.rotation.x = lerpf(left_leg.rotation.x, 0.0, delta * 8.0)
 		right_leg.rotation.x = lerpf(right_leg.rotation.x, 0.0, delta * 8.0)
+		if is_instance_valid(left_elbow): left_elbow.rotation.x = lerpf(left_elbow.rotation.x, -0.08, delta * 4.0)
+		if is_instance_valid(right_elbow): right_elbow.rotation.x = lerpf(right_elbow.rotation.x, -0.08, delta * 4.0)
+		if is_instance_valid(left_knee): left_knee.rotation.x = lerpf(left_knee.rotation.x, 0.0, delta * 8.0)
+		if is_instance_valid(right_knee): right_knee.rotation.x = lerpf(right_knee.rotation.x, 0.0, delta * 8.0)
 	visual_root.position.y = lerpf(visual_root.position.y, 0.0 if moving else sin(idle_clock * 1.35) * 0.006, delta * 6.0)
