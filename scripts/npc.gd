@@ -939,11 +939,21 @@ func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 		var working := ai_state == "working"
 		var eating := ai_state == "eating"
 		var resting := ai_state == "resting"
-		var gesture := sin(idle_phase * 2.1 + float(personal_seed)) * (0.18 if conversational else 0.025)
+		var gesture := sin(idle_phase * 2.1 + float(personal_seed)) * (0.10 if conversational else 0.025)
 		var work_motion := sin(idle_phase * 3.2 + float(personal_seed)) * 0.11 if working else 0.0
-		left_arm.rotation.x = lerpf(left_arm.rotation.x, gesture + work_motion, delta * (3.4 if conversational or working else 2.8))
-		var right_pose := -gesture * 0.7 - 0.62 if eating else -gesture * 0.7 + work_motion
-		right_arm.rotation.x = lerpf(right_arm.rotation.x, right_pose, delta * (3.0 if conversational or working or eating else 2.8))
+		var talk_left := 0.0
+		var talk_right := 0.0
+		if conversational:
+			conversation_gesture_elapsed += delta
+			if conversation_gesture_elapsed >= 1.35:
+				conversation_gesture_elapsed = 0.0
+				conversation_gesture_side *= -1.0
+			var talk_amount := sin(idle_phase * 3.8 + float(personal_seed)) * 0.12
+			talk_left = maxf(0.0, conversation_gesture_side) * (0.42 + talk_amount)
+			talk_right = maxf(0.0, -conversation_gesture_side) * (0.42 + talk_amount)
+		left_arm.rotation.x = lerpf(left_arm.rotation.x, gesture + work_motion - talk_left, delta * (4.2 if conversational else 3.0))
+		var right_pose := -gesture * 0.7 - 0.62 if eating else -gesture * 0.7 + work_motion - talk_right
+		right_arm.rotation.x = lerpf(right_arm.rotation.x, right_pose, delta * (4.0 if conversational or working or eating else 3.0))
 		left_arm.rotation.z = lerpf(left_arm.rotation.z, -0.10 if conversational else -0.035 if working else 0.0, delta * 2.5)
 		right_arm.rotation.z = lerpf(right_arm.rotation.z, 0.10 if conversational else 0.035 if working else 0.0, delta * 2.5)
 		if is_instance_valid(left_elbow):
