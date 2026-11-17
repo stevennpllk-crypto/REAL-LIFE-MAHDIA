@@ -491,6 +491,8 @@ func _spawn_residents() -> void:
 		npc.set_ai_context(player, world_systems, work_spot, i, save_manager)
 		npc.set_ai_service(ai_service)
 		add_child(npc)
+	if is_instance_valid(life_manager):
+		life_manager.call("resolve_delivery_target")
 
 func _spawn_vehicle() -> void:
 	vehicle = CharacterBody3D.new()

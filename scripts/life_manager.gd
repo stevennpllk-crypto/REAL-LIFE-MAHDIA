@@ -18,6 +18,7 @@ var stations: Array[Dictionary] = []
 var job_claimed := false
 var delivery_state := "not_started"
 var delivery_npc: Node3D
+var delivery_target_name := ""
 var inside_station_kind := ""
 var autosave_elapsed := 0.0
 var base_run_speed := 4.8
@@ -72,6 +73,7 @@ func setup(target: CharacterBody3D, saver: Node) -> void:
 	hunger = clampf(float(data.get("hunger", 100.0)), 0.0, 100.0)
 	job_claimed = bool(data.get("job_claimed", false))
 	delivery_state = str(data.get("delivery_state", "not_started"))
+	delivery_target_name = str(data.get("delivery_target_name", ""))
 	_create_station("مقهى الميناء", "cafe", Vector3(-12, 0, -5), Color(0.65, 0.28, 0.12))
 	_create_station("منزلك", "home", Vector3(15, 0, 8), Color(0.82, 0.76, 0.61))
 	_create_station("مكتب العمل", "job", Vector3(22, 0, -12), Color(0.18, 0.42, 0.28))
@@ -181,6 +183,15 @@ func try_interact() -> void:
 				_set_message("تحتاج إلى 10 د.ت لشراء وجبة.")
 	save_now()
 
+
+func resolve_delivery_target() -> void:
+	if delivery_target_name.is_empty() or delivery_state == "not_started" or delivery_state == "completed":
+		return
+	for candidate in get_tree().get_nodes_in_group("mahdia_residents"):
+		if is_instance_valid(candidate) and str(candidate.get("display_name")) == delivery_target_name:
+			delivery_npc = candidate
+			return
+
 func _nearest_resident() -> Node3D:
 	var nearest: Node3D
 	var best := 4.5
@@ -203,6 +214,8 @@ func _interact_resident(resident: Node3D) -> void:
 			food -= 1
 			money += 20
 			delivery_state = "completed"
+			delivery_target_name = ""
+			delivery_npc = null
 			_set_message("أحسنت! سلّمت الوجبة إلى %s وربحت 20 د.ت!" % str(resident.get("display_name")))
 		else:
 			_set_message("هذه الوجبة ليست لهذا المواطن. ابحث عن الشخص الذي طلبها!")
@@ -216,6 +229,7 @@ func _interact_resident(resident: Node3D) -> void:
 	else:
 		delivery_state = "accepted"
 		delivery_npc = resident
+		delivery_target_name = str(resident.get("display_name"))
 		_set_message("%s: هل يمكنك إحضار وجبة من متجر الحي؟ المكافأة 20 د.ت!" % resident_dialogue)
 	save_now()
 
@@ -234,7 +248,8 @@ func save_now() -> void:
 		"energy": energy,
 		"hunger": hunger,
 		"job_claimed": job_claimed,
-		"delivery_state": delivery_state
+		"delivery_state": delivery_state,
+		"delivery_target_name": delivery_target_name
 	}
 	var result: Error = save_manager.save_progress(all_data)
 	if result != OK:
