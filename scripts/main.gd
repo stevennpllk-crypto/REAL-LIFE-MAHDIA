@@ -42,6 +42,9 @@ var quality_level := 0
 var quality_button: Button
 var restored_vehicle_position := Vector3(5, 0.1, 10)
 var restore_vehicle_driver := false
+var mission_hud_label: Label
+var mission_target_marker: Label3D
+var mission_last_text := ""
 const AUTOSAVE_INTERVAL := 12.0
 const WORLD_SAVE_KEY := "mahdia_world"
 
@@ -712,6 +715,67 @@ func _build_hud() -> void:
 
 
 
+
+func _update_mission_hud() -> void:
+	if not is_instance_valid(mission_hud_label) or not is_instance_valid(life_manager) or not is_instance_valid(player):
+		return
+	var state := str(life_manager.get("delivery_state"))
+	var job_claimed := bool(life_manager.get("job_claimed"))
+	var title := "مهمة: بداية حياة جديدة في المهدية"
+	var objective := "تحدث مع أحد السكان لبدء مهمتك الأولى"
+	var target_position := Vector3.ZERO
+	var has_target := false
+	match state:
+		"accepted":
+			title = "مهمة 1/3: خدمة أهل المهدية"
+			objective = "اشترِ وجبة من متجر الحي (10 د.ت)"
+			for station in life_manager.get("stations"):
+				if str(station.get("kind")) == "shop":
+					target_position = station.get("position")
+					has_target = true
+		"ready":
+			title = "مهمة 2/3: توصيل الطلب"
+			objective = "عد إلى المواطن الذي طلب الوجبة وسلّمها"
+			var recipient = life_manager.get("delivery_npc")
+			if is_instance_valid(recipient):
+				target_position = recipient.global_position
+				has_target = true
+		"completed":
+			if not job_claimed:
+				title = "مهمة 3/3: أول وظيفة"
+				objective = "اذهب إلى مكتب العمل واحصل على أجرك (30 د.ت)"
+				for station in life_manager.get("stations"):
+					if str(station.get("kind")) == "job":
+						target_position = station.get("position")
+						has_target = true
+			else:
+				title = "اكتملت مهام البداية!"
+				objective = "أصبحت تعرف المدينة. استكشف المهدية بحرية."
+		_:
+			var residents := get_tree().get_nodes_in_group("mahdia_residents")
+			var nearest: Node3D
+			var nearest_distance := INF
+			for resident in residents:
+				if is_instance_valid(resident):
+					var distance := player.global_position.distance_to(resident.global_position)
+					if distance < nearest_distance:
+						nearest_distance = distance
+						nearest = resident
+			if is_instance_valid(nearest):
+				target_position = nearest.global_position
+				has_target = true
+	var distance_text := ""
+	if has_target:
+		distance_text = "\nالمسافة: %.0f م" % player.global_position.distance_to(target_position)
+	var display := "◆ %s\n%s%s" % [title, objective, distance_text]
+	if display != mission_last_text:
+		mission_hud_label.text = display
+		mission_last_text = display
+	if is_instance_valid(mission_target_marker):
+		mission_target_marker.visible = has_target
+		if has_target:
+			mission_target_marker.global_position = target_position + Vector3(0, 3.1, 0)
+
 func _build_reference_hud(layer: CanvasLayer) -> void:
 	var minimap := Control.new()
 	minimap.position = Vector2(18, 16)
@@ -741,10 +805,21 @@ func _build_reference_hud(layer: CanvasLayer) -> void:
 	mission.offset_top = 14
 	mission.offset_bottom = 72
 	layer.add_child(mission)
-	var mission_label := Label.new()
-	mission_label.text = "◆ المهمة الحالية\nاستكشف كورنيش المهدية وتعرّف إلى المدينة"
-	mission_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	mission.add_child(mission_label)
+	mission_hud_label = Label.new()
+	mission_hud_label.text = "◆ المهمة الحالية\nتحدث مع أحد سكان المهدية"
+	mission_hud_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mission_hud_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mission.add_child(mission_hud_label)
+	mission_target_marker = Label3D.new()
+	mission_target_marker.name = "MissionWorldMarker"
+	mission_target_marker.text = "▼\nالهدف"
+	mission_target_marker.font_size = 48
+	mission_target_marker.pixel_size = 0.006
+	mission_target_marker.modulate = Color(1.0, 0.78, 0.12)
+	mission_target_marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	mission_target_marker.no_depth_test = true
+	mission_target_marker.visible = false
+	add_child(mission_target_marker)
 	var wallet := PanelContainer.new()
 	wallet.anchor_left = 1.0
 	wallet.anchor_right = 1.0
@@ -847,6 +922,7 @@ func _process(delta: float) -> void:
 		player.interact_requested = false
 	if is_instance_valid(planet_navigation) and is_instance_valid(player):
 		planet_navigation.update_from_player(player.global_position)
+	_update_mission_hud()
 	if is_instance_valid(status_label):
 		var hour_value: float = world_systems.hour if is_instance_valid(world_systems) else 8.0
 		status_label.text = "%s • %s • %02d:%02d • %s • %d د.ت • طاقة %d%% • جوع %d%%" % [planet_navigation.get_region_name(), planet_navigation.get_coordinate_text(), int(hour_value), int(fposmod(hour_value * 60.0, 60.0)), world_systems.weather, life_manager.money, int(life_manager.energy), int(life_manager.hunger)]

@@ -199,19 +199,24 @@ func _interact_resident(resident: Node3D) -> void:
 		resident.on_player_interacted()
 	var resident_dialogue := str(resident.call("get_dialogue")) if resident.has_method("get_dialogue") else str(resident.get("display_name"))
 	if delivery_state == "ready" and food > 0:
-		food -= 1
-		money += 20
-		delivery_state = "completed"
-		delivery_npc = null
-		_set_message("أحسنت! سلّمت الوجبة وربحت 20 د.ت. شكراً لمساعدتك!")
+		if is_instance_valid(delivery_npc) and resident == delivery_npc:
+			food -= 1
+			money += 20
+			delivery_state = "completed"
+			_set_message("أحسنت! سلّمت الوجبة إلى %s وربحت 20 د.ت!" % str(resident.get("display_name")))
+		else:
+			_set_message("هذه الوجبة ليست لهذا المواطن. ابحث عن الشخص الذي طلبها!")
 	elif delivery_state == "accepted":
-		_set_message("المواطن ينتظر الوجبة. اشترها من متجر الحي ثم عد إليه.")
+		if is_instance_valid(delivery_npc) and resident != delivery_npc:
+			_set_message("تذكّر: %s هو من طلب الوجبة. اشترها من متجر الحي ثم عُد إليه." % str(delivery_npc.get("display_name")))
+		else:
+			_set_message("المواطن ينتظر الوجبة. اشترها من متجر الحي ثم عد إليه.")
 	elif delivery_state == "completed":
 		_set_message("%s: يعطيك الصحة! ساعدتني كثيراً." % resident_dialogue)
 	else:
 		delivery_state = "accepted"
 		delivery_npc = resident
-		_set_message("%s هل يمكنك إحضار وجبة من متجر الحي؟ المكافأة 20 د.ت!" % resident_dialogue)
+		_set_message("%s: هل يمكنك إحضار وجبة من متجر الحي؟ المكافأة 20 د.ت!" % resident_dialogue)
 	save_now()
 
 func _set_message(value: String) -> void:
