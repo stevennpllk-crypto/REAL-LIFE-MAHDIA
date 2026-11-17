@@ -719,7 +719,7 @@ func _build_hud() -> void:
 
 
 func _update_mission_hud() -> void:
-	if not is_instance_valid(mission_hud_label) or not is_instance_valid(life_manager) or not is_instance_valid(player):
+	if not is_instance_valid(mission_hud_label) or not is_instance_valid(life_manager) or not is_instance_valid(player) or not player.is_inside_tree():
 		return
 	var state := str(life_manager.get("delivery_state"))
 	var job_claimed := bool(life_manager.get("job_claimed"))
@@ -739,7 +739,7 @@ func _update_mission_hud() -> void:
 			title = "مهمة 2/3: توصيل الطلب"
 			objective = "عد إلى المواطن الذي طلب الوجبة وسلّمها"
 			var recipient = life_manager.get("delivery_npc")
-			if is_instance_valid(recipient):
+			if is_instance_valid(recipient) and recipient.is_inside_tree() and not recipient.is_queued_for_deletion():
 				target_position = recipient.global_position
 				has_target = true
 		"completed":
@@ -758,12 +758,12 @@ func _update_mission_hud() -> void:
 			var nearest: Node3D
 			var nearest_distance := INF
 			for resident in residents:
-				if is_instance_valid(resident):
+				if is_instance_valid(resident) and resident.is_inside_tree() and not resident.is_queued_for_deletion():
 					var distance := player.global_position.distance_to(resident.global_position)
 					if distance < nearest_distance:
 						nearest_distance = distance
 						nearest = resident
-			if is_instance_valid(nearest):
+			if is_instance_valid(nearest) and nearest.is_inside_tree() and not nearest.is_queued_for_deletion():
 				target_position = nearest.global_position
 				has_target = true
 	var distance_text := ""
@@ -773,7 +773,7 @@ func _update_mission_hud() -> void:
 	if display != mission_last_text:
 		mission_hud_label.text = display
 		mission_last_text = display
-	if is_instance_valid(mission_target_marker):
+	if is_instance_valid(mission_target_marker) and mission_target_marker.is_inside_tree():
 		mission_target_marker.visible = has_target
 		if has_target:
 			mission_target_marker.global_position = target_position + Vector3(0, 3.1, 0)

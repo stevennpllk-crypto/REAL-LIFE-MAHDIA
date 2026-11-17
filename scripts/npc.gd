@@ -109,18 +109,18 @@ func set_ai_service(service: Node) -> void:
 func get_world_observation() -> Dictionary:
 	var nearby_people: Array[Dictionary] = []
 	for person in get_tree().get_nodes_in_group("mahdia_residents"):
-		if person == self or not is_instance_valid(person) or person.is_queued_for_deletion():
+		if person == self or not is_instance_valid(person) or not person.is_inside_tree() or person.is_queued_for_deletion():
 			continue
 		var distance := global_position.distance_to(person.global_position)
 		if distance <= 14.0:
 			nearby_people.append({"name": str(person.get("display_name")), "distance_m": snappedf(distance, 0.1), "activity": str(person.get("ai_state")), "mood": snappedf(float(person.get("mood")), 0.05)})
 	var nearby_traffic := 0
 	for car in get_tree().get_nodes_in_group("mahdia_traffic"):
-		if is_instance_valid(car) and global_position.distance_to(car.global_position) <= 18.0:
+		if is_instance_valid(car) and car.is_inside_tree() and not car.is_queued_for_deletion() and global_position.distance_to(car.global_position) <= 18.0:
 			nearby_traffic += 1
 	var player_distance := -1.0
 	var player_activity := "غير موجود"
-	if is_instance_valid(player) and not player.is_queued_for_deletion():
+	if is_instance_valid(player) and player.is_inside_tree() and not player.is_queued_for_deletion():
 		player_distance = snappedf(global_position.distance_to(player.global_position), 0.1)
 		player_activity = "قريب" if player_distance <= 8.0 else "بعيد"
 	var weather := "غير معروف"
@@ -166,7 +166,7 @@ func _on_ai_thought(resident: Node3D, thought: String, decision: Dictionary, suc
 				target_position = station.global_position + Vector3(0, 0, 2.7)
 		"socialize":
 			var partner := _nearest_resident(12.0)
-			if is_instance_valid(partner):
+			if is_instance_valid(partner) and partner.is_inside_tree() and not partner.is_queued_for_deletion():
 				ai_state = "socializing"
 				target_position = partner.global_position + Vector3(1.2, 0, 0.8)
 		"explore":
@@ -498,7 +498,7 @@ func _choose_daily_goal(hour: float) -> void:
 		current_goal = "التواصل"
 		ai_state = "socializing"
 		var known_resident := _nearest_resident(10.0)
-		if is_instance_valid(known_resident):
+		if is_instance_valid(known_resident) and known_resident.is_inside_tree() and not known_resident.is_queued_for_deletion():
 			target_position = known_resident.global_position + Vector3(1.2, 0, 0.8)
 		else:
 			target_position = rest_position + _random_near(Vector3.ZERO) * 0.35
@@ -569,7 +569,7 @@ func _nearest_food_station() -> Node3D:
 	var nearest: Node3D
 	var best_distance := INF
 	for station in get_tree().get_nodes_in_group("resident_food_stations"):
-		if not is_instance_valid(station) or station.is_queued_for_deletion():
+		if not is_instance_valid(station) or not station.is_inside_tree() or station.is_queued_for_deletion():
 			continue
 		var distance := global_position.distance_to(station.global_position)
 		if distance < best_distance:
@@ -581,7 +581,7 @@ func _nearest_resident(max_distance: float) -> MahdiaNPC:
 	var nearest: MahdiaNPC
 	var best_distance := max_distance
 	for candidate in get_tree().get_nodes_in_group("mahdia_residents"):
-		if candidate == self or not is_instance_valid(candidate) or candidate.is_queued_for_deletion():
+		if candidate == self or not is_instance_valid(candidate) or not candidate.is_inside_tree() or candidate.is_queued_for_deletion():
 			continue
 		var distance := global_position.distance_to(candidate.global_position)
 		if distance < best_distance:
@@ -755,7 +755,7 @@ func get_dialogue() -> String:
 			return greeting + "! " + remembered + " يعطيك الصحة!"
 
 func _player_decision() -> bool:
-	if not is_instance_valid(player) or player.is_queued_for_deletion():
+	if not is_instance_valid(player) or not player.is_inside_tree() or player.is_queued_for_deletion():
 		return false
 	var distance := global_position.distance_to(player.global_position)
 	if distance > 8.0:
