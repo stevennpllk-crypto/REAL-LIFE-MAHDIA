@@ -131,11 +131,6 @@ func get_world_observation() -> Dictionary:
 func _request_ai_thought() -> void:
 	if not is_instance_valid(ai_service) or not ai_service.has_method("request_npc_thought"):
 		return
-	# Only ask the remote model to reason about residents near the player.
-	# Distant residents keep using their local needs/routine simulation, reducing
-	# network traffic and server load without freezing their autonomous behaviour.
-	if is_instance_valid(player) and player.is_inside_tree() and global_position.distance_to(player.global_position) > 42.0:
-		return
 	if not bool(ai_service.call("is_configured")):
 		return
 	if ai_request_cooldown > 0.0:
@@ -815,8 +810,7 @@ func _avoid_obstacle(direction: Vector3, delta: float) -> Vector3:
 func _avoid_resident_crowding(direction: Vector3) -> Vector3:
 	if direction.length_squared() < 0.01:
 		return direction
-	# Spread resident scans across time: identical intervals made every NPC
-	# query the full resident group on the same physics frame.
+	# Spread resident scans across time to avoid synchronized group queries.
 	crowd_check_elapsed += get_physics_process_delta_time()
 	var scan_interval := 0.30 + float(posmod(personal_seed, 6)) * 0.035
 	if crowd_check_elapsed < scan_interval:
