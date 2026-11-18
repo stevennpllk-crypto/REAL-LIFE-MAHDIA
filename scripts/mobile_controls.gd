@@ -55,7 +55,6 @@ func setup(player: CharacterBody3D) -> void:
 	interact_button.pressed.connect(func(): target.request_interact())
 	attack_button.pressed.connect(func(): target.request_attack())
 	crouch_button.pressed.connect(func(): target.toggle_crouch())
-	dodge_button.pressed.connect(func(): target.request_dodge())
 
 func _make_button(parent: Control, caption: String, offset: Vector2) -> Button:
 	var button := Button.new()
@@ -67,9 +66,9 @@ func _make_button(parent: Control, caption: String, offset: Vector2) -> Button:
 	button.anchor_top = 1.0
 	button.anchor_bottom = 1.0
 	button.offset_left = offset.x
-	button.offset_right = offset.x + 76.0
+	button.offset_right = offset.x + 72.0
 	button.offset_top = offset.y
-	button.offset_bottom = offset.y + 76.0
+	button.offset_bottom = offset.y + 72.0
 	button.focus_mode = Control.FOCUS_NONE
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = Color(0.035, 0.055, 0.075, 0.72)
