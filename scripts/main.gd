@@ -88,6 +88,7 @@ func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
 var rounded_mesh_cache: Dictionary = {}
 var plaster_texture: ImageTexture
 var surface_texture_cache: Dictionary = {}
+var pbr_texture_cache: Dictionary = {}
 
 func _rounded_box_mesh(size: Vector3) -> ArrayMesh:
 	var key := "%0.3f_%0.3f_%0.3f" % [size.x, size.y, size.z]
@@ -151,21 +152,54 @@ func _box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInst
 	parent.add_child(item)
 	return item
 
+func _pbr_texture(asset: String, map_name: String) -> Texture2D:
+	var key := asset + "_" + map_name
+	if pbr_texture_cache.has(key):
+		return pbr_texture_cache[key] as Texture2D
+	var extensions := ["jpg", "png"] if map_name == "diff" or map_name == "rough" else ["png", "jpg"]
+	for extension in extensions:
+		var path := "res://assets/textures/%s_%s_1k.%s" % [asset, map_name, extension]
+		if ResourceLoader.exists(path):
+			var texture := load(path) as Texture2D
+			if texture != null:
+				pbr_texture_cache[key] = texture
+				return texture
+	pbr_texture_cache[key] = null
+	return null
+
+
+func _apply_pbr_maps(material: StandardMaterial3D, asset: String) -> void:
+	var normal_map := _pbr_texture(asset, "nor_gl")
+	var rough_map := _pbr_texture(asset, "rough")
+	if normal_map != null:
+		material.normal_enabled = true
+		material.normal_texture = normal_map
+		material.normal_scale = 0.48
+	if rough_map != null:
+		material.roughness_texture = rough_map
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+
+
 func _plaster_material(color: Color) -> StandardMaterial3D:
-	if plaster_texture == null:
-		var image := Image.create(128, 128, false, Image.FORMAT_RGBA8)
-		for y in range(128):
-			for x in range(128):
-				var grain := randf_range(0.91, 1.0)
-				var stain := 0.96 + sin(float(x) * 0.11 + sin(float(y) * 0.07)) * 0.025
-				var value := clampf(grain * stain, 0.82, 1.0)
-				image.set_pixel(x, y, Color(value, value, value, 1.0))
-		plaster_texture = ImageTexture.create_from_image(image)
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
-	material.albedo_texture = plaster_texture
-	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
-	material.roughness = 1.0
+	var plaster_map := _pbr_texture("plastered_wall", "diff")
+	if plaster_map != null:
+		material.albedo_texture = plaster_map
+		_apply_pbr_maps(material, "plastered_wall")
+	else:
+		if plaster_texture == null:
+			var image := Image.create(128, 128, false, Image.FORMAT_RGBA8)
+			for y in range(128):
+				for x in range(128):
+					var grain := randf_range(0.91, 1.0)
+					var stain := 0.96 + sin(float(x) * 0.11 + sin(float(y) * 0.07)) * 0.025
+					var value := clampf(grain * stain, 0.82, 1.0)
+					image.set_pixel(x, y, Color(value, value, value, 1.0))
+			plaster_texture = ImageTexture.create_from_image(image)
+		material.albedo_texture = plaster_texture
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	material.roughness = 0.96
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	return material
 
@@ -227,7 +261,12 @@ func _build_environment() -> void:
 	add_child(shore)
 
 	# Mediterranean sea and a pale coastal promenade.
-	_box(self, Vector3(180, 0.16, 38), Vector3(0, -0.02, -78), Color(0.035, 0.34, 0.56))
+	var sea := _box(self, Vector3(180, 0.16, 38), Vector3(0, -0.02, -78), Color(0.025, 0.29, 0.50))
+	var sea_material := _material(Color(0.025, 0.29, 0.50), 0.24)
+	sea_material.metallic = 0.12
+	sea_material.roughness = 0.24
+	sea_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	sea.material_override = sea_material
 	_box(self, Vector3(180, 0.18, 5), Vector3(0, 0.04, -57), Color(0.82, 0.76, 0.64))
 	_create_coastal_scenery()
 	_create_waterfront_district()
@@ -382,6 +421,19 @@ func _create_borj_el_kebir_landmark() -> void:
 	_box(self, Vector3(1.25, 7.0, 10.0), Vector3(45.8, 3.5, -56.0), stone)
 	_box(self, Vector3(3.0, 3.8, 0.12), Vector3(37.0, 1.9, -50.32), Color(0.12, 0.11, 0.10))
 	_box(self, Vector3(4.2, 0.55, 0.42), Vector3(37.0, 4.0, -50.15), pale)
+	# Carved horizontal masonry courses and parapet teeth give the fortress a stone silhouette.
+	for course in range(7):
+		var y := 0.72 + float(course) * 0.88
+		for block in range(19):
+			var bx := 28.0 + float(block) * 1.0
+			if bx > 46.0:
+				continue
+			if course > 1 and course < 5 and absf(bx - 37.0) < 2.2:
+				continue
+			_box(self, Vector3(0.82, 0.055, 0.045), Vector3(bx, y, -50.34), Color(0.77, 0.70, 0.57))
+	for crenel in range(11):
+		var cx := 28.8 + float(crenel) * 1.64
+		_box(self, Vector3(0.78, 0.62, 1.32), Vector3(cx, 7.28, -51.0), pale)
 	for x in [28.5, 45.5]:
 		var tower := MeshInstance3D.new()
 		var mesh := CylinderMesh.new()
@@ -393,9 +445,11 @@ func _create_borj_el_kebir_landmark() -> void:
 		tower.position = Vector3(x, mesh.height * 0.5, -54.0)
 		tower.material_override = _material(stone)
 		add_child(tower)
-		for j in range(10):
-			var a := TAU * float(j) / 10.0
-			_box(self, Vector3(0.42, 0.58, 0.42), Vector3(x + cos(a) * 1.58, mesh.height + 0.28, -54.0 + sin(a) * 1.58), pale)
+		for j in range(12):
+			var a := TAU * float(j) / 12.0
+			_box(self, Vector3(0.34, 0.72, 0.34), Vector3(x + cos(a) * 1.62, mesh.height + 0.36, -54.0 + sin(a) * 1.62), pale)
+		for slit in range(4):
+			_box(self, Vector3(0.16, 1.05, 0.10), Vector3(x + cos(float(slit) * TAU / 4.0) * 1.72, mesh.height * 0.62, -54.0 + sin(float(slit) * TAU / 4.0) * 1.72), Color(0.20, 0.17, 0.13))
 	_box(self, Vector3(0.10, 10.0, 0.10), Vector3(25.0, 5.0, -49.5), Color(0.30, 0.27, 0.22))
 	_box(self, Vector3(2.6, 1.55, 0.08), Vector3(26.25, 8.45, -49.5), Color(0.82, 0.08, 0.12))
 	_box(self, Vector3(180.0, 0.78, 0.42), Vector3(0, 0.55, -55.2), pale)
@@ -1311,10 +1365,16 @@ func _textured_box(parent: Node3D, size: Vector3, pos: Vector3, tint: Color, tex
 	item.position = pos
 	var material := StandardMaterial3D.new()
 	material.albedo_color = tint
-	material.albedo_texture = _surface_texture(texture_kind)
+	var asset := "cobblestone_pavement" if texture_kind == "stone" else ""
+	var diffuse := _pbr_texture(asset, "diff") if not asset.is_empty() else null
+	if diffuse != null:
+		material.albedo_texture = diffuse
+		_apply_pbr_maps(material, asset)
+	else:
+		material.albedo_texture = _surface_texture(texture_kind)
 	material.uv1_scale = uv_scale
-	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
-	material.roughness = 1.0
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	material.roughness = 0.96
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	item.material_override = material
 	parent.add_child(item)

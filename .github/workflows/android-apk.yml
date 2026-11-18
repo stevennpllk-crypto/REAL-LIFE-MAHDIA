@@ -69,6 +69,20 @@ jobs:
           echo "Converted resident models:"
           du -h assets/characters/*.glb
 
+
+      - name: Download CC0 PBR textures for Mahdia streets and facades
+        run: |
+          set -euxo pipefail
+          mkdir -p assets/textures
+          for asset in plastered_wall cobblestone_pavement; do
+            base="https://dl.polyhaven.org/file/ph-assets/Textures"
+            curl --fail --location --retry 3 "$base/jpg/1k/$asset/${asset}_diff_1k.jpg" -o "assets/textures/${asset}_diff_1k.jpg"
+            curl --fail --location --retry 3 "$base/png/1k/$asset/${asset}_nor_gl_1k.png" -o "assets/textures/${asset}_nor_gl_1k.png"
+            curl --fail --location --retry 3 "$base/jpg/1k/$asset/${asset}_rough_1k.jpg" -o "assets/textures/${asset}_rough_1k.jpg"
+            test -s "assets/textures/${asset}_diff_1k.jpg"
+          done
+          du -h assets/textures/*
+
       - name: Configure Godot Android export paths
         run: |
           mkdir -p "$HOME/.config/godot"

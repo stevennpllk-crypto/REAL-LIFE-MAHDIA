@@ -69,10 +69,10 @@ func _ready() -> void:
 	camera = Camera3D.new()
 	# Closer over-the-shoulder framing: keep the full character readable while
 	# reducing empty foreground and making mobile touch control feel more immediate.
-	camera.position = Vector3(0, 0.42, 2.18)
+	camera.position = Vector3(0, 0.36, 1.82)
 	camera.rotation_degrees.x = -10.0
 	camera.current = true
-	camera.fov = 56.0
+	camera.fov = 54.0
 	camera.near = 0.08
 	camera_pivot.add_child(camera)
 	if not OS.has_feature("mobile"):
@@ -187,7 +187,7 @@ func _pose_imported_player_bone(key: String, angle: float) -> void:
 		# around the body's forward axis, then add gait swing around body-up.
 		var drop_axis := (inverse_rest * Vector3.BACK).normalized()
 		var swing_axis := (inverse_rest * Vector3.UP).normalized()
-		var drop_angle := 1.08 if key == "left_arm" else -1.08
+		var drop_angle := 1.48 if key == "left_arm" else -1.48
 		pose_rotation = Quaternion(drop_axis, drop_angle) * Quaternion(swing_axis, angle)
 	elif key == "head":
 		var head_axis := (inverse_rest * Vector3.UP).normalized()
