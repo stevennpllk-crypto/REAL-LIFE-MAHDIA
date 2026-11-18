@@ -54,6 +54,21 @@ jobs:
           test "$(find assets/characters -maxdepth 1 -name '*.glb' -type f | wc -l)" -eq 4
           du -h assets/characters/*.glb
 
+      # Godot 4.3 does not import the source models' meshopt/quantized
+      # geometry extensions. Decode meshopt and restore float attributes first.
+      - name: Convert resident GLBs to Godot-compatible geometry
+        run: |
+          set -euxo pipefail
+          npm install --global @gltf-transform/cli
+          for source in assets/characters/*.glb; do
+            converted="${source%.glb}.godot.glb"
+            gltf-transform dequantize "$source" "$converted"
+            test -s "$converted"
+            mv "$converted" "$source"
+          done
+          echo "Converted resident models:"
+          du -h assets/characters/*.glb
+
       - name: Configure Godot Android export paths
         run: |
           mkdir -p "$HOME/.config/godot"
