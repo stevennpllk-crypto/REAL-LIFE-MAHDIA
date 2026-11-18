@@ -1033,7 +1033,23 @@ func _cache_imported_bones() -> void:
 func _pose_imported_bone(key: String, angle: float) -> void:
 	if not is_instance_valid(imported_skeleton) or not imported_bones.has(key):
 		return
-	imported_skeleton.set_bone_pose_rotation(int(imported_bones[key]), Quaternion(Vector3.RIGHT, angle))
+	var bone_index := int(imported_bones[key])
+	var inverse_rest := imported_skeleton.get_bone_global_rest(bone_index).basis.inverse()
+	var pose_rotation := Quaternion.IDENTITY
+	if key == "left_arm" or key == "right_arm":
+		# Bip01 resident models are exported in a T-pose. Rest the upper arms
+		# beside the torso, then layer gait/talking gestures over that pose.
+		var drop_axis := (inverse_rest * Vector3.BACK).normalized()
+		var swing_axis := (inverse_rest * Vector3.UP).normalized()
+		var drop_angle := 1.08 if key == "left_arm" else -1.08
+		pose_rotation = Quaternion(drop_axis, drop_angle) * Quaternion(swing_axis, angle)
+	elif key == "head":
+		var head_axis := (inverse_rest * Vector3.UP).normalized()
+		pose_rotation = Quaternion(head_axis, angle)
+	else:
+		var limb_axis := (inverse_rest * Vector3.RIGHT).normalized()
+		pose_rotation = Quaternion(limb_axis, angle)
+	imported_skeleton.set_bone_pose_rotation(bone_index, pose_rotation)
 
 
 func _animate_imported_character(delta: float, moving: bool, pace: float, conversational: bool) -> void:

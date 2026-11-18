@@ -137,7 +137,24 @@ func _cache_imported_player_bones() -> void:
 func _pose_imported_player_bone(key: String, angle: float) -> void:
 	if not is_instance_valid(imported_player_skeleton) or not imported_player_bones.has(key):
 		return
-	imported_player_skeleton.set_bone_pose_rotation(int(imported_player_bones[key]), Quaternion(Vector3.RIGHT, angle))
+	var bone_index := int(imported_player_bones[key])
+	var inverse_rest := imported_player_skeleton.get_bone_global_rest(bone_index).basis.inverse()
+	var pose_rotation := Quaternion.IDENTITY
+	if key == "left_arm" or key == "right_arm":
+		# The imported Bip01 rig starts in a T-pose. Rotate each shoulder down
+		# around the body's forward axis, then add gait swing around body-up.
+		var drop_axis := (inverse_rest * Vector3.BACK).normalized()
+		var swing_axis := (inverse_rest * Vector3.UP).normalized()
+		var drop_angle := 1.08 if key == "left_arm" else -1.08
+		pose_rotation = Quaternion(drop_axis, drop_angle) * Quaternion(swing_axis, angle)
+	elif key == "head":
+		var head_axis := (inverse_rest * Vector3.UP).normalized()
+		pose_rotation = Quaternion(head_axis, angle)
+	else:
+		# Legs swing around the lateral body axis; forearms hinge in the same plane.
+		var limb_axis := (inverse_rest * Vector3.RIGHT).normalized()
+		pose_rotation = Quaternion(limb_axis, angle)
+	imported_player_skeleton.set_bone_pose_rotation(bone_index, pose_rotation)
 
 
 func _mat(color: Color, roughness := 0.82) -> StandardMaterial3D:
@@ -445,8 +462,10 @@ func _physics_process(delta: float) -> void:
 
 func _animate_imported_player(delta: float, moving: bool, speed: float) -> void:
 	if attack_time > 0.0:
-		_pose_imported_player_bone("right_arm", -1.05)
-		_pose_imported_player_bone("left_arm", -0.18)
+		_pose_imported_player_bone("right_arm", 0.28)
+		_pose_imported_player_bone("left_arm", -0.08)
+		_pose_imported_player_bone("right_forearm", -0.72)
+		_pose_imported_player_bone("left_forearm", -0.12)
 	elif moving:
 		animation_clock += delta * (10.0 if running or Input.is_action_pressed("run") else 6.2)
 		gait_intensity = move_toward(gait_intensity, 1.0, delta * 3.5)
