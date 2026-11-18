@@ -385,9 +385,12 @@ func _build_town() -> void:
 	_create_street_lamp(Vector3(-8, 0, 6.5))
 	_create_street_lamp(Vector3(8, 0, -6.5))
 	_create_outer_district()
-	# Extra street props are decorative; keep the low tier focused on smooth play.
+	# Keep a small set of recognizable street details even on the low-memory
+	# Android profile; reserve the denser decorative set for stronger devices.
 	if quality_level >= 1:
 		_create_city_details()
+	else:
+		_create_mobile_city_details()
 
 
 func _create_outer_district() -> void:
@@ -1152,6 +1155,22 @@ func _textured_box(parent: Node3D, size: Vector3, pos: Vector3, tint: Color, tex
 	item.material_override = material
 	parent.add_child(item)
 	return item
+
+func _create_mobile_city_details() -> void:
+	# A compact visual baseline for entry-level phones: a few high-value props,
+	# shared cached meshes/materials, and no extra collision or lighting nodes.
+	for x in [-38.0, 38.0]:
+		_box(self, Vector3(0.12, 3.0, 0.12), Vector3(x, 1.5, 6.2), Color(0.16, 0.18, 0.19))
+		_box(self, Vector3(0.52, 0.72, 0.30), Vector3(x, 3.25, 6.2), Color(0.12, 0.14, 0.15))
+		_box(self, Vector3(0.16, 0.16, 0.08), Vector3(x, 3.42, 6.02), Color(0.76, 0.18, 0.13))
+		_box(self, Vector3(0.16, 0.16, 0.08), Vector3(x, 3.18, 6.02), Color(0.18, 0.58, 0.30))
+	# Simple curbside bins and planted tubs give the promenade and sidewalks scale.
+	for i in range(4):
+		var x := -27.0 + float(i) * 18.0
+		_box(self, Vector3(0.58, 0.78, 0.58), Vector3(x, 0.42, -52.0), Color(0.16, 0.31, 0.32))
+		_box(self, Vector3(1.05, 0.30, 0.72), Vector3(x + 7.0, 0.20, 5.55), Color(0.48, 0.36, 0.25))
+		_box(self, Vector3(0.86, 0.18, 0.54), Vector3(x + 7.0, 0.43, 5.55), Color(0.20, 0.39, 0.23))
+
 
 func _create_realistic_street_layer() -> void:
 	# Fine pavement joints break up the huge flat sidewalk slabs.
