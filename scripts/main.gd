@@ -49,9 +49,9 @@ var wallet_label: Label
 var level_label: Label
 var chat_row: HBoxContainer
 var mission_hud_panel: PanelContainer
-const START_PLAYER_POSITION := Vector3(60.0, 0.03, -44.0)
-const START_PLAYER_ROTATION := PI * 0.5
-const START_VEHICLE_POSITION := Vector3(62.0, 0.1, -33.0)
+const START_PLAYER_POSITION := Vector3(60.0, 0.03, -49.0)
+const START_PLAYER_ROTATION := PI * 0.5 + 0.10
+const START_VEHICLE_POSITION := Vector3(52.0, 0.1, -45.0)
 const AUTOSAVE_INTERVAL := 12.0
 const WORLD_SAVE_KEY := "mahdia_world"
 
