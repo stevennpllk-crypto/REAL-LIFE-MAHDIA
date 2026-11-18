@@ -29,6 +29,18 @@ func _process(delta: float) -> void:
 	elif weather == "ممطر":
 		weather_light = 0.58
 	if is_instance_valid(sun):
+		# Move the sun across the Mediterranean sky instead of keeping noon-like
+		# shadows fixed all day. Keep the elevation shallow at dawn/night and
+		# highest around solar noon; the existing quality tier controls shadows.
+		var solar_phase := fposmod(hour - 6.0, 24.0) / 24.0
+		var sun_elevation := sin(clampf(daylight, 0.0, 1.0) * PI * 0.5)
+		sun.rotation_degrees = Vector3(
+			lerpf(-82.0, -18.0, sun_elevation),
+			-90.0 + solar_phase * 360.0,
+			0.0
+		)
+		var warm_light := 1.0 - clampf(absf(hour - 12.5) / 6.5, 0.0, 1.0)
+		sun.light_color = Color(1.0, 0.78, 0.62).lerp(Color(1.0, 0.96, 0.86), warm_light)
 		sun.light_energy = daylight * weather_light
 	if is_instance_valid(environment):
 		# Lightweight sky colour cycle: no procedural sky shader or extra GPU passes.
