@@ -1020,8 +1020,14 @@ func _process(delta: float) -> void:
 		var wave := water_waves[wave_index]
 		if is_instance_valid(wave):
 			var origin := water_wave_origins[wave_index]
-			wave.position.x = origin.x + sin(water_clock * 0.22 + float(wave_index)) * 0.32
-			wave.position.z = origin.z + sin(water_clock * 0.65 + float(wave_index) * 0.8) * 0.22
+			var phase := water_clock * 0.72 + float(wave_index) * 1.37
+			# Let each foam streak drift, rise and shorten independently to suggest
+			# overlapping small swells without adding shaders or physics bodies.
+			wave.position.x = origin.x + fposmod(water_clock * 0.42 + float(wave_index) * 2.1, 8.0) - 4.0
+			wave.position.y = origin.y + sin(phase) * 0.035
+			wave.position.z = origin.z + sin(phase * 0.83) * 0.18
+			wave.rotation.y = sin(phase * 0.6) * 0.025
+			wave.scale.x = 0.78 + (0.22 * (0.5 + 0.5 * sin(phase)))
 	autosave_elapsed += delta
 	if autosave_elapsed >= AUTOSAVE_INTERVAL:
 		autosave_elapsed = 0.0
