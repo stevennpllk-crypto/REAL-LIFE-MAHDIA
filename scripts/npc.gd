@@ -1054,6 +1054,10 @@ func _pose_imported_bone(key: String, angle: float) -> void:
 
 func _animate_imported_character(delta: float, moving: bool, pace: float, conversational: bool) -> void:
 	idle_phase += delta
+	# Imported rigs bypass the procedural fallback below, so advance their gait
+	# clock here; otherwise sin(clock) stays frozen and residents never walk.
+	if moving:
+		clock += delta
 	var has_clips := is_instance_valid(imported_animation_player) and not imported_animation_player.get_animation_list().is_empty()
 	if has_clips:
 		_play_imported_animation("walk" if moving else "talk" if conversational else "idle")
