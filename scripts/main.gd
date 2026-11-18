@@ -49,9 +49,9 @@ var wallet_label: Label
 var level_label: Label
 var chat_row: HBoxContainer
 var mission_hud_panel: PanelContainer
-const START_PLAYER_POSITION := Vector3(68.0, 0.03, -56.0)
+const START_PLAYER_POSITION := Vector3(68.0, 0.03, -46.0)
 const START_PLAYER_ROTATION := PI * 0.5 + 0.22
-const START_VEHICLE_POSITION := Vector3(59.0, 0.1, -50.0)
+const START_VEHICLE_POSITION := Vector3(58.0, 0.1, -43.5)
 const AUTOSAVE_INTERVAL := 12.0
 const WORLD_SAVE_KEY := "mahdia_world"
 
@@ -577,12 +577,12 @@ func _spawn_residents() -> void:
 		"يوسف", "سارة", "حاتم", "نجلاء", "وليد", "ريم"
 	]
 	var sidewalk_positions := [
-		Vector3(62.0, 0, -54.6), Vector3(57.0, 0, -58.0),
-		Vector3(51.0, 0, -54.7), Vector3(46.0, 0, -58.0),
-		Vector3(40.0, 0, -54.6), Vector3(35.0, 0, -58.0),
-		Vector3(29.0, 0, -54.7), Vector3(24.0, 0, -58.0),
-		Vector3(18.0, 0, -54.6), Vector3(13.0, 0, -58.0),
-		Vector3(7.0, 0, -54.7), Vector3(2.0, 0, -58.0)
+		Vector3(62.0, 0, -44.0), Vector3(57.0, 0, -50.0),
+		Vector3(51.0, 0, -44.2), Vector3(46.0, 0, -50.0),
+		Vector3(40.0, 0, -44.0), Vector3(35.0, 0, -50.0),
+		Vector3(29.0, 0, -44.2), Vector3(24.0, 0, -50.0),
+		Vector3(18.0, 0, -44.0), Vector3(13.0, 0, -50.0),
+		Vector3(7.0, 0, -44.2), Vector3(2.0, 0, -50.0)
 	]
 	var resident_budget: int = sidewalk_positions.size()
 	for i in range(mini(sidewalk_positions.size(), resident_budget)):
