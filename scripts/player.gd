@@ -92,7 +92,12 @@ func _build_imported_player_character() -> bool:
 	var model_instance := packed_model.instantiate()
 	model_instance.name = "ImportedPlayerHuman"
 	visual_root.add_child(model_instance)
-	visual_root.scale = Vector3.ONE * 0.94
+	# The supplied Biped GLB uses +Z as its visual forward direction, while
+	# CharacterBody3D and the follow camera use -Z. Turn the mesh only, not the
+	# controller, so the initial camera sees the player's back and movement stays correct.
+	model_instance.rotation.y = PI
+	_fit_imported_player_model(model_instance)
+	visual_root.scale = Vector3.ONE
 	var skeleton_nodes := model_instance.find_children("*", "Skeleton3D", true, false)
 	if not skeleton_nodes.is_empty():
 		imported_player_skeleton = skeleton_nodes[0] as Skeleton3D
@@ -104,6 +109,43 @@ func _build_imported_player_character() -> bool:
 			rig_names.append(imported_player_skeleton.get_bone_name(bone_index))
 	print("MAHDIA_PLAYER_IMPORTED=1 mapped_bones=", imported_player_bones.size(), " bone_names=", rig_names)
 	return true
+
+
+func _fit_imported_player_model(model_instance: Node3D) -> void:
+	# Imported character GLBs can use different authoring origins and scales.
+	# Fit their complete visible mesh bounds to the existing 1.78 m capsule,
+	# then put the bottom of the feet exactly on the world floor.
+	var mesh_nodes := model_instance.find_children("*", "MeshInstance3D", true, false)
+	var model_bounds := AABB()
+	var has_bounds := false
+	var inverse_root := model_instance.global_transform.affine_inverse()
+	for node in mesh_nodes:
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+		var local_bounds := mesh_instance.get_aabb()
+		if local_bounds.size.length_squared() < 0.0001:
+			continue
+		var relative_transform := inverse_root * mesh_instance.global_transform
+		for corner_index in range(8):
+			var corner := local_bounds.position + Vector3(
+				local_bounds.size.x if (corner_index & 1) != 0 else 0.0,
+				local_bounds.size.y if (corner_index & 2) != 0 else 0.0,
+				local_bounds.size.z if (corner_index & 4) != 0 else 0.0
+			)
+			var point_in_model := relative_transform * corner
+			if not has_bounds:
+				model_bounds = AABB(point_in_model, Vector3.ZERO)
+				has_bounds = true
+			else:
+				model_bounds = model_bounds.expand(point_in_model)
+	if not has_bounds or model_bounds.size.y < 0.1:
+		push_warning("Imported player model has no usable mesh bounds; using source scale")
+		return
+	var fit_scale := 1.78 / model_bounds.size.y
+	model_instance.scale = model_instance.scale * fit_scale
+	model_instance.position.y -= model_bounds.position.y * fit_scale
+	print("MAHDIA_PLAYER_FIT height=", model_bounds.size.y, " scale=", fit_scale, " offset_y=", model_instance.position.y)
 
 
 func _cache_imported_player_bones() -> void:

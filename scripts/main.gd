@@ -49,9 +49,9 @@ var wallet_label: Label
 var level_label: Label
 var chat_row: HBoxContainer
 var mission_hud_panel: PanelContainer
-const START_PLAYER_POSITION := Vector3(60.0, 0.03, -49.0)
-const START_PLAYER_ROTATION := PI * 0.5 + 0.10
-const START_VEHICLE_POSITION := Vector3(52.0, 0.1, -45.0)
+const START_PLAYER_POSITION := Vector3(68.0, 0.03, -56.0)
+const START_PLAYER_ROTATION := PI * 0.5 + 0.22
+const START_VEHICLE_POSITION := Vector3(59.0, 0.1, -50.0)
 const AUTOSAVE_INTERVAL := 12.0
 const WORLD_SAVE_KEY := "mahdia_world"
 
@@ -577,12 +577,12 @@ func _spawn_residents() -> void:
 		"يوسف", "سارة", "حاتم", "نجلاء", "وليد", "ريم"
 	]
 	var sidewalk_positions := [
-		Vector3(49.0, 0, -49.0), Vector3(46.0, 0, -39.5),
-		Vector3(41.0, 0, -51.0), Vector3(38.0, 0, -40.5),
-		Vector3(33.0, 0, -49.0), Vector3(29.0, 0, -39.0),
-		Vector3(24.0, 0, -50.0), Vector3(20.0, 0, -40.5),
-		Vector3(14.0, 0, -49.0), Vector3(10.0, 0, -40.0),
-		Vector3(4.0, 0, -50.0), Vector3(0.0, 0, -40.5)
+		Vector3(62.0, 0, -54.6), Vector3(57.0, 0, -58.0),
+		Vector3(51.0, 0, -54.7), Vector3(46.0, 0, -58.0),
+		Vector3(40.0, 0, -54.6), Vector3(35.0, 0, -58.0),
+		Vector3(29.0, 0, -54.7), Vector3(24.0, 0, -58.0),
+		Vector3(18.0, 0, -54.6), Vector3(13.0, 0, -58.0),
+		Vector3(7.0, 0, -54.7), Vector3(2.0, 0, -58.0)
 	]
 	var resident_budget: int = sidewalk_positions.size()
 	for i in range(mini(sidewalk_positions.size(), resident_budget)):
@@ -696,9 +696,9 @@ func _build_hud() -> void:
 	message_panel.anchor_bottom = 1.0
 	message_panel.offset_left = 0
 	message_panel.offset_right = 0
-	message_panel.offset_top = -104
-	message_panel.offset_bottom = -14
-	message_panel.custom_minimum_size = Vector2(250, 84)
+	message_panel.offset_top = -274
+	message_panel.offset_bottom = -208
+	message_panel.custom_minimum_size = Vector2(250, 62)
 	layer.add_child(message_panel)
 	var message_label := Label.new()
 	message_label.name = "LifeMessage"
@@ -707,7 +707,12 @@ func _build_hud() -> void:
 	message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	message_label.add_theme_font_size_override("font_size", 13)
 	message_panel.add_child(message_label)
-	life_manager.message_changed.connect(func(value: String): message_label.text = value)
+	message_panel.visible = false
+	life_manager.message_changed.connect(func(value: String):
+		message_label.text = value
+		var technical_status := value.contains("JASSIM AI") or value.contains("خادم") or value.contains("جارٍ الفحص")
+		message_panel.visible = not technical_status
+	)
 
 	# Lightweight chat input for the currently selected resident.
 	chat_row = HBoxContainer.new()

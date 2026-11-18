@@ -1,7 +1,7 @@
 extends Node
 class_name MahdiaWorldSystems
 
-var hour := 8.0
+var hour := 13.0
 var weather := "مشمس"
 var sun: DirectionalLight3D
 var environment: Environment
