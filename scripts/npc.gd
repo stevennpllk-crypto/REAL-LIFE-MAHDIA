@@ -55,6 +55,57 @@ var right_elbow: Node3D
 var left_knee: Node3D
 var right_knee: Node3D
 var visual_root: Node3D
+var imported_animation_player: AnimationPlayer
+var imported_model_loaded := false
+var imported_animation_key := ""
+
+func _build_imported_character() -> bool:
+	var model_paths := [
+		"res://assets/characters/male-adult-01.glb",
+		"res://assets/characters/male-adult-02.glb",
+		"res://assets/characters/female-adult-02.glb",
+		"res://assets/characters/female-party-01.glb"
+	]
+	var first_index := posmod(personal_seed, model_paths.size())
+	for offset in range(model_paths.size()):
+		var model_path: String = model_paths[(first_index + offset) % model_paths.size()]
+		if not ResourceLoader.exists(model_path):
+			continue
+		var packed_model := ResourceLoader.load(model_path) as PackedScene
+		if packed_model == null:
+			push_warning("Could not load resident model: " + model_path)
+			continue
+		visual_root = Node3D.new()
+		visual_root.name = "ResidentVisual"
+		add_child(visual_root)
+		var model_instance := packed_model.instantiate()
+		model_instance.name = "ImportedHuman"
+		visual_root.add_child(model_instance)
+		# The source characters are authored at approximately human height.
+		visual_root.scale = Vector3.ONE * 0.94
+		var animation_nodes := model_instance.find_children("*", "AnimationPlayer", true, false)
+		if not animation_nodes.is_empty():
+			imported_animation_player = animation_nodes[0] as AnimationPlayer
+		imported_model_loaded = true
+		_play_imported_animation("idle")
+		return true
+	return false
+
+
+func _play_imported_animation(key: String) -> void:
+	if not is_instance_valid(imported_animation_player):
+		return
+	var normalized_key := key.to_lower()
+	for animation_name in imported_animation_player.get_animation_list():
+		var normalized_name := str(animation_name).to_lower()
+		var matches := normalized_name.contains(normalized_key)
+		if normalized_key == "talk":
+			matches = normalized_name.contains("talk") or normalized_name.contains("conversation")
+		if matches:
+			if imported_animation_key != str(animation_name):
+				imported_animation_key = str(animation_name)
+				imported_animation_player.play(imported_animation_key, 0.22)
+			return
 var head_visual: Node3D
 var body_visual: Node3D
 var character_skin := Color(0.62, 0.39, 0.28)
@@ -212,6 +263,10 @@ func _mat(color: Color) -> StandardMaterial3D:
 	return material
 
 func _build_character() -> void:
+	# Prefer textured, rigged human GLBs when the Android build pipeline has
+	# supplied them. Keep the procedural resident as a safe offline fallback.
+	if _build_imported_character():
+		return
 	visual_root = Node3D.new()
 	visual_root.name = "ResidentVisual"
 	add_child(visual_root)
@@ -923,8 +978,21 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_animate(delta, true, pace)
 
+func _animate_imported_character(delta: float, moving: bool, pace: float, conversational: bool) -> void:
+	idle_phase += delta
+	_play_imported_animation("walk" if moving else "talk" if conversational else "idle")
+	if is_instance_valid(imported_animation_player) and moving:
+		imported_animation_player.speed_scale = clampf(pace / maxf(walk_speed, 0.1), 0.72, 1.28)
+	if is_instance_valid(visual_root):
+		var bob := absf(sin(clock)) * 0.012 if moving else sin(idle_phase * 1.35 + float(personal_seed)) * 0.004
+		visual_root.position.y = lerpf(visual_root.position.y, bob, delta * 4.0)
+
+
 func _animate(delta: float, moving: bool, pace: float = 0.0) -> void:
 	var conversational := ai_state == "socializing" or ai_state == "greeting" or ai_state == "acknowledging"
+	if imported_model_loaded:
+		_animate_imported_character(delta, moving, pace, conversational)
+		return
 	if not is_instance_valid(left_arm) or not is_instance_valid(right_arm) or not is_instance_valid(left_leg) or not is_instance_valid(right_leg):
 		return
 	if moving:

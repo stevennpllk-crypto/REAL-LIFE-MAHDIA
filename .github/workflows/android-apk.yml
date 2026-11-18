@@ -43,6 +43,17 @@ jobs:
           unzip -q /tmp/godot-templates.tpz -d /tmp/godot-templates
           cp /tmp/godot-templates/templates/* "$HOME/.local/share/godot/export_templates/4.3.stable/"
 
+      - name: Download licensed rigged resident characters
+        run: |
+          set -euxo pipefail
+          mkdir -p assets/characters
+          curl --fail --location --retry 3 https://models.codelove.in/models/male-adult-01.glb -o assets/characters/male-adult-01.glb
+          curl --fail --location --retry 3 https://models.codelove.in/models/male-adult-02.glb -o assets/characters/male-adult-02.glb
+          curl --fail --location --retry 3 https://models.codelove.in/models/female-adult-02.glb -o assets/characters/female-adult-02.glb
+          curl --fail --location --retry 3 https://models.codelove.in/models/female-party-01.glb -o assets/characters/female-party-01.glb
+          test "$(find assets/characters -maxdepth 1 -name '*.glb' -type f | wc -l)" -eq 4
+          du -h assets/characters/*.glb
+
       - name: Configure Godot Android export paths
         run: |
           mkdir -p "$HOME/.config/godot"
