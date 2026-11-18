@@ -12,6 +12,7 @@ var jump_button: Button
 var interact_button: Button
 var attack_button: Button
 var crouch_button: Button
+var dodge_button: Button
 var stick_max_radius := 62.0
 
 func setup(player: CharacterBody3D) -> void:
@@ -46,6 +47,7 @@ func setup(player: CharacterBody3D) -> void:
 	interact_button = _make_button(root, "💬", Vector2(-218, -112))
 	attack_button = _make_button(root, "✊", Vector2(-218, -218))
 	crouch_button = _make_button(root, "🧎", Vector2(-218, -324))
+	dodge_button = _make_button(root, "↗", Vector2(-112, -324))
 
 	run_button.button_down.connect(func(): target.set_mobile_run(true))
 	run_button.button_up.connect(func(): target.set_mobile_run(false))
@@ -53,6 +55,7 @@ func setup(player: CharacterBody3D) -> void:
 	interact_button.pressed.connect(func(): target.request_interact())
 	attack_button.pressed.connect(func(): target.request_attack())
 	crouch_button.pressed.connect(func(): target.toggle_crouch())
+	dodge_button.pressed.connect(func(): target.request_dodge())
 
 func _make_button(parent: Control, caption: String, offset: Vector2) -> Button:
 	var button := Button.new()

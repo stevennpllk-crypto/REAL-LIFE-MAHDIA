@@ -37,6 +37,13 @@ var camera_drag_finger := -1
 var is_swimming := false
 var crouching := false
 var attack_time := 0.0
+var attack_cooldown := 0.0
+var jump_buffer_time := 0.0
+var coyote_time := 0.0
+var dodge_requested := false
+var dodge_time := 0.0
+var dodge_cooldown := 0.0
+var dodge_direction := Vector3.ZERO
 
 func _ready() -> void:
 	_add_action("move_forward", KEY_W)
@@ -340,16 +347,37 @@ func request_interact() -> void:
 	interact_requested = true
 
 func request_attack() -> void:
+	if attack_cooldown > 0.0 or is_swimming or crouching:
+		return
 	attack_time = 0.42
+	attack_cooldown = 0.58
+
+
+func request_dodge() -> void:
+	if dodge_cooldown <= 0.0 and not is_swimming and not crouching:
+		dodge_requested = true
+
 
 func toggle_crouch() -> void:
 	crouching = not crouching
+	if crouching:
+		running = false
 
 func is_in_water() -> bool:
 	return global_position.z < -59.0 and absf(global_position.x) < 90.0
 
 func _physics_process(delta: float) -> void:
 	is_swimming = is_in_water()
+	attack_cooldown = maxf(0.0, attack_cooldown - delta)
+	dodge_cooldown = maxf(0.0, dodge_cooldown - delta)
+	jump_buffer_time = maxf(0.0, jump_buffer_time - delta)
+	if is_on_floor():
+		coyote_time = 0.12
+	else:
+		coyote_time = maxf(0.0, coyote_time - delta)
+	if Input.is_action_just_pressed("jump") or jump_requested:
+		jump_buffer_time = 0.16
+	jump_requested = false
 	if is_swimming:
 		var swim_level := -1.25
 		if Input.is_action_just_pressed("jump") or jump_requested:
@@ -373,7 +401,8 @@ func _physics_process(delta: float) -> void:
 	var direction := (right * input_dir.x - forward * input_dir.y)
 	direction.y = 0.0
 	direction = direction.normalized()
-	var speed := (2.8 if (running or Input.is_action_pressed("run")) else 1.8) if is_swimming else (run_speed if (running or Input.is_action_pressed("run")) else walk_speed)
+	var wants_to_run := (running or Input.is_action_pressed("run")) and strength > 0.08 and not crouching
+	var speed := (2.8 if wants_to_run else 1.8) if is_swimming else (run_speed if wants_to_run else walk_speed)
 	if crouching:
 		speed *= 0.48
 	attack_time = maxf(0.0, attack_time - delta)
@@ -388,9 +417,23 @@ func _physics_process(delta: float) -> void:
 		rate *= 1.65
 	velocity.x = move_toward(velocity.x, desired_velocity.x, rate * delta)
 	velocity.z = move_toward(velocity.z, desired_velocity.z, rate * delta)
-	if not is_swimming and (Input.is_action_just_pressed("jump") or jump_requested) and is_on_floor():
+	if not is_swimming and jump_buffer_time > 0.0 and coyote_time > 0.0:
 		velocity.y = jump_velocity
-	jump_requested = false
+		jump_buffer_time = 0.0
+		coyote_time = 0.0
+	if dodge_requested:
+		dodge_requested = false
+		if strength > 0.08 and dodge_cooldown <= 0.0 and not is_swimming and not crouching:
+			dodge_direction = direction if moving else -global_transform.basis.z
+			dodge_direction.y = 0.0
+			dodge_direction = dodge_direction.normalized()
+			dodge_time = 0.24
+			dodge_cooldown = 1.25
+	if dodge_time > 0.0:
+		dodge_time = maxf(0.0, dodge_time - delta)
+		var dodge_speed := 5.8 * clampf(dodge_time / 0.24, 0.72, 1.0)
+		velocity.x = dodge_direction.x * dodge_speed
+		velocity.z = dodge_direction.z * dodge_speed
 	move_and_slide()
 	_animate_figure(delta, moving and is_on_floor(), speed)
 
