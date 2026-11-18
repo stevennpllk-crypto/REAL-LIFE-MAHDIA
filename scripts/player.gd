@@ -110,23 +110,25 @@ func _cache_imported_player_bones() -> void:
 	imported_player_bones.clear()
 	if not is_instance_valid(imported_player_skeleton):
 		return
-	for bone_index in range(imported_player_skeleton.get_bone_count()):
-		var bone_name := imported_player_skeleton.get_bone_name(bone_index).to_lower().replace("mixamorig:", "").replace("_", "").replace(" ", "")
-		if bone_name.ends_with("leftarm") and not bone_name.contains("fore"):
+	var skeleton := imported_player_skeleton
+	for bone_index in range(skeleton.get_bone_count()):
+		var bone_name := skeleton.get_bone_name(bone_index).to_lower().replace("mixamorig:", "").replace("_", "").replace(" ", "")
+		# Support both Mixamo-style names and the Bip01 naming used by the shipped GLBs.
+		if bone_name.contains("lupperarm") or bone_name.ends_with("leftarm") and not bone_name.contains("fore"):
 			imported_player_bones["left_arm"] = bone_index
-		elif bone_name.ends_with("rightarm") and not bone_name.contains("fore"):
+		elif bone_name.contains("rupperarm") or bone_name.ends_with("rightarm") and not bone_name.contains("fore"):
 			imported_player_bones["right_arm"] = bone_index
-		elif bone_name.ends_with("leftforearm"):
+		elif bone_name.contains("lforearm") or bone_name.ends_with("leftforearm"):
 			imported_player_bones["left_forearm"] = bone_index
-		elif bone_name.ends_with("rightforearm"):
+		elif bone_name.contains("rforearm") or bone_name.ends_with("rightforearm"):
 			imported_player_bones["right_forearm"] = bone_index
-		elif bone_name.ends_with("leftupleg"):
+		elif bone_name.contains("lthigh") or bone_name.ends_with("leftupleg"):
 			imported_player_bones["left_leg"] = bone_index
-		elif bone_name.ends_with("rightupleg"):
+		elif bone_name.contains("rthigh") or bone_name.ends_with("rightupleg"):
 			imported_player_bones["right_leg"] = bone_index
-		elif bone_name.ends_with("leftleg"):
+		elif bone_name.contains("lcalf") or bone_name.ends_with("leftleg"):
 			imported_player_bones["left_knee"] = bone_index
-		elif bone_name.ends_with("rightleg"):
+		elif bone_name.contains("rcalf") or bone_name.ends_with("rightleg"):
 			imported_player_bones["right_knee"] = bone_index
 		elif bone_name.ends_with("head"):
 			imported_player_bones["head"] = bone_index
