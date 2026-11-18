@@ -230,6 +230,7 @@ func _build_environment() -> void:
 	_box(self, Vector3(180, 0.16, 38), Vector3(0, -0.02, -78), Color(0.035, 0.34, 0.56))
 	_box(self, Vector3(180, 0.18, 5), Vector3(0, 0.04, -57), Color(0.82, 0.76, 0.64))
 	_create_coastal_scenery()
+	_create_waterfront_district()
 	_create_beach_cafe()
 
 func _create_coastal_scenery() -> void:
@@ -264,6 +265,69 @@ func _create_coastal_scenery() -> void:
 	for i in range(7):
 		_create_palm(Vector3(-42.0 + float(i) * 14.0, 0, -47.0))
 	_create_borj_el_kebir_landmark()
+
+
+func _create_waterfront_district() -> void:
+	# Dense whitewashed Mahdia-style facades along the inland side of the promenade.
+	# Their street-facing sides look toward the sea-facing walking route.
+	var positions := [Vector3(34, 0, -29), Vector3(52, 0, -29), Vector3(70, 0, -29), Vector3(88, 0, -29), Vector3(106, 0, -29)]
+	var palettes := [
+		Color(0.91, 0.86, 0.76), Color(0.95, 0.91, 0.82),
+		Color(0.84, 0.80, 0.71), Color(0.93, 0.88, 0.78),
+		Color(0.87, 0.83, 0.75)
+	]
+	for i in range(positions.size()):
+		var dimensions := Vector3(13.0 if i % 2 == 0 else 11.5, 9.0 + float(i % 3), 10.0)
+		_create_building(positions[i], dimensions, palettes[i], 210 + i)
+		var facade := get_child(get_child_count() - 1) as Node3D
+		if is_instance_valid(facade):
+			facade.rotation.y = PI
+		# Ground-floor cafe/shop awnings, facing the pedestrian promenade.
+		var awning_color: Color = [Color(0.76, 0.16, 0.13), Color(0.90, 0.84, 0.69), Color(0.12, 0.36, 0.42)][i % 3]
+		_box(self, Vector3(4.4, 0.16, 1.25), positions[i] + Vector3(0, 3.0, 5.35), awning_color)
+		_box(self, Vector3(4.4, 0.12, 0.12), positions[i] + Vector3(0, 2.86, 5.96), Color(0.94, 0.90, 0.82))
+	# A line of palms and planters gives the promenade the dense coastal rhythm in the reference.
+	for i in range(5):
+		var x := 30.0 + float(i) * 18.0
+		_create_palm(Vector3(x, 0, -40.5))
+		_box(self, Vector3(1.8, 0.34, 0.9), Vector3(x + 5.5, 0.22, -42.2), Color(0.53, 0.39, 0.27))
+		_box(self, Vector3(1.55, 0.26, 0.72), Vector3(x + 5.5, 0.48, -42.2), Color(0.18, 0.39, 0.22))
+	_create_tunisian_flag(Vector3(58.0, 0.0, -39.0))
+
+
+func _create_tunisian_flag(pos: Vector3) -> void:
+	var pole := _box(self, Vector3(0.10, 6.8, 0.10), pos + Vector3(0, 3.4, 0), Color(0.16, 0.18, 0.20))
+	var flag := _box(self, Vector3(1.65, 1.05, 0.055), pos + Vector3(0.82, 5.55, 0), Color(0.83, 0.055, 0.09))
+	# White disc, red crescent and star are layered on the camera-facing side.
+	var disc := MeshInstance3D.new()
+	var disc_mesh := CylinderMesh.new()
+	disc_mesh.top_radius = 0.32
+	disc_mesh.bottom_radius = 0.32
+	disc_mesh.height = 0.035
+	disc_mesh.radial_segments = 32
+	disc.mesh = disc_mesh
+	disc.rotation_degrees.x = 90
+	disc.position = pos + Vector3(0.82, 5.55, 0.055)
+	disc.material_override = _material(Color(0.96, 0.94, 0.88))
+	add_child(disc)
+	var crescent := MeshInstance3D.new()
+	var crescent_mesh := TorusMesh.new()
+	crescent_mesh.inner_radius = 0.12
+	crescent_mesh.outer_radius = 0.20
+	crescent_mesh.rings = 24
+	crescent_mesh.ring_segments = 12
+	crescent.mesh = crescent_mesh
+	crescent.rotation_degrees.x = 90
+	crescent.position = pos + Vector3(0.79, 5.55, 0.083)
+	crescent.material_override = _material(Color(0.82, 0.055, 0.09))
+	add_child(crescent)
+	var star := MeshInstance3D.new()
+	var star_mesh := PrismMesh.new()
+	star_mesh.size = Vector3(0.19, 0.19, 0.025)
+	star.mesh = star_mesh
+	star.position = pos + Vector3(1.04, 5.55, 0.09)
+	star.material_override = _material(Color(0.82, 0.055, 0.09))
+	add_child(star)
 
 
 func _create_beach_cafe() -> void:

@@ -69,10 +69,10 @@ func _ready() -> void:
 	camera = Camera3D.new()
 	# Closer over-the-shoulder framing: keep the full character readable while
 	# reducing empty foreground and making mobile touch control feel more immediate.
-	camera.position = Vector3(0, 0.48, 2.65)
+	camera.position = Vector3(0, 0.42, 2.18)
 	camera.rotation_degrees.x = -10.0
 	camera.current = true
-	camera.fov = 60.0
+	camera.fov = 56.0
 	camera.near = 0.08
 	camera_pivot.add_child(camera)
 	if not OS.has_feature("mobile"):
