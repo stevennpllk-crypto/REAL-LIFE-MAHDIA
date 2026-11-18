@@ -16,6 +16,12 @@ var brake_lamp_materials: Array[StandardMaterial3D] = []
 var indicator_materials: Array[StandardMaterial3D] = []
 var indicator_clock := 0.0
 var indicator_on := false
+var front_wheels: Array[MeshInstance3D] = []
+var wheel_hubs: Array[MeshInstance3D] = []
+@export var braking_deceleration := 18.0
+@export var coasting_deceleration := 2.8
+@export var steering_response := 4.0
+@export var max_steering_angle := 0.38
 
 func _rounded_mesh(size: Vector3) -> ArrayMesh:
 	var key := "%.2f_%.2f_%.2f" % [size.x, size.y, size.z]
@@ -136,6 +142,8 @@ func _build_car() -> void:
 			wheel.material_override = _mat(Color(0.045, 0.05, 0.055))
 			add_child(wheel)
 			wheels.append(wheel)
+			if z < 0.0:
+				front_wheels.append(wheel)
 			var hub := MeshInstance3D.new()
 			var hub_mesh := CylinderMesh.new()
 			hub_mesh.top_radius = 0.17
@@ -146,6 +154,7 @@ func _build_car() -> void:
 			hub.rotation_degrees.z = 90
 			hub.material_override = _mat(Color(0.58, 0.60, 0.62), 0.8)
 			add_child(hub)
+			wheel_hubs.append(hub)
 	# Front fascia: grille, bumper inserts and readable headlamp shapes.
 	_box(Vector3(0.78, 0.20, 0.07), Vector3(0, 0.66, -1.88), Color(0.10, 0.12, 0.13), 0.25)
 	_box(Vector3(0.44, 0.055, 0.075), Vector3(0, 0.69, -1.925), Color(0.34, 0.38, 0.39), 0.45)
@@ -188,10 +197,20 @@ func _physics_process(delta: float) -> void:
 	for i in range(indicator_materials.size()):
 		var active := indicator_left if i == 0 else indicator_right
 		indicator_materials[i].emission_energy_multiplier = 1.25 if active else 0.05
-	speed = move_toward(speed, target_speed, acceleration * delta)
-	steering_input = move_toward(steering_input, steering, delta * 5.0)
-	var steering_factor := clampf(absf(speed) / 2.0, 0.0, 1.0)
-	rotation.y -= steering_input * turn_speed * delta * steering_factor * (1.0 if speed >= 0.0 else -1.0)
+	# Opposite throttle acts as a brake before engaging the other direction.
+	if absf(target_speed) < 0.05:
+		speed = move_toward(speed, 0.0, coasting_deceleration * delta)
+	elif absf(speed) > 0.25 and signf(target_speed) != signf(speed):
+		speed = move_toward(speed, 0.0, braking_deceleration * delta)
+	else:
+		speed = move_toward(speed, target_speed, acceleration * delta)
+	steering_input = move_toward(steering_input, steering, delta * steering_response)
+	var speed_ratio := clampf(absf(speed) / 3.0, 0.0, 1.0)
+	# Steering becomes progressively less aggressive at high speed for stability.
+	var high_speed_limit := lerpf(1.0, 0.58, clampf(absf(speed) / maxf(max_speed, 0.1), 0.0, 1.0))
+	rotation.y -= steering_input * turn_speed * high_speed_limit * delta * speed_ratio * (1.0 if speed >= 0.0 else -1.0)
+	for wheel_index in range(front_wheels.size()):
+		front_wheels[wheel_index].rotation.y = -steering_input * max_steering_angle
 	velocity.x = -global_transform.basis.z.x * speed
 	velocity.z = -global_transform.basis.z.z * speed
 	if not is_on_floor():
@@ -203,6 +222,8 @@ func _physics_process(delta: float) -> void:
 		speed *= 0.82
 	for wheel in wheels:
 		wheel.rotate_object_local(Vector3(0, 0, 1), speed * delta / 0.39)
+	for hub in wheel_hubs:
+		hub.rotate_object_local(Vector3(0, 0, 1), speed * delta / 0.39)
 	driver.global_position = global_position + Vector3(0, 1.8, 0)
 	if Input.is_action_just_pressed("interact"):
 		exit_vehicle()

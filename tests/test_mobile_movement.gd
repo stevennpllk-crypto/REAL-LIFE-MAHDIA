@@ -107,6 +107,9 @@ func _run_tests() -> void:
 	root.add_child(detailed_car)
 	await process_frame
 	_check(detailed_car.get("wheels").size() == 0, "headless vehicle test skips render-only wheel meshes")
+	_check(float(detailed_car.get("braking_deceleration")) > float(detailed_car.get("acceleration")), "vehicle brakes harder than it accelerates")
+	_check(float(detailed_car.get("coasting_deceleration")) < float(detailed_car.get("braking_deceleration")), "vehicle coasts down more gently than active braking")
+	_check(float(detailed_car.get("max_steering_angle")) > 0.0, "vehicle exposes a bounded front-wheel steering angle")
 	_check(detailed_car.get_child_count() == 1 and detailed_car.get_child(0) is CollisionShape3D, "vehicle keeps its collision body when visuals are disabled")
 	detailed_car.queue_free()
 
