@@ -64,15 +64,16 @@ func _ready() -> void:
 	collider.position.y = 0.89
 	add_child(collider)
 	camera_pivot = Node3D.new()
-	camera_pivot.position.y = 1.48
+	camera_pivot.position.y = 1.43
 	add_child(camera_pivot)
 	camera = Camera3D.new()
-	# Closer over-the-shoulder framing: keep the full character readable while
-	# reducing empty foreground and making mobile touch control feel more immediate.
-	camera.position = Vector3(0, 0.36, 1.82)
-	camera.rotation_degrees.x = -10.0
+	# Reference-image framing: a close, centered third-person follow camera.
+	# The slightly narrower lens keeps the player prominent without extreme
+	# perspective distortion on a tall mobile display.
+	camera.position = Vector3(0.10, 0.30, 1.55)
+	camera.rotation_degrees.x = -8.5
 	camera.current = true
-	camera.fov = 54.0
+	camera.fov = 51.0
 	camera.near = 0.08
 	camera_pivot.add_child(camera)
 	if not OS.has_feature("mobile"):
