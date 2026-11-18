@@ -589,6 +589,12 @@ func _spawn_residents() -> void:
 		npc.set_ai_context(player, world_systems, work_spot, i, save_manager)
 		npc.set_ai_service(ai_service)
 		add_child(npc)
+	var imported_resident_count := 0
+	var resident_nodes := get_tree().get_nodes_in_group("mahdia_residents")
+	for resident in resident_nodes:
+		if bool(resident.get("imported_model_loaded")):
+			imported_resident_count += 1
+	print("MAHDIA_IMPORTED_RESIDENTS=", imported_resident_count, "/", resident_nodes.size())
 	if is_instance_valid(life_manager):
 		life_manager.call("resolve_delivery_target")
 

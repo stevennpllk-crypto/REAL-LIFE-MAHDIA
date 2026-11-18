@@ -87,6 +87,11 @@ func _build_imported_character() -> bool:
 		if not animation_nodes.is_empty():
 			imported_animation_player = animation_nodes[0] as AnimationPlayer
 		imported_model_loaded = true
+		var animation_names: Array[String] = []
+		if is_instance_valid(imported_animation_player):
+			for animation_name in imported_animation_player.get_animation_list():
+				animation_names.append(str(animation_name))
+		print("MAHDIA_IMPORTED_MODEL: ", model_path, " animations=", animation_names)
 		_play_imported_animation("idle")
 		return true
 	return false
@@ -95,17 +100,26 @@ func _build_imported_character() -> bool:
 func _play_imported_animation(key: String) -> void:
 	if not is_instance_valid(imported_animation_player):
 		return
+	var animations := imported_animation_player.get_animation_list()
+	if animations.is_empty():
+		return
 	var normalized_key := key.to_lower()
-	for animation_name in imported_animation_player.get_animation_list():
+	var selected_animation := ""
+	for animation_name in animations:
 		var normalized_name := str(animation_name).to_lower()
 		var matches := normalized_name.contains(normalized_key)
 		if normalized_key == "talk":
 			matches = normalized_name.contains("talk") or normalized_name.contains("conversation")
 		if matches:
-			if imported_animation_key != str(animation_name):
-				imported_animation_key = str(animation_name)
-				imported_animation_player.play(imported_animation_key, 0.22)
-			return
+			selected_animation = str(animation_name)
+			break
+	# Asset packs often use names such as "mixamo.com" instead of idle/walk.
+	# Keep a real rig animation running rather than leaving a textured model frozen.
+	if selected_animation.is_empty():
+		selected_animation = str(animations[0])
+	if imported_animation_key != selected_animation:
+		imported_animation_key = selected_animation
+		imported_animation_player.play(imported_animation_key, 0.22)
 var head_visual: Node3D
 var body_visual: Node3D
 var character_skin := Color(0.62, 0.39, 0.28)

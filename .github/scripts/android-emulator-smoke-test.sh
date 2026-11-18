@@ -68,6 +68,15 @@ if [[ "$scene_ready" != "true" ]]; then
   exit 1
 fi
 
+# A successful world render is not enough: require imported human GLB assets
+# to instantiate in the live Android scene, not merely exist in the build ZIP.
+if ! adb logcat -d | grep -Eq 'MAHDIA_IMPORTED_RESIDENTS=[1-9][0-9]*/'; then
+  echo "No imported human resident model was confirmed in the Android runtime."
+  adb logcat -d | grep 'MAHDIA_IMPORTED_' | tail -n 40 || true
+  exit 1
+fi
+adb logcat -d | grep 'MAHDIA_IMPORTED_' | tail -n 20
+
 activity_state="$(adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' || true)"
 echo "$activity_state"
 if ! grep -q 'com.jassim.reallifemahdia' <<< "$activity_state"; then
