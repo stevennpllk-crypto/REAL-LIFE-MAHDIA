@@ -38,7 +38,7 @@ var water_waves: Array[MeshInstance3D] = []
 var water_wave_origins: Array[Vector3] = []
 var water_clock := 0.0
 var autosave_elapsed := 0.0
-var quality_level := 0
+var quality_level := 2
 var quality_button: Button
 var restored_vehicle_position := Vector3(5, 0.1, 10)
 var restore_vehicle_driver := false
@@ -185,8 +185,8 @@ func _build_environment() -> void:
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48, -32, 0)
 	sun.light_energy = 1.28
-	# One directional sun provides real surface shading. Shadows are quality-tiered.
-	sun.shadow_enabled = quality_level >= 1
+	# One directional sun provides real surface shading and shadows.
+	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 48.0
 	sun.shadow_opacity = 0.62
 	sun.visible = true
@@ -385,12 +385,8 @@ func _build_town() -> void:
 	_create_street_lamp(Vector3(-8, 0, 6.5))
 	_create_street_lamp(Vector3(8, 0, -6.5))
 	_create_outer_district()
-	# Keep a small set of recognizable street details even on the low-memory
-	# Android profile; reserve the denser decorative set for stronger devices.
-	if quality_level >= 1:
-		_create_city_details()
-	else:
-		_create_mobile_city_details()
+	# One unified world-detail set for every device profile.
+	_create_city_details()
 
 
 func _create_outer_district() -> void:
@@ -418,7 +414,7 @@ func _create_outer_district() -> void:
 		Vector3(72, 0, -20), Vector3(72, 0, 5), Vector3(72, 0, 35), Vector3(72, 0, 68),
 		Vector3(-32, 0, 78), Vector3(-10, 0, 78), Vector3(12, 0, 78), Vector3(32, 0, 78)
 	]
-	var count: int = [8, 12, 16][clampi(quality_level, 0, 2)]
+	var count: int = lots.size()
 	for i in range(mini(count, lots.size())):
 		var height := randf_range(5.8, 10.5)
 		var dimensions := Vector3(randf_range(7.0, 9.5), height, randf_range(7.0, 9.5))
@@ -580,7 +576,7 @@ func _spawn_residents() -> void:
 		Vector3(-6.6, 0, 17), Vector3(6.6, 0, 17),
 		Vector3(-6.6, 0, 25), Vector3(6.6, 0, 25)
 	]
-	var resident_budget: int = int([8, 10, 12][quality_level])
+	var resident_budget: int = sidewalk_positions.size()
 	for i in range(mini(sidewalk_positions.size(), resident_budget)):
 		var npc := CharacterBody3D.new()
 		npc.set_script(NPC_SCRIPT)
@@ -619,7 +615,7 @@ func _spawn_traffic() -> void:
 		[false, -1.65, -40.0, 1.0, 3.8],
 		[false, 1.65, 48.0, -1.0, 4.2]
 	]
-	var traffic_budget: int = int([2, 3, 4][quality_level])
+	var traffic_budget: int = traffic_specs.size()
 	for i in range(mini(traffic_specs.size(), traffic_budget)):
 		var spec: Array = traffic_specs[i]
 		var car := CharacterBody3D.new()
@@ -673,17 +669,6 @@ func _build_hud() -> void:
 	status_label.text = "MAHDIA • 08:00 • Prototype"
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(status_label)
-	quality_button = Button.new()
-	quality_button.text = "الرسوم: منخفضة"
-	quality_button.anchor_left = 1.0
-	quality_button.anchor_right = 1.0
-	quality_button.offset_left = -170.0
-	quality_button.offset_right = -16.0
-	quality_button.offset_top = 14.0
-	quality_button.offset_bottom = 62.0
-	quality_button.focus_mode = Control.FOCUS_NONE
-	quality_button.pressed.connect(_cycle_graphics_quality)
-	layer.add_child(quality_button)
 	_apply_graphics_quality()
 	hint_label = Label.new()
 	hint_label.text = "الحركة: العصا اليسرى • الكاميرا: اسحب يمين الشاشة"
@@ -1068,7 +1053,7 @@ func _restore_world_progress() -> void:
 		var car: Array = world.vehicle_position
 		restored_vehicle_position = Vector3(float(car[0]), float(car[1]), float(car[2]))
 	restore_vehicle_driver = bool(world.get("was_driving", false))
-	quality_level = clampi(int(world.get("graphics_quality", 0)), 0, 2)
+	quality_level = 2
 	print("MAHDIA_WORLD_PROGRESS_RESTORED")
 
 func _save_world_progress() -> void:
@@ -1096,33 +1081,18 @@ func _notification(what: int) -> void:
 		_save_world_progress()
 
 func _select_device_profile() -> void:
-	# Android phones start in the conservative tier. This is a deliberate
-	# performance budget, not a requirement for the player to change phone settings.
-	if OS.has_feature("mobile"):
-		quality_level = 0
-	else:
-		quality_level = 2
-
-func _cycle_graphics_quality() -> void:
-	quality_level = (quality_level + 1) % 3
-	_apply_graphics_quality()
-	_save_world_progress()
+	# The world uses one shared visual and simulation configuration everywhere.
+	quality_level = 2
 
 func _apply_graphics_quality() -> void:
-	var labels := ["اقتصادية", "متوازنة", "مرتفعة"]
-	if is_instance_valid(quality_button):
-		quality_button.text = "الأداء: " + labels[quality_level]
-	# Frame pacing, physics cadence and 3D internal resolution are real workload
-	# controls. The UI stays full resolution for readable touch controls.
-	Engine.max_fps = [30, 45, 60][quality_level]
-	Engine.physics_ticks_per_second = [30, 45, 60][quality_level]
-	get_viewport().scaling_3d_scale = [0.72, 0.86, 1.0][quality_level]
+	Engine.max_fps = 60
+	Engine.physics_ticks_per_second = 60
+	get_viewport().scaling_3d_scale = 1.0
 	if is_instance_valid(sun):
-		# Keep real lighting at every tier; only the expensive shadow map is optional.
 		sun.visible = true
-		sun.shadow_enabled = quality_level >= 1
+		sun.shadow_enabled = true
 	if is_instance_valid(world_environment):
-		world_environment.ambient_light_energy = [0.72, 0.84, 0.94][quality_level]
+		world_environment.ambient_light_energy = 0.94
 
 
 func _surface_texture(kind: String) -> ImageTexture:
