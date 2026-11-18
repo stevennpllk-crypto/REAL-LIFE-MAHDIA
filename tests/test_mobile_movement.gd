@@ -199,7 +199,7 @@ func _run_tests() -> void:
 	var relationships: Dictionary = resident.get("resident_relationships")
 	_check(relationships.has("resident_08"), "NPC recognizes a nearby resident and creates a relationship")
 	_check(float(resident.get("social_need")) < 0.8, "nearby conversation reduces social need")
-	resident.set("crowd_check_elapsed", 0.30)
+	resident.set("crowd_check_elapsed", 1.0)
 	var crowd_direction: Vector3 = resident.call("_avoid_resident_crowding", Vector3(1, 0, 0))
 	_check(crowd_direction.x < 0.99 and crowd_direction.z < -0.1 and crowd_direction.length() > 0.9, "pedestrians steer away from nearby residents instead of overlapping")
 	var live_observation: Dictionary = resident.call("get_world_observation")
