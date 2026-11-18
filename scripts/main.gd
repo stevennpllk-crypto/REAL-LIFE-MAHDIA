@@ -223,6 +223,7 @@ func _build_environment() -> void:
 	_box(self, Vector3(180, 0.16, 38), Vector3(0, -0.02, -78), Color(0.035, 0.34, 0.56))
 	_box(self, Vector3(180, 0.18, 5), Vector3(0, 0.04, -57), Color(0.82, 0.76, 0.64))
 	_create_coastal_scenery()
+	_create_beach_cafe()
 
 func _create_coastal_scenery() -> void:
 	# A small Mediterranean waterfront set: boats, wave crests, benches and shade.
@@ -256,6 +257,51 @@ func _create_coastal_scenery() -> void:
 	for i in range(7):
 		_create_palm(Vector3(-42.0 + float(i) * 14.0, 0, -47.0))
 	_create_borj_el_kebir_landmark()
+
+
+func _create_beach_cafe() -> void:
+	# A recognizable waterfront cafe with a shaded counter and outdoor seating.
+	var sand := Color(0.83, 0.76, 0.63)
+	var wood := Color(0.34, 0.22, 0.14)
+	var cafe := Node3D.new()
+	cafe.name = "BeachCafe"
+	cafe.position = Vector3(-63.0, 0.0, -46.5)
+	add_child(cafe)
+	_box(cafe, Vector3(7.0, 0.22, 4.2), Vector3(0, 0.12, 0), sand)
+	_box(cafe, Vector3(6.6, 2.4, 0.18), Vector3(0, 1.32, -1.95), Color(0.91, 0.86, 0.75))
+	_box(cafe, Vector3(0.18, 2.4, 3.9), Vector3(-3.25, 1.32, 0), Color(0.91, 0.86, 0.75))
+	_box(cafe, Vector3(0.18, 2.4, 3.9), Vector3(3.25, 1.32, 0), Color(0.91, 0.86, 0.75))
+	_box(cafe, Vector3(7.5, 0.22, 4.7), Vector3(0, 2.62, 0), Color(0.17, 0.38, 0.43))
+	_box(cafe, Vector3(7.7, 0.14, 1.25), Vector3(0, 2.28, 2.05), Color(0.88, 0.28, 0.16))
+	_box(cafe, Vector3(4.2, 0.82, 0.72), Vector3(0, 0.62, 1.05), wood)
+	_box(cafe, Vector3(4.35, 0.10, 0.82), Vector3(0, 1.08, 1.05), Color(0.79, 0.72, 0.59))
+	var sign := Label3D.new()
+	sign.text = "مقهى الشاطئ"
+	sign.position = Vector3(0, 2.0, 2.42)
+	sign.font_size = 36
+	sign.pixel_size = 0.008
+	cafe.add_child(sign)
+	# Three outdoor tables with simple chairs; shared meshes keep this mobile-friendly.
+	for i in range(3):
+		var x := -5.4 + float(i) * 5.4
+		var table := MeshInstance3D.new()
+		var table_mesh := CylinderMesh.new()
+		table_mesh.top_radius = 0.68
+		table_mesh.bottom_radius = 0.68
+		table_mesh.height = 0.12
+		table.mesh = table_mesh
+		table.position = Vector3(x, 0.88, 4.2)
+		table.material_override = _material(Color(0.88, 0.84, 0.74))
+		cafe.add_child(table)
+		_box(cafe, Vector3(0.16, 0.82, 0.16), Vector3(x, 0.42, 4.2), wood)
+		for side in [-1.0, 1.0]:
+			_box(cafe, Vector3(0.72, 0.12, 0.72), Vector3(x + side * 1.15, 0.48, 4.2), Color(0.22, 0.38, 0.36))
+			_box(cafe, Vector3(0.72, 0.82, 0.12), Vector3(x + side * 1.15, 0.88, 4.5), wood)
+	# A striped shade sail gives the cafe a distinct beach silhouette.
+	_box(cafe, Vector3(4.0, 0.10, 3.0), Vector3(0, 3.15, 4.4), Color(0.91, 0.83, 0.68))
+	for x in [-1.9, 1.9]:
+		_box(cafe, Vector3(0.12, 3.0, 0.12), Vector3(x, 1.55, 5.7), wood)
+
 
 func _create_borj_el_kebir_landmark() -> void:
 	var stone := Color(0.69, 0.62, 0.49)

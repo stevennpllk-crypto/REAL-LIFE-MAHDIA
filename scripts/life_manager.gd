@@ -75,6 +75,7 @@ func setup(target: CharacterBody3D, saver: Node) -> void:
 	delivery_state = str(data.get("delivery_state", "not_started"))
 	delivery_target_name = str(data.get("delivery_target_name", ""))
 	_create_station("مقهى الميناء", "cafe", Vector3(-12, 0, -5), Color(0.65, 0.28, 0.12))
+	_create_station("مقهى الشاطئ", "cafe", Vector3(-63, 0, -46.5), Color(0.17, 0.38, 0.43))
 	_create_station("منزلك", "home", Vector3(15, 0, 8), Color(0.82, 0.76, 0.61))
 	_create_station("مكتب العمل", "job", Vector3(22, 0, -12), Color(0.18, 0.42, 0.28))
 	_create_station("متجر الحي", "shop", Vector3(-22, 0, 12), Color(0.18, 0.38, 0.68))
