@@ -13,7 +13,7 @@ var interact_button: Button
 var attack_button: Button
 var crouch_button: Button
 var dodge_button: Button
-var stick_max_radius := 62.0
+var stick_max_radius := 46.0
 
 func setup(player: CharacterBody3D) -> void:
 	target = player
@@ -34,8 +34,8 @@ func setup(player: CharacterBody3D) -> void:
 	stick_base.anchor_top = 1.0
 	stick_base.anchor_bottom = 1.0
 	stick_base.offset_left = 20.0
-	stick_base.offset_top = -204.0
-	stick_base.offset_right = 204.0
+	stick_base.offset_top = -158.0
+	stick_base.offset_right = 158.0
 	stick_base.offset_bottom = -20.0
 	stick_base.mouse_filter = Control.MOUSE_FILTER_STOP
 	stick_base.draw.connect(_draw_stick)
@@ -88,7 +88,7 @@ func _draw_stick() -> void:
 	var center := stick_base.size * 0.5
 	stick_base.draw_circle(center, stick_max_radius + 8.0, Color(0.04, 0.07, 0.12, 0.38))
 	stick_base.draw_arc(center, stick_max_radius + 8.0, 0.0, TAU, 48, Color(0.82, 0.88, 0.98, 0.72), 3.0)
-	stick_base.draw_circle(center + stick_value * stick_max_radius, 27.0, Color(0.78, 0.87, 1.0, 0.92))
+	stick_base.draw_circle(center + stick_value * stick_max_radius, 21.0, Color(0.78, 0.87, 1.0, 0.92))
 
 func _on_stick_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
