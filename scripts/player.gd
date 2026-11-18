@@ -205,7 +205,9 @@ func _pose_imported_player_bone(key: String, angle: float) -> void:
 		# around the body's forward axis, then add gait swing around body-up.
 		var drop_axis := (inverse_rest * Vector3.BACK).normalized()
 		var swing_axis := (inverse_rest * Vector3.UP).normalized()
-		var drop_angle := 1.48 if key == "left_arm" else -1.48
+		# Bip01's local shoulder roll is opposite to the imported Mixamo axis.
+		# Negative left / positive right lowers the arms beside the torso.
+		var drop_angle := -1.20 if key == "left_arm" else 1.20
 		pose_rotation = Quaternion(drop_axis, drop_angle) * Quaternion(swing_axis, angle)
 	elif key == "head" or key == "neck":
 		var head_axis := (inverse_rest * Vector3.UP).normalized()

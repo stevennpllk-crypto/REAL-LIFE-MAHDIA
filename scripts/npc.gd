@@ -1059,7 +1059,9 @@ func _pose_imported_bone(key: String, angle: float) -> void:
 		# beside the torso, then layer gait/talking gestures over that pose.
 		var drop_axis := (inverse_rest * Vector3.BACK).normalized()
 		var swing_axis := (inverse_rest * Vector3.UP).normalized()
-		var drop_angle := 1.08 if key == "left_arm" else -1.08
+		# Correct the Bip01 shoulder-roll direction so residents rest their
+		# arms naturally beside the torso instead of holding a raised V-pose.
+		var drop_angle := -1.20 if key == "left_arm" else 1.20
 		pose_rotation = Quaternion(drop_axis, drop_angle) * Quaternion(swing_axis, angle)
 	elif key == "head" or key == "neck":
 		var head_axis := (inverse_rest * Vector3.UP).normalized()
