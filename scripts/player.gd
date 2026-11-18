@@ -67,12 +67,12 @@ func _ready() -> void:
 	camera_pivot.position.y = 1.48
 	add_child(camera_pivot)
 	camera = Camera3D.new()
-	camera.position = Vector3(0, 1.0, 5.8)
-	# A positive pitch points the camera above the horizon in Godot's -Z forward convention.
-	# Tilt slightly downward so the player and the nearby 3D street occupy the opening frame.
-	camera.rotation_degrees.x = -12.0
+	# Closer over-the-shoulder framing: keep the full character readable while
+	# reducing empty foreground and making mobile touch control feel more immediate.
+	camera.position = Vector3(0, 0.72, 3.85)
+	camera.rotation_degrees.x = -10.0
 	camera.current = true
-	camera.fov = 68.0
+	camera.fov = 66.0
 	camera.near = 0.08
 	camera_pivot.add_child(camera)
 	if not OS.has_feature("mobile"):
