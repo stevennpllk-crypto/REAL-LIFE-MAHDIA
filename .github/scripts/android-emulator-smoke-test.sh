@@ -84,6 +84,23 @@ if ! adb logcat -d | grep -Eq 'MAHDIA_IMPORTED_RESIDENTS=[1-9][0-9]*/'; then
 fi
 adb logcat -d | grep 'MAHDIA_IMPORTED_' | tail -n 20
 
+# Require an imported resident to enter its gait animation path at runtime.
+gait_active=false
+for attempt in $(seq 1 24); do
+  if adb logcat -d | grep -q 'MAHDIA_IMPORTED_GAIT_ACTIVE'; then
+    gait_active=true
+    echo "Imported resident gait animation became active on attempt $attempt."
+    adb logcat -d | grep 'MAHDIA_IMPORTED_GAIT_ACTIVE' | tail -n 8
+    break
+  fi
+  sleep 2
+done
+if [[ "$gait_active" != "true" ]]; then
+  echo "No imported resident entered the runtime gait animation path."
+  adb logcat -d | grep -E 'MAHDIA_IMPORTED_|MAHDIA_WORLD_READY' | tail -n 60 || true
+  exit 1
+fi
+
 activity_state="$(adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' || true)"
 echo "$activity_state"
 if ! grep -q 'com.jassim.reallifemahdia' <<< "$activity_state"; then

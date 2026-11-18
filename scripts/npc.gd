@@ -60,6 +60,7 @@ var imported_skeleton: Skeleton3D
 var imported_bones: Dictionary = {}
 var imported_model_loaded := false
 var imported_animation_key := ""
+var imported_gait_verified := false
 
 func _build_imported_character() -> bool:
 	var model_paths := [
@@ -1076,6 +1077,12 @@ func _animate_imported_character(delta: float, moving: bool, pace: float, conver
 		_pose_imported_bone("left_knee", maxf(0.0, gait * stride) * 0.42)
 		_pose_imported_bone("right_knee", maxf(0.0, -gait * stride) * 0.42)
 		_pose_imported_bone("head", sin(idle_phase * 0.7 + float(personal_seed)) * 0.025)
+	if moving and not imported_gait_verified and clock >= 0.35:
+		imported_gait_verified = true
+		var gait_mode := "animation_player" if has_clips else "procedural_bones"
+		var left_leg_pose := imported_skeleton.get_bone_pose_rotation(int(imported_bones["left_leg"])) if is_instance_valid(imported_skeleton) and imported_bones.has("left_leg") else Quaternion.IDENTITY
+		var right_leg_pose := imported_skeleton.get_bone_pose_rotation(int(imported_bones["right_leg"])) if is_instance_valid(imported_skeleton) and imported_bones.has("right_leg") else Quaternion.IDENTITY
+		print("MAHDIA_IMPORTED_GAIT_ACTIVE mode=", gait_mode, " clock=", snappedf(clock, 0.01), " left_leg_pose=", left_leg_pose, " right_leg_pose=", right_leg_pose)
 	if is_instance_valid(visual_root):
 		var bob := absf(sin(clock)) * 0.012 if moving else sin(idle_phase * 1.35 + float(personal_seed)) * 0.004
 		visual_root.position.y = lerpf(visual_root.position.y, bob, delta * 4.0)
