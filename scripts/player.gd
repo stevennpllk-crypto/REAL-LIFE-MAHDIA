@@ -172,6 +172,23 @@ func _cache_imported_player_bones() -> void:
 			imported_player_bones["left_knee"] = bone_index
 		elif bone_name.contains("rcalf") or bone_name.ends_with("rightleg"):
 			imported_player_bones["right_knee"] = bone_index
+		elif bone_name.contains("lclavicle"):
+			imported_player_bones["left_clavicle"] = bone_index
+		elif bone_name.contains("rclavicle"):
+			imported_player_bones["right_clavicle"] = bone_index
+		elif bone_name.contains("lhand") or bone_name.ends_with("lefthand"):
+			imported_player_bones["left_hand"] = bone_index
+		elif bone_name.contains("rhand") or bone_name.ends_with("righthand"):
+			imported_player_bones["right_hand"] = bone_index
+		elif bone_name.contains("lfoot") or bone_name.ends_with("leftfoot"):
+			imported_player_bones["left_foot"] = bone_index
+		elif bone_name.contains("rfoot") or bone_name.ends_with("rightfoot"):
+			imported_player_bones["right_foot"] = bone_index
+		elif bone_name.ends_with("spine1") or bone_name.ends_with("spine2"):
+			if not imported_player_bones.has("spine"):
+				imported_player_bones["spine"] = bone_index
+		elif bone_name.ends_with("neck"):
+			imported_player_bones["neck"] = bone_index
 		elif bone_name.ends_with("head"):
 			imported_player_bones["head"] = bone_index
 
@@ -189,11 +206,17 @@ func _pose_imported_player_bone(key: String, angle: float) -> void:
 		var swing_axis := (inverse_rest * Vector3.UP).normalized()
 		var drop_angle := 1.48 if key == "left_arm" else -1.48
 		pose_rotation = Quaternion(drop_axis, drop_angle) * Quaternion(swing_axis, angle)
-	elif key == "head":
+	elif key == "head" or key == "neck":
 		var head_axis := (inverse_rest * Vector3.UP).normalized()
 		pose_rotation = Quaternion(head_axis, angle)
+	elif key == "spine":
+		var spine_axis := (inverse_rest * Vector3.FORWARD).normalized()
+		pose_rotation = Quaternion(spine_axis, angle)
+	elif key.ends_with("clavicle"):
+		var clavicle_axis := (inverse_rest * Vector3.BACK).normalized()
+		pose_rotation = Quaternion(clavicle_axis, angle)
 	else:
-		# Legs swing around the lateral body axis; forearms hinge in the same plane.
+		# Limbs hinge around their local lateral axis.
 		var limb_axis := (inverse_rest * Vector3.RIGHT).normalized()
 		pose_rotation = Quaternion(limb_axis, angle)
 	imported_player_skeleton.set_bone_pose_rotation(bone_index, pose_rotation)
@@ -514,26 +537,44 @@ func _animate_imported_player(delta: float, moving: bool, speed: float) -> void:
 		var actual_speed := Vector2(velocity.x, velocity.z).length()
 		var gait_scale := clampf(actual_speed / maxf(speed, 0.1), 0.35, 1.0)
 		var swing := sin(animation_clock) * 0.46 * gait_intensity * gait_scale
-		_pose_imported_player_bone("left_arm", swing)
-		_pose_imported_player_bone("right_arm", -swing)
+		var torso_sway := sin(animation_clock * 0.5) * 0.035
+		_pose_imported_player_bone("spine", -0.025 + torso_sway + (0.035 if running else 0.0))
+		_pose_imported_player_bone("left_clavicle", torso_sway)
+		_pose_imported_player_bone("right_clavicle", -torso_sway)
+		_pose_imported_player_bone("neck", -0.018 if running else 0.0)
+		_pose_imported_player_bone("left_arm", swing + torso_sway)
+		_pose_imported_player_bone("right_arm", -swing - torso_sway)
 		_pose_imported_player_bone("left_forearm", -0.10 - maxf(0.0, swing) * 0.18)
 		_pose_imported_player_bone("right_forearm", -0.10 - maxf(0.0, -swing) * 0.18)
+		_pose_imported_player_bone("left_hand", sin(animation_clock + 0.4) * 0.07)
+		_pose_imported_player_bone("right_hand", -sin(animation_clock + 0.4) * 0.07)
 		_pose_imported_player_bone("left_leg", -swing * (1.0 if not is_swimming else 0.28))
 		_pose_imported_player_bone("right_leg", swing * (1.0 if not is_swimming else 0.28))
 		_pose_imported_player_bone("left_knee", maxf(0.0, swing) * 0.42)
 		_pose_imported_player_bone("right_knee", maxf(0.0, -swing) * 0.42)
+		_pose_imported_player_bone("left_foot", -maxf(0.0, swing) * 0.18)
+		_pose_imported_player_bone("right_foot", -maxf(0.0, -swing) * 0.18)
 	else:
 		gait_intensity = move_toward(gait_intensity, 0.0, delta * 5.0)
 		idle_clock += delta
 		var breath := sin(idle_clock * 1.35) * 0.018
+		var relaxed_sway := sin(idle_clock * 0.52) * 0.012
+		_pose_imported_player_bone("spine", breath)
+		_pose_imported_player_bone("left_clavicle", relaxed_sway)
+		_pose_imported_player_bone("right_clavicle", -relaxed_sway)
+		_pose_imported_player_bone("neck", sin(idle_clock * 0.7) * 0.012)
 		_pose_imported_player_bone("left_arm", breath)
 		_pose_imported_player_bone("right_arm", breath)
 		_pose_imported_player_bone("left_forearm", -0.04)
 		_pose_imported_player_bone("right_forearm", -0.04)
+		_pose_imported_player_bone("left_hand", sin(idle_clock) * 0.015)
+		_pose_imported_player_bone("right_hand", -sin(idle_clock) * 0.015)
 		_pose_imported_player_bone("left_leg", 0.0)
 		_pose_imported_player_bone("right_leg", 0.0)
 		_pose_imported_player_bone("left_knee", 0.0)
 		_pose_imported_player_bone("right_knee", 0.0)
+		_pose_imported_player_bone("left_foot", 0.0)
+		_pose_imported_player_bone("right_foot", 0.0)
 		_pose_imported_player_bone("head", sin(idle_clock * 0.7) * 0.018)
 	var run_lean := -0.055 if running else -0.018
 	var swim_lean := 0.20 if is_swimming else 0.0
