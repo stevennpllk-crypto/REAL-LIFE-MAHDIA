@@ -1085,14 +1085,14 @@ func _build_reference_hud(layer: CanvasLayer) -> void:
 	wallet.offset_bottom = 52
 	layer.add_child(wallet)
 	wallet_label = Label.new()
-	wallet_label.text = "💵 100 د.ت  ＋"
+	wallet_label.text = "💵 12,560 د.ت  ＋"
 	wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	wallet_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	wallet_label.add_theme_font_size_override("font_size", 15)
 	wallet.add_child(wallet_label)
 
 	level_label = Label.new()
-	level_label.text = "Lv. 1   •   المهدية"
+	level_label.text = "Lv. 8   •   المهدية"
 	level_label.anchor_left = 1.0
 	level_label.anchor_right = 1.0
 	level_label.offset_left = -252

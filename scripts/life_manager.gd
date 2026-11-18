@@ -9,7 +9,7 @@ var player: CharacterBody3D
 var ai_service: Node
 var active_resident: Node3D
 var save_manager: Node
-var money := 100
+var money := 12560
 var food := 0
 var energy := 100.0
 var hunger := 100.0
@@ -67,7 +67,7 @@ func setup(target: CharacterBody3D, saver: Node) -> void:
 	save_manager = saver
 	var saved: Dictionary = save_manager.load_progress()
 	var data: Dictionary = saved.get(SAVE_KEY, {})
-	money = maxi(0, int(data.get("money", 100)))
+	money = maxi(0, int(data.get("money", 12560)))
 	food = maxi(0, int(data.get("food", 0)))
 	energy = clampf(float(data.get("energy", 100.0)), 0.0, 100.0)
 	hunger = clampf(float(data.get("hunger", 100.0)), 0.0, 100.0)
