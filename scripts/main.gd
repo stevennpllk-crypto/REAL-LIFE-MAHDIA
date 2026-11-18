@@ -40,11 +40,18 @@ var water_clock := 0.0
 var autosave_elapsed := 0.0
 var quality_level := 2
 var quality_button: Button
-var restored_vehicle_position := Vector3(5, 0.1, 10)
+var restored_vehicle_position := START_VEHICLE_POSITION
 var restore_vehicle_driver := false
 var mission_hud_label: Label
 var mission_target_marker: Label3D
 var mission_last_text := ""
+var wallet_label: Label
+var level_label: Label
+var chat_row: HBoxContainer
+var mission_hud_panel: PanelContainer
+const START_PLAYER_POSITION := Vector3(60.0, 0.03, -44.0)
+const START_PLAYER_ROTATION := PI * 0.5
+const START_VEHICLE_POSITION := Vector3(62.0, 0.1, -33.0)
 const AUTOSAVE_INTERVAL := 12.0
 const WORLD_SAVE_KEY := "mahdia_world"
 
@@ -547,7 +554,8 @@ func _create_street_lamp(pos: Vector3) -> void:
 func _spawn_player() -> void:
 	player = CharacterBody3D.new()
 	player.set_script(PLAYER_SCRIPT)
-	player.position = Vector3(0, 0.03, 8)
+	player.position = START_PLAYER_POSITION
+	player.rotation.y = START_PLAYER_ROTATION
 	player.name = "Player"
 	add_child(player)
 
@@ -569,12 +577,12 @@ func _spawn_residents() -> void:
 		"يوسف", "سارة", "حاتم", "نجلاء", "وليد", "ريم"
 	]
 	var sidewalk_positions := [
-		Vector3(-6.6, 0, -25), Vector3(6.6, 0, -25),
-		Vector3(-6.6, 0, -17), Vector3(6.6, 0, -17),
-		Vector3(-6.6, 0, -9), Vector3(6.6, 0, -9),
-		Vector3(-6.6, 0, 9), Vector3(6.6, 0, 9),
-		Vector3(-6.6, 0, 17), Vector3(6.6, 0, 17),
-		Vector3(-6.6, 0, 25), Vector3(6.6, 0, 25)
+		Vector3(49.0, 0, -49.0), Vector3(46.0, 0, -39.5),
+		Vector3(41.0, 0, -51.0), Vector3(38.0, 0, -40.5),
+		Vector3(33.0, 0, -49.0), Vector3(29.0, 0, -39.0),
+		Vector3(24.0, 0, -50.0), Vector3(20.0, 0, -40.5),
+		Vector3(14.0, 0, -49.0), Vector3(10.0, 0, -40.0),
+		Vector3(4.0, 0, -50.0), Vector3(0.0, 0, -40.5)
 	]
 	var resident_budget: int = sidewalk_positions.size()
 	for i in range(mini(sidewalk_positions.size(), resident_budget)):
@@ -601,6 +609,7 @@ func _spawn_vehicle() -> void:
 	vehicle = CharacterBody3D.new()
 	vehicle.set_script(VEHICLE_SCRIPT)
 	vehicle.position = restored_vehicle_position
+	vehicle.rotation.y = START_PLAYER_ROTATION
 	vehicle.name = "MahdiaCar"
 	add_child(vehicle)
 	if restore_vehicle_driver:
@@ -661,9 +670,9 @@ func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	var panel := PanelContainer.new()
-	# Keep the compass clear and reserve the top-right for quality/AI status.
 	panel.position = Vector2(172, 14)
 	panel.custom_minimum_size = Vector2(300, 54)
+	panel.visible = false
 	layer.add_child(panel)
 	status_label = Label.new()
 	status_label.text = "MAHDIA • 08:00 • Prototype"
@@ -676,36 +685,39 @@ func _build_hud() -> void:
 	hint_label.custom_minimum_size = Vector2(390, 34)
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint_label.add_theme_font_size_override("font_size", 15)
+	hint_label.visible = false
 	layer.add_child(hint_label)
 	var message_panel := PanelContainer.new()
 	# Keep the message strip in the central safe zone: mobile action buttons
 	# occupy the lower-right corner and the movement stick occupies lower-left.
-	message_panel.anchor_left = 0.28
-	message_panel.anchor_right = 0.72
+	message_panel.anchor_left = 0.02
+	message_panel.anchor_right = 0.34
 	message_panel.anchor_top = 1.0
 	message_panel.anchor_bottom = 1.0
 	message_panel.offset_left = 0
 	message_panel.offset_right = 0
-	message_panel.offset_top = -112
-	message_panel.offset_bottom = -72
+	message_panel.offset_top = -104
+	message_panel.offset_bottom = -14
+	message_panel.custom_minimum_size = Vector2(250, 84)
 	layer.add_child(message_panel)
 	var message_label := Label.new()
 	message_label.name = "LifeMessage"
 	message_label.text = "مرحباً بك في المهدية! اقترب من شخص أو مبنى للتفاعل."
-	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	message_label.add_theme_font_size_override("font_size", 13)
 	message_panel.add_child(message_label)
 	life_manager.message_changed.connect(func(value: String): message_label.text = value)
 
 	# Lightweight chat input for the currently selected resident.
-	var chat_row := HBoxContainer.new()
-	# A compact center-bottom composer avoids covering the joystick and
-	# the three touch action buttons on 16:9 phones.
-	chat_row.anchor_left = 0.28
-	chat_row.anchor_right = 0.72
+	chat_row = HBoxContainer.new()
+	chat_row.anchor_left = 0.02
+	chat_row.anchor_right = 0.36
 	chat_row.anchor_top = 1.0
 	chat_row.anchor_bottom = 1.0
-	chat_row.offset_top = -64
-	chat_row.offset_bottom = -18
+	chat_row.offset_top = -58
+	chat_row.offset_bottom = -12
+	chat_row.visible = false
 	layer.add_child(chat_row)
 	chat_input = LineEdit.new()
 	chat_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -726,6 +738,7 @@ func _build_hud() -> void:
 	ai_row_panel.offset_right = -16
 	ai_row_panel.offset_top = 86
 	ai_row_panel.offset_bottom = 124
+	ai_row_panel.visible = false
 	layer.add_child(ai_row_panel)
 	var ai_row := HBoxContainer.new()
 	ai_row_panel.add_child(ai_row)
@@ -877,39 +890,96 @@ func _update_mission_hud() -> void:
 			mission_target_marker.global_position = target_position + Vector3(0, 3.1, 0)
 
 func _build_reference_hud(layer: CanvasLayer) -> void:
+	# Circular navigation map: fixed to the upper-left safe area.
 	var minimap := Control.new()
-	minimap.position = Vector2(18, 16)
-	minimap.custom_minimum_size = Vector2(112, 112)
+	minimap.position = Vector2(18, 14)
+	minimap.custom_minimum_size = Vector2(124, 124)
 	minimap.draw.connect(func():
-		var center := Vector2(56, 56)
-		minimap.draw_circle(center, 54.0, Color(0.035, 0.07, 0.09, 0.82))
-		minimap.draw_arc(center, 53.0, 0.0, TAU, 64, Color(0.86, 0.89, 0.86), 3.0)
+		var center := Vector2(62, 62)
+		minimap.draw_circle(center, 59.0, Color(0.025, 0.055, 0.07, 0.84))
+		minimap.draw_arc(center, 58.0, 0.0, TAU, 72, Color(0.88, 0.91, 0.88, 0.92), 3.0)
 		for road in range(-2, 3):
-			var offset := float(road) * 20.0
-			minimap.draw_line(Vector2(8, 56 + offset), Vector2(104, 56 + offset), Color(0.58, 0.65, 0.61, 0.42), 3.0)
-			minimap.draw_line(Vector2(56 + offset, 8), Vector2(56 + offset, 104), Color(0.58, 0.65, 0.61, 0.42), 3.0)
-		minimap.draw_circle(center, 4.0, Color(1.0, 0.82, 0.18))
-		minimap.draw_colored_polygon(PackedVector2Array([Vector2(56, 24), Vector2(48, 42), Vector2(64, 42)]), Color.WHITE)
+			var offset := float(road) * 22.0
+			minimap.draw_line(Vector2(8, 62 + offset), Vector2(116, 62 + offset), Color(0.60, 0.68, 0.65, 0.54), 3.0)
+			minimap.draw_line(Vector2(62 + offset, 8), Vector2(62 + offset, 116), Color(0.60, 0.68, 0.65, 0.54), 3.0)
+		minimap.draw_line(Vector2(10, 88), Vector2(114, 88), Color(0.18, 0.48, 0.64, 0.78), 5.0)
+		minimap.draw_circle(center, 5.0, Color(1.0, 0.82, 0.18))
+		minimap.draw_colored_polygon(PackedVector2Array([Vector2(62, 27), Vector2(54, 47), Vector2(70, 47)]), Color.WHITE)
 	)
 	layer.add_child(minimap)
 	var location := Label.new()
 	location.text = "📍 المهدية"
-	location.position = Vector2(24, 130)
+	location.position = Vector2(22, 136)
 	location.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35))
+	location.add_theme_font_size_override("font_size", 15)
 	layer.add_child(location)
-	var mission := PanelContainer.new()
-	mission.anchor_left = 0.5
-	mission.anchor_right = 0.5
-	mission.offset_left = -142
-	mission.offset_right = 142
-	mission.offset_top = 14
-	mission.offset_bottom = 72
-	layer.add_child(mission)
+
+	# A one-tap return-to-waterfront icon sits beside the minimap.
+	var home_button := Button.new()
+	home_button.text = "⌂"
+	home_button.position = Vector2(148, 18)
+	home_button.custom_minimum_size = Vector2(44, 44)
+	home_button.add_theme_font_size_override("font_size", 27)
+	home_button.focus_mode = Control.FOCUS_NONE
+	_style_round_hud_button(home_button)
+	home_button.pressed.connect(_return_to_start_view)
+	layer.add_child(home_button)
+
+	mission_hud_panel = PanelContainer.new()
+	mission_hud_panel.anchor_left = 0.5
+	mission_hud_panel.anchor_right = 0.5
+	mission_hud_panel.offset_left = -148
+	mission_hud_panel.offset_right = 148
+	mission_hud_panel.offset_top = 12
+	mission_hud_panel.offset_bottom = 78
+	layer.add_child(mission_hud_panel)
 	mission_hud_label = Label.new()
-	mission_hud_label.text = "◆ المهمة الحالية\nتحدث مع أحد سكان المهدية"
+	mission_hud_label.text = "◆ المهمة الحالية\nتحدث مع أحد سكان المهدية لبدء مغامرتك"
 	mission_hud_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mission_hud_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	mission_hud_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	mission.add_child(mission_hud_label)
+	mission_hud_label.add_theme_font_size_override("font_size", 14)
+	mission_hud_panel.add_child(mission_hud_label)
+
+	# Real wallet amount is read from the saved life simulation, not a fake HUD value.
+	var wallet := PanelContainer.new()
+	wallet.anchor_left = 1.0
+	wallet.anchor_right = 1.0
+	wallet.offset_left = -258
+	wallet.offset_right = -82
+	wallet.offset_top = 12
+	wallet.offset_bottom = 52
+	layer.add_child(wallet)
+	wallet_label = Label.new()
+	wallet_label.text = "💵 100 د.ت  ＋"
+	wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wallet_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	wallet_label.add_theme_font_size_override("font_size", 15)
+	wallet.add_child(wallet_label)
+
+	level_label = Label.new()
+	level_label.text = "Lv. 1   •   المهدية"
+	level_label.anchor_left = 1.0
+	level_label.anchor_right = 1.0
+	level_label.offset_left = -252
+	level_label.offset_right = -86
+	level_label.offset_top = 56
+	level_label.offset_bottom = 80
+	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_label.add_theme_font_size_override("font_size", 13)
+	layer.add_child(level_label)
+
+	var profile := _make_hud_icon(layer, "👤", 12.0, 12.0, Callable())
+	profile.custom_minimum_size = Vector2(58, 58)
+	profile.offset_left = -70.0
+	profile.offset_right = -12.0
+	profile.offset_bottom = 70.0
+
+	_make_hud_icon(layer, "🏆", 12.0, 88.0, Callable(self, "_toggle_mission_panel"))
+	_make_hud_icon(layer, "⚙", 64.0, 88.0, Callable(self, "_toggle_ai_setup"))
+	_make_hud_icon(layer, "👥", 116.0, 88.0, Callable(self, "_show_resident_count"))
+	_make_hud_icon(layer, "💬", 12.0, 198.0, Callable(self, "_toggle_chat_panel"))
+
 	mission_target_marker = Label3D.new()
 	mission_target_marker.name = "MissionWorldMarker"
 	mission_target_marker.text = "▼\nالهدف"
@@ -920,28 +990,74 @@ func _build_reference_hud(layer: CanvasLayer) -> void:
 	mission_target_marker.no_depth_test = true
 	mission_target_marker.visible = false
 	add_child(mission_target_marker)
-	var wallet := PanelContainer.new()
-	wallet.anchor_left = 1.0
-	wallet.anchor_right = 1.0
-	wallet.offset_left = -190
-	wallet.offset_right = -14
-	wallet.offset_top = 14
-	wallet.offset_bottom = 52
-	layer.add_child(wallet)
-	var wallet_label := Label.new()
-	wallet_label.text = "💵  $ 12,560   ＋"
-	wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	wallet.add_child(wallet_label)
-	var level := Label.new()
-	level.text = "Lv. 8   ━━━━━━━━━"
-	level.anchor_left = 1.0
-	level.anchor_right = 1.0
-	level.offset_left = -184
-	level.offset_right = -16
-	level.offset_top = 56
-	level.offset_bottom = 82
-	level.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	layer.add_child(level)
+
+
+func _style_round_hud_button(button: Button) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.035, 0.055, 0.075, 0.78)
+	normal.set_corner_radius_all(22)
+	normal.set_border_width_all(1)
+	normal.border_color = Color(0.82, 0.88, 0.88, 0.78)
+	button.add_theme_stylebox_override("normal", normal)
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.11, 0.17, 0.20, 0.92)
+	button.add_theme_stylebox_override("hover", hover)
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(0.18, 0.25, 0.27, 0.96)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_color_override("font_color", Color.WHITE)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	button.focus_mode = Control.FOCUS_NONE
+
+
+func _make_hud_icon(layer: CanvasLayer, caption: String, right_offset: float, top_offset: float, callback: Callable) -> Button:
+	var button := Button.new()
+	button.text = caption
+	button.anchor_left = 1.0
+	button.anchor_right = 1.0
+	button.anchor_top = 0.0
+	button.anchor_bottom = 0.0
+	button.offset_left = -right_offset - 44.0
+	button.offset_right = -right_offset
+	button.offset_top = top_offset
+	button.offset_bottom = top_offset + 44.0
+	button.custom_minimum_size = Vector2(44, 44)
+	button.add_theme_font_size_override("font_size", 21)
+	_style_round_hud_button(button)
+	if callback.is_valid():
+		button.pressed.connect(callback)
+	layer.add_child(button)
+	return button
+
+
+func _return_to_start_view() -> void:
+	if not is_instance_valid(player):
+		return
+	if is_instance_valid(vehicle) and vehicle.driver == player:
+		vehicle.exit_vehicle()
+	player.global_position = START_PLAYER_POSITION
+	player.rotation.y = START_PLAYER_ROTATION
+	player.velocity = Vector3.ZERO
+
+
+func _toggle_mission_panel() -> void:
+	if is_instance_valid(mission_hud_panel):
+		mission_hud_panel.visible = not mission_hud_panel.visible
+
+
+func _toggle_chat_panel() -> void:
+	if is_instance_valid(chat_row):
+		chat_row.visible = not chat_row.visible
+		if chat_row.visible and is_instance_valid(chat_input):
+			chat_input.grab_focus()
+
+
+func _show_resident_count() -> void:
+	if is_instance_valid(life_manager):
+		var count := get_tree().get_nodes_in_group("mahdia_residents").size()
+		life_manager.call("_set_message", "سكان المهدية الموجودون الآن: %d" % count)
+
 
 func _on_ai_connection_status(ready: bool, message: String) -> void:
 	if not is_instance_valid(ai_status_label):
@@ -1034,6 +1150,8 @@ func _process(delta: float) -> void:
 	if is_instance_valid(planet_navigation) and is_instance_valid(player):
 		planet_navigation.update_from_player(player.global_position)
 	_update_mission_hud()
+	if is_instance_valid(wallet_label) and is_instance_valid(life_manager):
+		wallet_label.text = "💵 %d د.ت  ＋" % int(life_manager.money)
 	if is_instance_valid(status_label):
 		var hour_value: float = world_systems.hour if is_instance_valid(world_systems) else 8.0
 		status_label.text = "%s • %s • %02d:%02d • %s • %d د.ت • طاقة %d%% • جوع %d%%" % [planet_navigation.get_region_name(), planet_navigation.get_coordinate_text(), int(hour_value), int(fposmod(hour_value * 60.0, 60.0)), world_systems.weather, life_manager.money, int(life_manager.energy), int(life_manager.hunger)]
@@ -1044,14 +1162,21 @@ func _restore_world_progress() -> void:
 		return
 	var data: Dictionary = save_manager.load_progress()
 	var world: Dictionary = data.get(WORLD_SAVE_KEY, {})
+	var migrate_legacy_start := false
 	if world.has("player_position") and world.player_position is Array and world.player_position.size() == 3:
 		var p: Array = world.player_position
-		player.global_position = Vector3(float(p[0]), float(p[1]), float(p[2]))
-	if world.has("player_rotation_y"):
+		var saved_position := Vector3(float(p[0]), float(p[1]), float(p[2]))
+		# Older builds started at the inland crossroads. Move only that old
+		# default spawn; leave all genuine saved exploration positions untouched.
+		migrate_legacy_start = saved_position.distance_to(Vector3(0, 0.03, 8)) < 14.0
+		player.global_position = START_PLAYER_POSITION if migrate_legacy_start else saved_position
+	if migrate_legacy_start:
+		player.rotation.y = START_PLAYER_ROTATION
+	elif world.has("player_rotation_y"):
 		player.rotation.y = float(world.player_rotation_y)
 	if world.has("vehicle_position") and world.vehicle_position is Array and world.vehicle_position.size() == 3:
 		var car: Array = world.vehicle_position
-		restored_vehicle_position = Vector3(float(car[0]), float(car[1]), float(car[2]))
+		restored_vehicle_position = START_VEHICLE_POSITION if migrate_legacy_start else Vector3(float(car[0]), float(car[1]), float(car[2]))
 	restore_vehicle_driver = bool(world.get("was_driving", false))
 	quality_level = 2
 	print("MAHDIA_WORLD_PROGRESS_RESTORED")

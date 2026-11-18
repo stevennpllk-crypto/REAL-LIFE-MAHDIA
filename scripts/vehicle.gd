@@ -97,10 +97,11 @@ func _box(size: Vector3, pos: Vector3, color: Color, metallic := 0.0) -> MeshIns
 	return item
 
 func _build_car() -> void:
-	var paint := Color(0.72, 0.12, 0.08)
-	var glass := _mat(Color(0.10, 0.22, 0.29), 0.25)
-	_box(Vector3(1.92, 0.58, 3.65), Vector3(0, 0.66, 0), paint, 0.35)
-	_box(Vector3(1.58, 0.78, 1.85), Vector3(0, 1.27, -0.18), Color(0.78, 0.16, 0.10), 0.3)
+	var paint := Color(0.025, 0.035, 0.045)
+	var glass := _mat(Color(0.045, 0.075, 0.095), 0.30)
+	_box(Vector3(1.92, 0.58, 3.65), Vector3(0, 0.66, 0), paint, 0.62)
+	_box(Vector3(1.58, 0.78, 1.85), Vector3(0, 1.27, -0.18), Color(0.045, 0.055, 0.065), 0.58)
+	_box(Vector3(1.28, 0.20, 0.12), Vector3(0, 0.66, -1.87), Color(0.55, 0.58, 0.60), 0.78)
 	_box(Vector3(1.48, 0.55, 0.06), Vector3(0, 1.34, -1.12), Color(0.11, 0.23, 0.29))
 	_box(Vector3(1.48, 0.52, 0.06), Vector3(0, 1.34, 0.76), Color(0.11, 0.23, 0.29))
 	_box(Vector3(0.06, 0.52, 0.78), Vector3(-0.79, 1.34, -0.18), Color(0.12, 0.25, 0.31))

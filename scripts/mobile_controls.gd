@@ -42,12 +42,12 @@ func setup(player: CharacterBody3D) -> void:
 	stick_base.gui_input.connect(_on_stick_input)
 	root.add_child(stick_base)
 
-	run_button = _make_button(root, "🏃", Vector2(-112, -218))
-	jump_button = _make_button(root, "⬆", Vector2(-112, -112))
-	interact_button = _make_button(root, "💬", Vector2(-218, -112))
-	attack_button = _make_button(root, "✊", Vector2(-218, -218))
-	crouch_button = _make_button(root, "🧎", Vector2(-218, -324))
-	dodge_button = _make_button(root, "↗", Vector2(-112, -324))
+	run_button = _make_button(root, "🏃", Vector2(-90, -258))
+	jump_button = _make_button(root, "⬆", Vector2(-90, -80))
+	interact_button = _make_button(root, "💬", Vector2(-90, -350))
+	attack_button = _make_button(root, "👊", Vector2(-178, -166))
+	crouch_button = _make_button(root, "🧎", Vector2(-178, -80))
+	dodge_button = null
 
 	run_button.button_down.connect(func(): target.set_mobile_run(true))
 	run_button.button_up.connect(func(): target.set_mobile_run(false))
@@ -60,8 +60,8 @@ func setup(player: CharacterBody3D) -> void:
 func _make_button(parent: Control, caption: String, offset: Vector2) -> Button:
 	var button := Button.new()
 	button.text = caption
-	button.custom_minimum_size = Vector2(76, 76)
-	button.add_theme_font_size_override("font_size", 28)
+	button.custom_minimum_size = Vector2(72, 72)
+	button.add_theme_font_size_override("font_size", 25)
 	button.anchor_left = 1.0
 	button.anchor_right = 1.0
 	button.anchor_top = 1.0
@@ -71,7 +71,17 @@ func _make_button(parent: Control, caption: String, offset: Vector2) -> Button:
 	button.offset_top = offset.y
 	button.offset_bottom = offset.y + 76.0
 	button.focus_mode = Control.FOCUS_NONE
-	button.add_theme_font_size_override("font_size", 20)
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.035, 0.055, 0.075, 0.72)
+	normal.set_corner_radius_all(36)
+	normal.set_border_width_all(1)
+	normal.border_color = Color(0.84, 0.89, 0.92, 0.60)
+	button.add_theme_stylebox_override("normal", normal)
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(0.22, 0.29, 0.33, 0.92)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_color_override("font_color", Color.WHITE)
+	button.add_theme_font_size_override("font_size", 24)
 	parent.add_child(button)
 	return button
 
