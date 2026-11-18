@@ -56,6 +56,8 @@ var left_knee: Node3D
 var right_knee: Node3D
 var visual_root: Node3D
 var imported_animation_player: AnimationPlayer
+var imported_skeleton: Skeleton3D
+var imported_bones: Dictionary = {}
 var imported_model_loaded := false
 var imported_animation_key := ""
 
@@ -86,12 +88,16 @@ func _build_imported_character() -> bool:
 		var animation_nodes := model_instance.find_children("*", "AnimationPlayer", true, false)
 		if not animation_nodes.is_empty():
 			imported_animation_player = animation_nodes[0] as AnimationPlayer
+		var skeleton_nodes := model_instance.find_children("*", "Skeleton3D", true, false)
+		if not skeleton_nodes.is_empty():
+			imported_skeleton = skeleton_nodes[0] as Skeleton3D
+			_cache_imported_bones()
 		imported_model_loaded = true
 		var animation_names: Array[String] = []
 		if is_instance_valid(imported_animation_player):
 			for animation_name in imported_animation_player.get_animation_list():
 				animation_names.append(str(animation_name))
-		print("MAHDIA_IMPORTED_MODEL: ", model_path, " animations=", animation_names)
+		print("MAHDIA_IMPORTED_MODEL: ", model_path, " animations=", animation_names, " mapped_bones=", imported_bones.size())
 		_play_imported_animation("idle")
 		return true
 	return false
@@ -992,11 +998,58 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_animate(delta, true, pace)
 
+func _cache_imported_bones() -> void:
+	imported_bones.clear()
+	if not is_instance_valid(imported_skeleton):
+		return
+	for bone_index in range(imported_skeleton.get_bone_count()):
+		var bone_name := imported_skeleton.get_bone_name(bone_index).to_lower().replace("mixamorig:", "").replace("_", "").replace(" ", "")
+		if bone_name.ends_with("leftarm") and not bone_name.contains("fore"):
+			imported_bones["left_arm"] = bone_index
+		elif bone_name.ends_with("rightarm") and not bone_name.contains("fore"):
+			imported_bones["right_arm"] = bone_index
+		elif bone_name.ends_with("leftforearm"):
+			imported_bones["left_forearm"] = bone_index
+		elif bone_name.ends_with("rightforearm"):
+			imported_bones["right_forearm"] = bone_index
+		elif bone_name.ends_with("leftupleg"):
+			imported_bones["left_leg"] = bone_index
+		elif bone_name.ends_with("rightupleg"):
+			imported_bones["right_leg"] = bone_index
+		elif bone_name.ends_with("leftleg"):
+			imported_bones["left_knee"] = bone_index
+		elif bone_name.ends_with("rightleg"):
+			imported_bones["right_knee"] = bone_index
+		elif bone_name.ends_with("head"):
+			imported_bones["head"] = bone_index
+
+
+func _pose_imported_bone(key: String, angle: float) -> void:
+	if not is_instance_valid(imported_skeleton) or not imported_bones.has(key):
+		return
+	imported_skeleton.set_bone_pose_rotation(int(imported_bones[key]), Quaternion(Vector3.RIGHT, angle))
+
+
 func _animate_imported_character(delta: float, moving: bool, pace: float, conversational: bool) -> void:
 	idle_phase += delta
-	_play_imported_animation("walk" if moving else "talk" if conversational else "idle")
-	if is_instance_valid(imported_animation_player) and moving:
-		imported_animation_player.speed_scale = clampf(pace / maxf(walk_speed, 0.1), 0.72, 1.28)
+	var has_clips := is_instance_valid(imported_animation_player) and not imported_animation_player.get_animation_list().is_empty()
+	if has_clips:
+		_play_imported_animation("walk" if moving else "talk" if conversational else "idle")
+		if moving:
+			imported_animation_player.speed_scale = clampf(pace / maxf(walk_speed, 0.1), 0.72, 1.28)
+	elif is_instance_valid(imported_skeleton):
+		var gait := sin(clock * (4.8 + pace * 1.2))
+		var stride := 0.42 if moving else 0.0
+		var talk := sin(idle_phase * 3.4 + float(personal_seed)) * (0.13 if conversational else 0.025)
+		_pose_imported_bone("left_arm", gait * stride + talk)
+		_pose_imported_bone("right_arm", -gait * stride - talk)
+		_pose_imported_bone("left_forearm", -0.12 - maxf(0.0, gait * stride) * 0.22)
+		_pose_imported_bone("right_forearm", -0.12 - maxf(0.0, -gait * stride) * 0.22)
+		_pose_imported_bone("left_leg", -gait * stride * 1.15)
+		_pose_imported_bone("right_leg", gait * stride * 1.15)
+		_pose_imported_bone("left_knee", maxf(0.0, gait * stride) * 0.42)
+		_pose_imported_bone("right_knee", maxf(0.0, -gait * stride) * 0.42)
+		_pose_imported_bone("head", sin(idle_phase * 0.7 + float(personal_seed)) * 0.025)
 	if is_instance_valid(visual_root):
 		var bob := absf(sin(clock)) * 0.012 if moving else sin(idle_phase * 1.35 + float(personal_seed)) * 0.004
 		visual_root.position.y = lerpf(visual_root.position.y, bob, delta * 4.0)

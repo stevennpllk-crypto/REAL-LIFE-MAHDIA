@@ -53,6 +53,13 @@ if [[ "$player_ready" != "true" ]]; then
   exit 1
 fi
 
+# Confirm the player itself uses the imported human asset, not the old blocky fallback.
+if ! adb logcat -d | grep -q "MAHDIA_PLAYER_IMPORTED=1"; then
+  echo "Imported human player model was not confirmed in the Android runtime."
+  adb logcat -d | grep "MAHDIA_PLAYER_" | tail -n 40 || true
+  exit 1
+fi
+
 scene_ready=false
 for attempt in $(seq 1 48); do
   if adb logcat -d | grep -q "MAHDIA_WORLD_READY"; then

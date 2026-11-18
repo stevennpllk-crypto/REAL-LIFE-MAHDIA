@@ -19,6 +19,9 @@ var interact_requested := false
 var camera_pivot: Node3D
 var camera: Camera3D
 var visual_root: Node3D
+var imported_player_skeleton: Skeleton3D
+var imported_player_bones: Dictionary = {}
+var imported_player_loaded := false
 var left_arm: Node3D
 var right_arm: Node3D
 var left_leg: Node3D
@@ -44,7 +47,8 @@ func _ready() -> void:
 	_add_action("jump", KEY_SPACE)
 	_add_action("interact", KEY_E)
 	if build_visuals:
-		_build_human_figure()
+		if not _build_imported_player_character():
+			_build_human_figure()
 	var collider := CollisionShape3D.new()
 	var shape := CapsuleShape3D.new()
 	shape.radius = 0.31
@@ -66,6 +70,62 @@ func _ready() -> void:
 	camera_pivot.add_child(camera)
 	if not OS.has_feature("mobile"):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _build_imported_player_character() -> bool:
+	var model_path := "res://assets/characters/male-adult-01.glb"
+	if not ResourceLoader.exists(model_path):
+		return false
+	var packed_model := ResourceLoader.load(model_path) as PackedScene
+	if packed_model == null:
+		push_warning("Could not load imported player character")
+		return false
+	visual_root = Node3D.new()
+	visual_root.name = "ImportedPlayerVisual"
+	add_child(visual_root)
+	var model_instance := packed_model.instantiate()
+	model_instance.name = "ImportedPlayerHuman"
+	visual_root.add_child(model_instance)
+	visual_root.scale = Vector3.ONE * 0.94
+	var skeleton_nodes := model_instance.find_children("*", "Skeleton3D", true, false)
+	if not skeleton_nodes.is_empty():
+		imported_player_skeleton = skeleton_nodes[0] as Skeleton3D
+		_cache_imported_player_bones()
+	imported_player_loaded = true
+	print("MAHDIA_PLAYER_IMPORTED=1 mapped_bones=", imported_player_bones.size())
+	return true
+
+
+func _cache_imported_player_bones() -> void:
+	imported_player_bones.clear()
+	if not is_instance_valid(imported_player_skeleton):
+		return
+	for bone_index in range(imported_player_skeleton.get_bone_count()):
+		var bone_name := imported_player_skeleton.get_bone_name(bone_index).to_lower().replace("mixamorig:", "").replace("_", "").replace(" ", "")
+		if bone_name.ends_with("leftarm") and not bone_name.contains("fore"):
+			imported_player_bones["left_arm"] = bone_index
+		elif bone_name.ends_with("rightarm") and not bone_name.contains("fore"):
+			imported_player_bones["right_arm"] = bone_index
+		elif bone_name.ends_with("leftforearm"):
+			imported_player_bones["left_forearm"] = bone_index
+		elif bone_name.ends_with("rightforearm"):
+			imported_player_bones["right_forearm"] = bone_index
+		elif bone_name.ends_with("leftupleg"):
+			imported_player_bones["left_leg"] = bone_index
+		elif bone_name.ends_with("rightupleg"):
+			imported_player_bones["right_leg"] = bone_index
+		elif bone_name.ends_with("leftleg"):
+			imported_player_bones["left_knee"] = bone_index
+		elif bone_name.ends_with("rightleg"):
+			imported_player_bones["right_knee"] = bone_index
+		elif bone_name.ends_with("head"):
+			imported_player_bones["head"] = bone_index
+
+
+func _pose_imported_player_bone(key: String, angle: float) -> void:
+	if not is_instance_valid(imported_player_skeleton) or not imported_player_bones.has(key):
+		return
+	imported_player_skeleton.set_bone_pose_rotation(int(imported_player_bones[key]), Quaternion(Vector3.RIGHT, angle))
+
 
 func _mat(color: Color, roughness := 0.82) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -334,8 +394,50 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_animate_figure(delta, moving and is_on_floor(), speed)
 
+func _animate_imported_player(delta: float, moving: bool, speed: float) -> void:
+	if attack_time > 0.0:
+		_pose_imported_player_bone("right_arm", -1.05)
+		_pose_imported_player_bone("left_arm", -0.18)
+	elif moving:
+		animation_clock += delta * (10.0 if running or Input.is_action_pressed("run") else 6.2)
+		gait_intensity = move_toward(gait_intensity, 1.0, delta * 3.5)
+		var actual_speed := Vector2(velocity.x, velocity.z).length()
+		var gait_scale := clampf(actual_speed / maxf(speed, 0.1), 0.35, 1.0)
+		var swing := sin(animation_clock) * 0.46 * gait_intensity * gait_scale
+		_pose_imported_player_bone("left_arm", swing)
+		_pose_imported_player_bone("right_arm", -swing)
+		_pose_imported_player_bone("left_forearm", -0.10 - maxf(0.0, swing) * 0.18)
+		_pose_imported_player_bone("right_forearm", -0.10 - maxf(0.0, -swing) * 0.18)
+		_pose_imported_player_bone("left_leg", -swing * (1.0 if not is_swimming else 0.28))
+		_pose_imported_player_bone("right_leg", swing * (1.0 if not is_swimming else 0.28))
+		_pose_imported_player_bone("left_knee", maxf(0.0, swing) * 0.42)
+		_pose_imported_player_bone("right_knee", maxf(0.0, -swing) * 0.42)
+	else:
+		gait_intensity = move_toward(gait_intensity, 0.0, delta * 5.0)
+		idle_clock += delta
+		var breath := sin(idle_clock * 1.35) * 0.018
+		_pose_imported_player_bone("left_arm", breath)
+		_pose_imported_player_bone("right_arm", breath)
+		_pose_imported_player_bone("left_forearm", -0.04)
+		_pose_imported_player_bone("right_forearm", -0.04)
+		_pose_imported_player_bone("left_leg", 0.0)
+		_pose_imported_player_bone("right_leg", 0.0)
+		_pose_imported_player_bone("left_knee", 0.0)
+		_pose_imported_player_bone("right_knee", 0.0)
+		_pose_imported_player_bone("head", sin(idle_clock * 0.7) * 0.018)
+	var run_lean := -0.055 if running else -0.018
+	var swim_lean := 0.20 if is_swimming else 0.0
+	var crouch_lean := 0.13 if crouching else 0.0
+	visual_root.rotation.x = lerpf(visual_root.rotation.x, run_lean + swim_lean + crouch_lean, delta * 5.0)
+	visual_root.scale.y = lerpf(visual_root.scale.y, 0.84 if crouching else 1.0, delta * 6.0)
+	visual_root.position.y = lerpf(visual_root.position.y, 0.0 if moving else sin(idle_clock * 1.35) * 0.006, delta * 6.0)
+
+
 func _animate_figure(delta: float, moving: bool, speed: float) -> void:
 	if not is_instance_valid(visual_root):
+		return
+	if imported_player_loaded:
+		_animate_imported_player(delta, moving, speed)
 		return
 	if attack_time > 0.0:
 		right_arm.rotation.x = lerpf(right_arm.rotation.x, -1.45, delta * 16.0)
