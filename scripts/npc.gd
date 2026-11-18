@@ -1027,6 +1027,23 @@ func _cache_imported_bones() -> void:
 			imported_bones["left_knee"] = bone_index
 		elif bone_name.contains("rcalf") or bone_name.ends_with("rightleg"):
 			imported_bones["right_knee"] = bone_index
+		elif bone_name.contains("lclavicle"):
+			imported_bones["left_clavicle"] = bone_index
+		elif bone_name.contains("rclavicle"):
+			imported_bones["right_clavicle"] = bone_index
+		elif bone_name.contains("lhand") or bone_name.ends_with("lefthand"):
+			imported_bones["left_hand"] = bone_index
+		elif bone_name.contains("rhand") or bone_name.ends_with("righthand"):
+			imported_bones["right_hand"] = bone_index
+		elif bone_name.contains("lfoot") or bone_name.ends_with("leftfoot"):
+			imported_bones["left_foot"] = bone_index
+		elif bone_name.contains("rfoot") or bone_name.ends_with("rightfoot"):
+			imported_bones["right_foot"] = bone_index
+		elif bone_name.ends_with("spine1") or bone_name.ends_with("spine2"):
+			if not imported_bones.has("spine"):
+				imported_bones["spine"] = bone_index
+		elif bone_name.ends_with("neck"):
+			imported_bones["neck"] = bone_index
 		elif bone_name.ends_with("head"):
 			imported_bones["head"] = bone_index
 
@@ -1044,9 +1061,15 @@ func _pose_imported_bone(key: String, angle: float) -> void:
 		var swing_axis := (inverse_rest * Vector3.UP).normalized()
 		var drop_angle := 1.08 if key == "left_arm" else -1.08
 		pose_rotation = Quaternion(drop_axis, drop_angle) * Quaternion(swing_axis, angle)
-	elif key == "head":
+	elif key == "head" or key == "neck":
 		var head_axis := (inverse_rest * Vector3.UP).normalized()
 		pose_rotation = Quaternion(head_axis, angle)
+	elif key == "spine":
+		var spine_axis := (inverse_rest * Vector3.FORWARD).normalized()
+		pose_rotation = Quaternion(spine_axis, angle)
+	elif key.ends_with("clavicle"):
+		var clavicle_axis := (inverse_rest * Vector3.BACK).normalized()
+		pose_rotation = Quaternion(clavicle_axis, angle)
 	else:
 		var limb_axis := (inverse_rest * Vector3.RIGHT).normalized()
 		pose_rotation = Quaternion(limb_axis, angle)
@@ -1067,16 +1090,27 @@ func _animate_imported_character(delta: float, moving: bool, pace: float, conver
 	elif is_instance_valid(imported_skeleton):
 		var gait := sin(clock * (4.8 + pace * 1.2))
 		var stride := 0.42 if moving else 0.0
-		var talk := sin(idle_phase * 3.4 + float(personal_seed)) * (0.13 if conversational else 0.025)
-		_pose_imported_bone("left_arm", gait * stride + talk)
-		_pose_imported_bone("right_arm", -gait * stride - talk)
-		_pose_imported_bone("left_forearm", -0.12 - maxf(0.0, gait * stride) * 0.22)
-		_pose_imported_bone("right_forearm", -0.12 - maxf(0.0, -gait * stride) * 0.22)
+		var personal_phase := float(personal_seed) * 0.73
+		var talk := sin(idle_phase * 3.4 + personal_phase) * (0.13 if conversational else 0.025)
+		var breathing := sin(idle_phase * 1.65 + personal_phase) * 0.018
+		var shoulder_sway := sin(clock * 0.5 + personal_phase) * (0.035 if moving else 0.012)
+		_pose_imported_bone("left_clavicle", shoulder_sway + talk * 0.16)
+		_pose_imported_bone("right_clavicle", -shoulder_sway - talk * 0.16)
+		_pose_imported_bone("spine", breathing + (sin(clock) * 0.035 if moving else 0.0))
+		_pose_imported_bone("neck", sin(idle_phase * 0.62 + personal_phase) * 0.018)
+		_pose_imported_bone("left_arm", gait * stride + talk + shoulder_sway)
+		_pose_imported_bone("right_arm", -gait * stride - talk - shoulder_sway)
+		_pose_imported_bone("left_forearm", -0.12 - maxf(0.0, gait * stride) * 0.22 + (0.12 if conversational else 0.0))
+		_pose_imported_bone("right_forearm", -0.12 - maxf(0.0, -gait * stride) * 0.22 - (0.12 if conversational else 0.0))
+		_pose_imported_bone("left_hand", sin(clock * 1.1 + personal_phase) * (0.08 if moving else 0.025))
+		_pose_imported_bone("right_hand", -sin(clock * 1.1 + personal_phase) * (0.08 if moving else 0.025))
 		_pose_imported_bone("left_leg", -gait * stride * 1.15)
 		_pose_imported_bone("right_leg", gait * stride * 1.15)
 		_pose_imported_bone("left_knee", maxf(0.0, gait * stride) * 0.42)
 		_pose_imported_bone("right_knee", maxf(0.0, -gait * stride) * 0.42)
-		_pose_imported_bone("head", sin(idle_phase * 0.7 + float(personal_seed)) * 0.025)
+		_pose_imported_bone("left_foot", -maxf(0.0, gait * stride) * 0.18)
+		_pose_imported_bone("right_foot", -maxf(0.0, -gait * stride) * 0.18)
+		_pose_imported_bone("head", sin(idle_phase * 0.7 + personal_phase) * 0.025)
 	if moving and not imported_gait_verified and clock >= 0.35:
 		imported_gait_verified = true
 		var gait_mode := "animation_player" if has_clips else "procedural_bones"
