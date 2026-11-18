@@ -730,29 +730,31 @@ func _build_hud() -> void:
 	send_button.pressed.connect(_on_chat_send_pressed)
 	chat_row.add_child(send_button)
 
-	var ai_config_button := Button.new()
-	ai_config_button.text = "إعداد الذكاء"
-	ai_config_button.anchor_left = 1.0
-	ai_config_button.anchor_right = 1.0
-	ai_config_button.offset_left = -170
-	ai_config_button.offset_right = -16
-	ai_config_button.offset_top = 72
-	ai_config_button.offset_bottom = 116
-	ai_config_button.pressed.connect(_toggle_ai_setup)
-	layer.add_child(ai_config_button)
-
-	# Expose real backend/model readiness instead of silently losing service signals.
+	# Compact connection row: keep backend diagnostics out of the playable view.
+	var ai_row_panel := PanelContainer.new()
+	ai_row_panel.anchor_left = 1.0
+	ai_row_panel.anchor_right = 1.0
+	ai_row_panel.offset_left = -286
+	ai_row_panel.offset_right = -16
+	ai_row_panel.offset_top = 86
+	ai_row_panel.offset_bottom = 124
+	layer.add_child(ai_row_panel)
+	var ai_row := HBoxContainer.new()
+	ai_row_panel.add_child(ai_row)
 	ai_status_label = Label.new()
-	ai_status_label.text = "JASSIM AI: جارٍ فحص الخادم..."
+	ai_status_label.text = "○ JASSIM AI: جارٍ الفحص"
 	ai_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	ai_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	ai_status_label.anchor_left = 1.0
-	ai_status_label.anchor_right = 1.0
-	ai_status_label.offset_left = -340
-	ai_status_label.offset_right = -16
-	ai_status_label.offset_top = 122
-	ai_status_label.offset_bottom = 166
-	layer.add_child(ai_status_label)
+	ai_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ai_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ai_status_label.clip_text = true
+	ai_status_label.add_theme_font_size_override("font_size", 13)
+	ai_row.add_child(ai_status_label)
+	var ai_config_button := Button.new()
+	ai_config_button.text = "⚙"
+	ai_config_button.custom_minimum_size = Vector2(40, 34)
+	ai_config_button.tooltip_text = "إعداد الذكاء الاصطناعي"
+	ai_config_button.pressed.connect(_toggle_ai_setup)
+	ai_row.add_child(ai_config_button)
 
 	ai_setup_panel = PanelContainer.new()
 	ai_setup_panel.anchor_left = 0.5
@@ -956,7 +958,12 @@ func _build_reference_hud(layer: CanvasLayer) -> void:
 func _on_ai_connection_status(ready: bool, message: String) -> void:
 	if not is_instance_valid(ai_status_label):
 		return
-	ai_status_label.text = ("● " if ready else "○ ") + "JASSIM AI: " + message
+	var compact_status := "JASSIM AI: متصل" if ready else "JASSIM AI: غير متصل"
+	if not ready and (message.contains("فحص") or message.contains("جارٍ")):
+		compact_status = "JASSIM AI: جارٍ الفحص"
+	ai_status_label.text = ("● " if ready else "○ ") + compact_status
+	# Preserve the complete diagnostic without drawing a long line across the world.
+	ai_status_label.tooltip_text = message
 	ai_status_label.add_theme_color_override("font_color", Color(0.35, 0.92, 0.55) if ready else Color(1.0, 0.72, 0.38))
 
 func _on_chat_submitted(value: String) -> void:
