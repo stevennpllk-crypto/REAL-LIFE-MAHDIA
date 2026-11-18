@@ -97,7 +97,11 @@ func _build_imported_character() -> bool:
 		if is_instance_valid(imported_animation_player):
 			for animation_name in imported_animation_player.get_animation_list():
 				animation_names.append(str(animation_name))
-		print("MAHDIA_IMPORTED_MODEL: ", model_path, " animations=", animation_names, " mapped_bones=", imported_bones.size())
+		var rig_names: Array[String] = []
+		if is_instance_valid(imported_skeleton):
+			for bone_index in range(imported_skeleton.get_bone_count()):
+				rig_names.append(imported_skeleton.get_bone_name(bone_index))
+		print("MAHDIA_IMPORTED_MODEL: ", model_path, " animations=", animation_names, " mapped_bones=", imported_bones.size(), " bone_names=", rig_names)
 		_play_imported_animation("idle")
 		return true
 	return false

@@ -662,8 +662,9 @@ func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	var panel := PanelContainer.new()
-	panel.position = Vector2(16, 14)
-	panel.custom_minimum_size = Vector2(470, 62)
+	# Keep the compass clear and reserve the top-right for quality/AI status.
+	panel.position = Vector2(172, 14)
+	panel.custom_minimum_size = Vector2(300, 54)
 	layer.add_child(panel)
 	status_label = Label.new()
 	status_label.text = "MAHDIA • 08:00 • Prototype"
@@ -682,8 +683,11 @@ func _build_hud() -> void:
 	layer.add_child(quality_button)
 	_apply_graphics_quality()
 	hint_label = Label.new()
-	hint_label.text = "عصا اللمس للحركة • اسحب يمين الشاشة للكاميرا • جري • قفز • مراوغة • انحناء • تفاعل"
-	hint_label.position = Vector2(16, 78)
+	hint_label.text = "الحركة: العصا اليسرى • الكاميرا: اسحب يمين الشاشة"
+	hint_label.position = Vector2(172, 72)
+	hint_label.custom_minimum_size = Vector2(390, 34)
+	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint_label.add_theme_font_size_override("font_size", 15)
 	layer.add_child(hint_label)
 	var message_panel := PanelContainer.new()
 	# Keep the message strip in the central safe zone: mobile action buttons

@@ -98,7 +98,11 @@ func _build_imported_player_character() -> bool:
 		imported_player_skeleton = skeleton_nodes[0] as Skeleton3D
 		_cache_imported_player_bones()
 	imported_player_loaded = true
-	print("MAHDIA_PLAYER_IMPORTED=1 mapped_bones=", imported_player_bones.size())
+	var rig_names: Array[String] = []
+	if is_instance_valid(imported_player_skeleton):
+		for bone_index in range(imported_player_skeleton.get_bone_count()):
+			rig_names.append(imported_player_skeleton.get_bone_name(bone_index))
+	print("MAHDIA_PLAYER_IMPORTED=1 mapped_bones=", imported_player_bones.size(), " bone_names=", rig_names)
 	return true
 
 
