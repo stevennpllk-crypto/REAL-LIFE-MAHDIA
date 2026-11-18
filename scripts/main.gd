@@ -267,7 +267,7 @@ func _build_environment() -> void:
 	sea_material.roughness = 0.24
 	sea_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	sea.material_override = sea_material
-	_box(self, Vector3(180, 0.18, 5), Vector3(0, 0.04, -57), Color(0.82, 0.76, 0.64))
+	_textured_box(self, Vector3(180, 0.18, 5.5), Vector3(0, 0.04, -57), Color(0.88, 0.84, 0.75), "stone", Vector3(1.0, 42.0, 1.0))
 	_create_coastal_scenery()
 	_create_waterfront_district()
 	_create_beach_cafe()
@@ -416,9 +416,20 @@ func _create_beach_cafe() -> void:
 func _create_borj_el_kebir_landmark() -> void:
 	var stone := Color(0.69, 0.62, 0.49)
 	var pale := Color(0.82, 0.75, 0.62)
-	_box(self, Vector3(19.0, 7.0, 1.25), Vector3(37.0, 3.5, -51.0), stone)
-	_box(self, Vector3(1.25, 7.0, 10.0), Vector3(28.2, 3.5, -56.0), stone)
-	_box(self, Vector3(1.25, 7.0, 10.0), Vector3(45.8, 3.5, -56.0), stone)
+	var fortress_material := StandardMaterial3D.new()
+	fortress_material.albedo_color = stone
+	var fortress_diffuse := _pbr_texture("cobblestone_pavement", "diff")
+	if fortress_diffuse != null:
+		fortress_material.albedo_texture = fortress_diffuse
+		_apply_pbr_maps(fortress_material, "cobblestone_pavement")
+	fortress_material.uv1_scale = Vector3(3.0, 1.0, 1.0)
+	fortress_material.roughness = 0.94
+	var main_wall := _box(self, Vector3(19.0, 7.0, 1.25), Vector3(37.0, 3.5, -51.0), stone)
+	main_wall.material_override = fortress_material
+	var west_wall := _box(self, Vector3(1.25, 7.0, 10.0), Vector3(28.2, 3.5, -56.0), stone)
+	west_wall.material_override = fortress_material
+	var east_wall := _box(self, Vector3(1.25, 7.0, 10.0), Vector3(45.8, 3.5, -56.0), stone)
+	east_wall.material_override = fortress_material
 	_box(self, Vector3(3.0, 3.8, 0.12), Vector3(37.0, 1.9, -50.32), Color(0.12, 0.11, 0.10))
 	_box(self, Vector3(4.2, 0.55, 0.42), Vector3(37.0, 4.0, -50.15), pale)
 	# Carved horizontal masonry courses and parapet teeth give the fortress a stone silhouette.
@@ -443,7 +454,7 @@ func _create_borj_el_kebir_landmark() -> void:
 		mesh.radial_segments = 16
 		tower.mesh = mesh
 		tower.position = Vector3(x, mesh.height * 0.5, -54.0)
-		tower.material_override = _material(stone)
+		tower.material_override = fortress_material
 		add_child(tower)
 		for j in range(12):
 			var a := TAU * float(j) / 12.0
