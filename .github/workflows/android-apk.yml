@@ -156,8 +156,13 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Select Mobile Vulkan APK for emulator rendering test
-        run: cp build/REAL_LIFE_MAHDIA-mobile.apk build/REAL_LIFE_MAHDIA-debug.apk
+      - name: Keep GLES Compatibility APK for emulator smoke test
+        run: |
+          set -euxo pipefail
+          test -s build/REAL_LIFE_MAHDIA-debug.apk
+          file build/REAL_LIFE_MAHDIA-debug.apk
+          # The cloud emulator smoke test uses the GLES Compatibility APK.
+          # Keep the separate Vulkan APK as an independently downloadable build.
 
       - name: Prepare KVM and ADB for emulator
         run: |
