@@ -50,7 +50,7 @@ var level_label: Label
 var chat_row: HBoxContainer
 var mission_hud_panel: PanelContainer
 const START_PLAYER_POSITION := Vector3(68.0, 0.03, -46.0)
-const START_PLAYER_ROTATION := PI * 0.5 + 0.22
+const START_PLAYER_ROTATION := PI * 0.5 - 0.25
 const START_VEHICLE_POSITION := Vector3(58.0, 0.1, -43.5)
 const AUTOSAVE_INTERVAL := 12.0
 const WORLD_SAVE_KEY := "mahdia_world"
