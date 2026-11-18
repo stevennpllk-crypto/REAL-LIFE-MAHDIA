@@ -815,10 +815,11 @@ func _avoid_obstacle(direction: Vector3, delta: float) -> Vector3:
 func _avoid_resident_crowding(direction: Vector3) -> Vector3:
 	if direction.length_squared() < 0.01:
 		return direction
-	# A short staggered scan keeps pedestrians from clipping through one another
-	# without adding physics bodies, navigation meshes, or per-frame raycasts.
+	# Spread resident scans across time: identical intervals made every NPC
+	# query the full resident group on the same physics frame.
 	crowd_check_elapsed += get_physics_process_delta_time()
-	if crowd_check_elapsed < 0.30:
+	var scan_interval := 0.30 + float(posmod(personal_seed, 6)) * 0.035
+	if crowd_check_elapsed < scan_interval:
 		return direction
 	crowd_check_elapsed = 0.0
 	var separation := Vector3.ZERO
