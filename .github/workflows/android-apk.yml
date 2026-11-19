@@ -5,6 +5,11 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Keep only the newest build for main; stale runs waste emulator minutes.
+concurrency:
+  group: mahdia-android-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -15,6 +20,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Cache resident models and PBR textures
+        id: assets-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            assets/characters
+            assets/textures
+          key: mahdia-assets-v1-${{ runner.os }}
+
+      - name: Cache Godot 4.3 export templates
+        id: templates-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot/export_templates/4.3.stable
+          key: mahdia-godot-4.3-templates-v1-${{ runner.os }}
+
+      - name: Cache glTF Transform npm packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: mahdia-gltf-transform-npm-v1-${{ runner.os }}
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -27,8 +54,12 @@ jobs:
           SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
-          yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses || true
-          "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest" "cmake;3.10.2.4988404" "ndk;23.2.8568313"
+          if [[ ! -x "$SDK_ROOT/platform-tools/adb" || ! -d "$SDK_ROOT/platforms/android-34" || ! -d "$SDK_ROOT/build-tools/34.0.0" || ! -d "$SDK_ROOT/cmake/3.10.2.4988404" || ! -d "$SDK_ROOT/ndk/23.2.8568313" ]]; then
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+            "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest" "cmake;3.10.2.4988404" "ndk;23.2.8568313"
+          else
+            echo "Android SDK components already installed; skipping sdkmanager downloads."
+          fi
 
       - name: Set up Godot 4.3
         uses: chickensoft-games/setup-godot@v2
@@ -37,6 +68,7 @@ jobs:
           use-dotnet: false
 
       - name: Install Godot export templates
+        if: steps.templates-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
           curl -L --fail --retry 3 https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz -o /tmp/godot-templates.tpz
@@ -44,6 +76,7 @@ jobs:
           cp /tmp/godot-templates/templates/* "$HOME/.local/share/godot/export_templates/4.3.stable/"
 
       - name: Download licensed rigged resident characters
+        if: steps.assets-cache.outputs.cache-hit != 'true'
         run: |
           set -euxo pipefail
           mkdir -p assets/characters
@@ -57,6 +90,7 @@ jobs:
       # Godot 4.3 does not import the source models' meshopt/quantized
       # geometry extensions. Decode meshopt and restore float attributes first.
       - name: Convert resident GLBs to Godot-compatible geometry
+        if: steps.assets-cache.outputs.cache-hit != 'true'
         run: |
           set -euxo pipefail
           npm install --global @gltf-transform/cli
@@ -71,6 +105,7 @@ jobs:
 
 
       - name: Download CC0 PBR textures for Mahdia streets and facades
+        if: steps.assets-cache.outputs.cache-hit != 'true'
         run: |
           set -euxo pipefail
           mkdir -p assets/textures
@@ -82,6 +117,14 @@ jobs:
             test -s "assets/textures/${asset}_diff_1k.jpg"
           done
           du -h assets/textures/*
+
+      - name: Verify cached and downloaded visual assets
+        run: |
+          set -euxo pipefail
+          test "$(find assets/characters -maxdepth 1 -name '*.glb' -type f | wc -l)" -eq 4
+          test -s assets/textures/plastered_wall_diff_1k.jpg
+          test -s assets/textures/cobblestone_pavement_diff_1k.jpg
+          du -h assets/characters/*.glb assets/textures/*
 
       - name: Configure Godot Android export paths
         run: |
@@ -190,10 +233,10 @@ jobs:
           profile: pixel_2
           ram-size: 1536M
           heap-size: 384M
-          emulator-boot-timeout: 900
+          emulator-boot-timeout: 300
           disable-linux-hw-accel: false
           # Prefer KVM when the runner exposes it; SwiftShader remains the graphics backend.
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-metrics
           disable-animations: true
           script: bash .github/scripts/android-emulator-smoke-test.sh
 
