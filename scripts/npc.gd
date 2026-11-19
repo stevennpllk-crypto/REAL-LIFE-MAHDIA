@@ -297,7 +297,9 @@ func _mat(color: Color) -> StandardMaterial3D:
 func _build_character() -> void:
 	# Prefer textured, rigged human GLBs when the Android build pipeline has
 	# supplied them. Keep the procedural resident as a safe offline fallback.
-	if _build_imported_character():
+	# Beach residents use the procedural rig so their swimwear is visible;
+	# imported street outfits remain unchanged for other residents.
+	if occupation != "beachgoer" and occupation != "swimmer" and _build_imported_character():
 		return
 	visual_root = Node3D.new()
 	visual_root.name = "ResidentVisual"
