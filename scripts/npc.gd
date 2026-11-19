@@ -1091,7 +1091,10 @@ func _animate_imported_character(delta: float, moving: bool, pace: float, conver
 			imported_animation_player.speed_scale = clampf(pace / maxf(walk_speed, 0.1), 0.72, 1.28)
 	elif is_instance_valid(imported_skeleton):
 		var gait := sin(clock * (4.8 + pace * 1.2))
+		# Keep leg stride and arm counter-swing independent: real walkers use
+		# a shorter, softer arm arc than their leg stride.
 		var stride := 0.42 if moving else 0.0
+		var arm_swing := 0.24 if moving else 0.0
 		var personal_phase := float(personal_seed) * 0.73
 		var talk := sin(idle_phase * 3.4 + personal_phase) * (0.13 if conversational else 0.025)
 		var breathing := sin(idle_phase * 1.65 + personal_phase) * 0.018
@@ -1100,10 +1103,10 @@ func _animate_imported_character(delta: float, moving: bool, pace: float, conver
 		_pose_imported_bone("right_clavicle", -shoulder_sway - talk * 0.16)
 		_pose_imported_bone("spine", breathing + (sin(clock) * 0.035 if moving else 0.0))
 		_pose_imported_bone("neck", sin(idle_phase * 0.62 + personal_phase) * 0.018)
-		_pose_imported_bone("left_arm", gait * stride + talk + shoulder_sway)
-		_pose_imported_bone("right_arm", -gait * stride - talk - shoulder_sway)
-		_pose_imported_bone("left_forearm", -0.12 - maxf(0.0, gait * stride) * 0.22 + (0.12 if conversational else 0.0))
-		_pose_imported_bone("right_forearm", -0.12 - maxf(0.0, -gait * stride) * 0.22 - (0.12 if conversational else 0.0))
+		_pose_imported_bone("left_arm", gait * arm_swing + talk + shoulder_sway)
+		_pose_imported_bone("right_arm", -gait * arm_swing - talk - shoulder_sway)
+		_pose_imported_bone("left_forearm", -0.10 - maxf(0.0, gait * arm_swing) * 0.16 + (0.12 if conversational else 0.0))
+		_pose_imported_bone("right_forearm", -0.10 - maxf(0.0, -gait * arm_swing) * 0.16 - (0.12 if conversational else 0.0))
 		_pose_imported_bone("left_hand", sin(clock * 1.1 + personal_phase) * (0.08 if moving else 0.025))
 		_pose_imported_bone("right_hand", -sin(clock * 1.1 + personal_phase) * (0.08 if moving else 0.025))
 		_pose_imported_bone("left_leg", -gait * stride * 1.15)
