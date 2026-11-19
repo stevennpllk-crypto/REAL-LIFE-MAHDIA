@@ -305,7 +305,10 @@ func _build_character() -> void:
 	var palette := [Color(0.72, 0.25, 0.16), Color(0.12, 0.42, 0.36), Color(0.82, 0.62, 0.18), Color(0.24, 0.34, 0.62), Color(0.62, 0.35, 0.22), Color(0.42, 0.30, 0.58), Color(0.78, 0.72, 0.58), Color(0.12, 0.22, 0.28)]
 	var skin_palette := [Color(0.48, 0.30, 0.21), Color(0.60, 0.39, 0.28), Color(0.69, 0.48, 0.35), Color(0.76, 0.56, 0.42), Color(0.55, 0.35, 0.25)]
 	var hair_palette := [Color(0.045, 0.035, 0.03), Color(0.13, 0.075, 0.045), Color(0.22, 0.15, 0.09), Color(0.34, 0.25, 0.16)]
+	var is_beachgoer := occupation == "beachgoer" or occupation == "swimmer"
 	var shirt: Color = palette[posmod(personal_seed, palette.size())]
+	if is_beachgoer:
+		shirt = [Color(0.04, 0.32, 0.58), Color(0.78, 0.18, 0.30), Color(0.92, 0.72, 0.16), Color(0.08, 0.42, 0.34)][posmod(personal_seed, 4)]
 	var skin: Color = skin_palette[posmod(personal_seed * 3 + 1, skin_palette.size())]
 	character_skin = skin
 	var hair: Color = hair_palette[posmod(personal_seed * 5 + 2, hair_palette.size())]
@@ -325,13 +328,18 @@ func _build_character() -> void:
 	shoulder_mesh.scale = Vector3(1.22, 0.78, 0.92)
 	_part(_torus(0.105, 0.025), Vector3(0, 1.56, -0.005), shirt.darkened(0.18))
 	_part(_capsule(0.045, 0.16), Vector3(0, 1.49, -0.19), shirt.lightened(0.16))
-	# Layered everyday clothing: collar, placket, hem, seams and pockets.
-	_part(_torus(0.205, 0.018), Vector3(0, 1.55, 0), shirt.lightened(0.24))
-	_part(_capsule(0.012, 0.30), Vector3(0, 1.25, -0.245), shirt.darkened(0.12))
-	for button_index in range(3):
-		_part(_sphere(0.009, 0.009), Vector3(0, 1.34 - float(button_index) * 0.075, -0.257), Color(0.78, 0.70, 0.52))
-	_part(_box_mesh(Vector3(0.105, 0.12, 0.012)), Vector3(-0.15, 1.29, -0.245), shirt.darkened(0.10))
-	_part(_box_mesh(Vector3(0.105, 0.12, 0.012)), Vector3(0.15, 1.29, -0.245), shirt.darkened(0.10))
+	if is_beachgoer:
+		# Family-friendly beach outfit: sleeveless swim top and knee-length trunks.
+		_part(_torus(0.205, 0.018), Vector3(0, 1.55, 0), shirt.lightened(0.18))
+		_part(_box_mesh(Vector3(0.38, 0.13, 0.035)), Vector3(0, 1.02, -0.205), shirt.darkened(0.12))
+	else:
+		# Layered everyday clothing: collar, placket, hem, seams and pockets.
+		_part(_torus(0.205, 0.018), Vector3(0, 1.55, 0), shirt.lightened(0.24))
+		_part(_capsule(0.012, 0.30), Vector3(0, 1.25, -0.245), shirt.darkened(0.12))
+		for button_index in range(3):
+			_part(_sphere(0.009, 0.009), Vector3(0, 1.34 - float(button_index) * 0.075, -0.257), Color(0.78, 0.70, 0.52))
+		_part(_box_mesh(Vector3(0.105, 0.12, 0.012)), Vector3(-0.15, 1.29, -0.245), shirt.darkened(0.10))
+		_part(_box_mesh(Vector3(0.105, 0.12, 0.012)), Vector3(0.15, 1.29, -0.245), shirt.darkened(0.10))
 	head_visual = get_node_or_null("ResidentVisual/HeadPivot") as Node3D
 	if not is_instance_valid(head_visual):
 		head_visual = Node3D.new()
@@ -402,10 +410,12 @@ func _build_character() -> void:
 		_part(_sphere(0.082, 0.12), Vector3(foot_x, 0.12, -0.135), Color(0.075, 0.072, 0.068))
 	_part(_torus(0.105, 0.012), Vector3(0, 0.82, 0), Color(0.42, 0.34, 0.22))
 	_build_occupation_details()
-	left_arm = _limb(Vector3(-0.30, 1.43, 0), shirt, 0.62, 0.10)
-	right_arm = _limb(Vector3(0.30, 1.43, 0), shirt, 0.62, 0.10)
-	left_leg = _limb(Vector3(-0.14, 0.76, 0), Color(0.12, 0.14, 0.18), 0.72, 0.12)
-	right_leg = _limb(Vector3(0.14, 0.76, 0), Color(0.12, 0.14, 0.18), 0.72, 0.12)
+	var arm_color := character_skin if is_beachgoer else shirt
+	var leg_color := shirt if is_beachgoer else Color(0.12, 0.14, 0.18)
+	left_arm = _limb(Vector3(-0.30, 1.43, 0), arm_color, 0.62, 0.10)
+	right_arm = _limb(Vector3(0.30, 1.43, 0), arm_color, 0.62, 0.10)
+	left_leg = _limb(Vector3(-0.14, 0.76, 0), leg_color, 0.72, 0.12)
+	right_leg = _limb(Vector3(0.14, 0.76, 0), leg_color, 0.72, 0.12)
 
 func _torus(inner_radius: float, outer_radius: float) -> TorusMesh:
 	var mesh := TorusMesh.new()
@@ -440,6 +450,9 @@ func _build_occupation_details() -> void:
 		"driver":
 			_detail_box(details, Vector3(0.38, 0.10, 0.32), Vector3(0, 2.05, 0), Color(0.16, 0.20, 0.25))
 			_detail_box(details, Vector3(0.44, 0.06, 0.26), Vector3(0, 1.99, -0.06), Color(0.16, 0.20, 0.25))
+		"beachgoer", "swimmer":
+			_detail_box(details, Vector3(0.43, 0.28, 0.24), Vector3(0, 0.88, 0), Color(0.92, 0.82, 0.62))
+			_detail_box(details, Vector3(0.08, 0.035, 0.26), Vector3(0, 0.73, 0), Color(0.92, 0.82, 0.62))
 		_:
 			_detail_box(details, Vector3(0.42, 0.12, 0.30), Vector3(0, 1.66, 0), Color(0.78, 0.68, 0.48))
 
