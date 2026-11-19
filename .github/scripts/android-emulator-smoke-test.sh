@@ -14,7 +14,7 @@ echo "Waiting for ADB device..."
 adb wait-for-device
 echo "Waiting for Android boot and Package Manager..."
 package_ready=false
-for attempt in $(seq 1 180); do
+for attempt in $(seq 1 120); do
   boot_state="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
   package_state="$(adb shell service check package 2>&1 || true)"
   echo "Readiness attempt $attempt: boot=$boot_state; $package_state"
@@ -22,7 +22,7 @@ for attempt in $(seq 1 180); do
     package_ready=true
     break
   fi
-  sleep 5
+  sleep 2
 done
 
 if [[ "$package_ready" != "true" ]]; then
@@ -39,13 +39,13 @@ adb shell am start -W -n com.jassim.reallifemahdia/com.godot.game.GodotApp
 
 # Require the first playable frame before waiting for the complete city.
 player_ready=false
-for attempt in $(seq 1 24); do
+for attempt in $(seq 1 30); do
   if adb logcat -d | grep -q "MAHDIA_PLAYER_READY"; then
     player_ready=true
     echo "Playable player/camera/HUD initialized on attempt $attempt."
     break
   fi
-  sleep 5
+  sleep 2
 done
 if [[ "$player_ready" != "true" ]]; then
   echo "Player scene did not initialize. Recent Godot log:"
@@ -61,13 +61,13 @@ if ! adb logcat -d | grep -q "MAHDIA_PLAYER_IMPORTED=1"; then
 fi
 
 scene_ready=false
-for attempt in $(seq 1 48); do
+for attempt in $(seq 1 120); do
   if adb logcat -d | grep -q "MAHDIA_WORLD_READY"; then
     scene_ready=true
     echo "Main world scene reported ready on attempt $attempt."
     break
   fi
-  sleep 5
+  sleep 2
 done
 if [[ "$scene_ready" != "true" ]]; then
   echo "City scene did not finish initializing. Recent Godot log:"
@@ -86,14 +86,14 @@ adb logcat -d | grep 'MAHDIA_IMPORTED_' | tail -n 20
 
 # Require an imported resident to enter its gait animation path at runtime.
 gait_active=false
-for attempt in $(seq 1 24); do
+for attempt in $(seq 1 20); do
   if adb logcat -d | grep -q 'MAHDIA_IMPORTED_GAIT_ACTIVE'; then
     gait_active=true
     echo "Imported resident gait animation became active on attempt $attempt."
     adb logcat -d | grep 'MAHDIA_IMPORTED_GAIT_ACTIVE' | tail -n 8
     break
   fi
-  sleep 2
+  sleep 1
 done
 if [[ "$gait_active" != "true" ]]; then
   echo "No imported resident entered the runtime gait animation path."
