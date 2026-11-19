@@ -103,6 +103,7 @@ func _build_imported_player_character() -> bool:
 	if not skeleton_nodes.is_empty():
 		imported_player_skeleton = skeleton_nodes[0] as Skeleton3D
 		_cache_imported_player_bones()
+		_log_imported_player_orientation()
 	imported_player_loaded = true
 	var rig_names: Array[String] = []
 	if is_instance_valid(imported_player_skeleton):
@@ -110,6 +111,27 @@ func _build_imported_player_character() -> bool:
 			rig_names.append(imported_player_skeleton.get_bone_name(bone_index))
 	print("MAHDIA_PLAYER_IMPORTED=1 mapped_bones=", imported_player_bones.size(), " bone_names=", rig_names)
 	return true
+
+
+func _log_imported_player_orientation() -> void:
+	if not is_instance_valid(imported_player_skeleton):
+		print("MAHDIA_PLAYER_ORIENTATION=UNVERIFIED reason=no_skeleton")
+		return
+	var head_index := -1
+	var hips_index := -1
+	for bone_index in range(imported_player_skeleton.get_bone_count()):
+		var bone_name := imported_player_skeleton.get_bone_name(bone_index).to_lower().replace("mixamorig:", "").replace("_", "").replace(" ", "")
+		if bone_name.ends_with("head"):
+			head_index = bone_index
+		elif bone_name.contains("hips") or bone_name.contains("pelvis"):
+			hips_index = bone_index
+	if head_index < 0 or hips_index < 0:
+		print("MAHDIA_PLAYER_ORIENTATION=UNVERIFIED head_bone=", head_index, " hips_bone=", hips_index)
+		return
+	var head_y := imported_player_skeleton.get_bone_global_rest(head_index).origin.y
+	var hips_y := imported_player_skeleton.get_bone_global_rest(hips_index).origin.y
+	var orientation := "UPRIGHT" if head_y > hips_y + 0.05 else "INVERTED"
+	print("MAHDIA_PLAYER_ORIENTATION=", orientation, " head_y=", snappedf(head_y, 0.001), " hips_y=", snappedf(hips_y, 0.001))
 
 
 func _fit_imported_player_model(model_instance: Node3D) -> void:
