@@ -10,7 +10,7 @@ func _initialize() -> void:
 	call_deferred("_watch_test_timeout")
 
 func _watch_test_timeout() -> void:
-	await create_timer(120.0).timeout
+	await create_timer(60.0).timeout
 	if not test_completed:
 		push_error("Gameplay test timed out at stage: " + test_stage)
 		quit(124)
