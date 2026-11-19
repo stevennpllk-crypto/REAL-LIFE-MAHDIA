@@ -143,6 +143,11 @@ if ! grep -q 'com.jassim.reallifemahdia' <<< "$activity_state"; then
   exit 1
 fi
 
+# Dismiss Android's one-time immersive-mode confirmation so the evidence shows unobstructed gameplay.
+# The Pixel 6 landscape capture is 2400x1080; this targets the system dialog's Got it button.
+adb shell input tap 1310 385 >/dev/null 2>&1 || true
+sleep 1
+
 # Allow a few rendered frames after scene initialization before inspecting pixels.
 sleep 3
 adb shell screencap -p /sdcard/mahdia-emulator.png >/dev/null
