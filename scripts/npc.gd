@@ -307,7 +307,8 @@ func _build_character() -> void:
 	var palette := [Color(0.72, 0.25, 0.16), Color(0.12, 0.42, 0.36), Color(0.82, 0.62, 0.18), Color(0.24, 0.34, 0.62), Color(0.62, 0.35, 0.22), Color(0.42, 0.30, 0.58), Color(0.78, 0.72, 0.58), Color(0.12, 0.22, 0.28)]
 	var skin_palette := [Color(0.48, 0.30, 0.21), Color(0.60, 0.39, 0.28), Color(0.69, 0.48, 0.35), Color(0.76, 0.56, 0.42), Color(0.55, 0.35, 0.25)]
 	var hair_palette := [Color(0.045, 0.035, 0.03), Color(0.13, 0.075, 0.045), Color(0.22, 0.15, 0.09), Color(0.34, 0.25, 0.16)]
-	var is_beachgoer := occupation == "beachgoer" or occupation == "swimmer"
+	# Only explicitly adult beachgoers receive swimwear variants.
+	var is_beachgoer := (occupation == "beachgoer" or occupation == "swimmer") and is_adult
 	var shirt: Color = palette[posmod(personal_seed, palette.size())]
 	if is_beachgoer:
 		shirt = [Color(0.04, 0.32, 0.58), Color(0.78, 0.18, 0.30), Color(0.92, 0.72, 0.16), Color(0.08, 0.42, 0.34)][posmod(personal_seed, 4)]
@@ -323,17 +324,21 @@ func _build_character() -> void:
 	torso.bottom_radius = 0.275 * body_width
 	torso.height = 0.78
 	torso.radial_segments = 12
-	body_visual = _part(torso, Vector3(0, 1.18, 0), shirt)
+	body_visual = _part(torso, Vector3(0, 1.18, 0), skin if is_beachgoer else shirt)
 	# Rounded shoulder line and layered fabric give the torso a less primitive silhouette.
 	var shoulders := _sphere(0.285, 0.30)
-	var shoulder_mesh := _part(shoulders, Vector3(0, 1.48, 0), shirt)
+	var shoulder_mesh := _part(shoulders, Vector3(0, 1.48, 0), skin if is_beachgoer else shirt)
 	shoulder_mesh.scale = Vector3(1.22, 0.78, 0.92)
-	_part(_torus(0.105, 0.025), Vector3(0, 1.56, -0.005), shirt.darkened(0.18))
-	_part(_capsule(0.045, 0.16), Vector3(0, 1.49, -0.19), shirt.lightened(0.16))
 	if is_beachgoer:
-		# Family-friendly beach outfit: sleeveless swim top and knee-length trunks.
-		_part(_torus(0.205, 0.018), Vector3(0, 1.55, 0), shirt.lightened(0.18))
-		_part(_box_mesh(Vector3(0.38, 0.13, 0.035)), Vector3(0, 1.02, -0.205), shirt.darkened(0.12))
+		# Adult beachwear: compact, opaque swim top and short swim bottoms.
+		# Coverage remains non-explicit; no nudity or transparent materials.
+		_part(_box_mesh(Vector3(0.39, 0.19, 0.045)), Vector3(0, 1.39, -0.215), shirt)
+		_part(_capsule(0.018, 0.20), Vector3(-0.13, 1.51, -0.205), shirt.darkened(0.08))
+		_part(_capsule(0.018, 0.20), Vector3(0.13, 1.51, -0.205), shirt.darkened(0.08))
+		_part(_box_mesh(Vector3(0.43, 0.25, 0.25)), Vector3(0, 0.84, 0), shirt.darkened(0.08))
+	else:
+		_part(_torus(0.105, 0.025), Vector3(0, 1.56, -0.005), shirt.darkened(0.18))
+		_part(_capsule(0.045, 0.16), Vector3(0, 1.49, -0.19), shirt.lightened(0.16))
 	else:
 		# Layered everyday clothing: collar, placket, hem, seams and pockets.
 		_part(_torus(0.205, 0.018), Vector3(0, 1.55, 0), shirt.lightened(0.24))
@@ -413,7 +418,7 @@ func _build_character() -> void:
 	_part(_torus(0.105, 0.012), Vector3(0, 0.82, 0), Color(0.42, 0.34, 0.22))
 	_build_occupation_details()
 	var arm_color := character_skin if is_beachgoer else shirt
-	var leg_color := shirt if is_beachgoer else Color(0.12, 0.14, 0.18)
+	var leg_color := character_skin if is_beachgoer else Color(0.12, 0.14, 0.18)
 	left_arm = _limb(Vector3(-0.30, 1.43, 0), arm_color, 0.62, 0.10)
 	right_arm = _limb(Vector3(0.30, 1.43, 0), arm_color, 0.62, 0.10)
 	left_leg = _limb(Vector3(-0.14, 0.76, 0), leg_color, 0.72, 0.12)
