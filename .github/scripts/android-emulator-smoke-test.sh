@@ -89,9 +89,9 @@ adb logcat -d | grep 'MAHDIA_IMPORTED_' | tail -n 20
 # authored AnimationPlayer clip; absence of the clip diagnostic is not fatal.
 residents_ready=false
 for attempt in $(seq 1 20); do
-  if adb logcat -d | grep -q 'MAHDIA_IMPORTED_RESIDENTS=12/12'; then
+  if adb logcat -d | grep -q 'MAHDIA_IMPORTED_RESIDENTS=11/12'; then
     residents_ready=true
-    echo "All 12 imported residents loaded."
+    echo "11 imported residents and one beachwear resident loaded."
     break
   fi
   sleep 1
@@ -99,6 +99,11 @@ done
 if [[ "$residents_ready" != "true" ]]; then
   echo "Imported resident load check failed."
   adb logcat -d | grep -E 'MAHDIA_IMPORTED_|MAHDIA_WORLD_READY' | tail -n 60 || true
+  exit 1
+fi
+if ! adb logcat -d | grep -q 'MAHDIA_BEACHGOERS=1/12'; then
+  echo "The beachwear resident variant was not confirmed in the live scene."
+  adb logcat -d | grep -E 'MAHDIA_IMPORTED_|MAHDIA_BEACHGOERS=' | tail -n 40 || true
   exit 1
 fi
 if adb logcat -d | grep -q 'MAHDIA_IMPORTED_GAIT_ACTIVE'; then
