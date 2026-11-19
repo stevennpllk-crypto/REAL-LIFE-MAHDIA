@@ -55,6 +55,9 @@ func _run_tests() -> void:
 	_check(vertical.x == 0.0 and vertical.y > 0.0, "joystick direction is preserved")
 	player.global_position = Vector3(0, 0, -65)
 	_check(bool(player.call("is_in_water")), "player enters the sea swimming zone")
+	player.call("request_jump")
+	player.call("_physics_process", 0.016)
+	_check(float(player.get("velocity").y) > 2.0, "mobile jump button propels the player upward while swimming")
 	player.global_position = Vector3(0, 0, -40)
 	_check(not bool(player.call("is_in_water")), "player leaves the swimming zone at the shore")
 
