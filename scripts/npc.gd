@@ -1163,8 +1163,15 @@ func _correct_imported_model_orientation(model_instance: Node3D) -> void:
 	var head_height := imported_skeleton.get_bone_global_rest(head_index).origin.y
 	var hips_height := imported_skeleton.get_bone_global_rest(hips_index).origin.y
 	if head_height + 0.15 < hips_height:
-		model_instance.rotation.z = PI
-		print("MAHDIA_IMPORTED_ORIENTATION_CORRECTED head_y=", snappedf(head_height, 0.01), " hips_y=", snappedf(hips_height, 0.01))
+		# Rotate around the hips, not around the model root. Rotating a rig
+		# around a foot/root origin can send the corrected body underground.
+		var hip_pivot := model_instance.to_local(
+			imported_skeleton.to_global(imported_skeleton.get_bone_global_rest(hips_index).origin)
+		)
+		var flip_basis := Basis(Vector3.BACK, PI)
+		model_instance.position += hip_pivot - flip_basis * hip_pivot
+		model_instance.rotation.z += PI
+		print("MAHDIA_IMPORTED_ORIENTATION_CORRECTED head_y=", snappedf(head_height, 0.01), " hips_y=", snappedf(hips_height, 0.01), " pivot=", hip_pivot)
 	else:
 		print("MAHDIA_IMPORTED_ORIENTATION_OK head_y=", snappedf(head_height, 0.01), " hips_y=", snappedf(hips_height, 0.01))
 
