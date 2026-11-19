@@ -508,12 +508,13 @@ func _physics_process(delta: float) -> void:
 		coyote_time = 0.12
 	else:
 		coyote_time = maxf(0.0, coyote_time - delta)
-	if Input.is_action_just_pressed("jump") or jump_requested:
+	var jump_pressed := Input.is_action_just_pressed("jump") or jump_requested
+	if jump_pressed:
 		jump_buffer_time = 0.16
 	jump_requested = false
 	if is_swimming:
 		var swim_level := -1.25
-		if Input.is_action_just_pressed("jump") or jump_requested:
+		if jump_pressed:
 			velocity.y = 2.8
 		else:
 			var vertical_target := clampf((swim_level - global_position.y) * 2.0, -1.4, 1.4)
