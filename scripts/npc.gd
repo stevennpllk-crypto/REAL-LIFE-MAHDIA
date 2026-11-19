@@ -6,6 +6,7 @@ class_name MahdiaNPC
 @export var wander_radius := 7.0
 @export var personality := "friendly"
 @export var occupation := "resident"
+var is_adult := false
 @export var build_visuals := true
 
 var player: CharacterBody3D
