@@ -363,7 +363,12 @@ func _build_character() -> void:
 		left_hip.scale = Vector3(0.92, 0.82, 0.90)
 		var right_hip := _part(_sphere(0.105, 0.19), Vector3(0.145, 0.80, 0.005), skin)
 		right_hip.scale = Vector3(0.92, 0.82, 0.90)
-		# Opaque swim shorts follow the hip contour instead of using a box primitive.
+		# Simplified, non-explicit lower-body anatomy under the opaque garment:
+		# one smooth central volume blends into the pelvis; it has no genital detail.
+		var concealed_lower_form := _part(_sphere(0.095, 0.16), Vector3(0, 0.79, -0.012), skin)
+		concealed_lower_form.scale = Vector3(0.82, 0.78, 0.70)
+		# Opaque swim shorts fully cover the complete underlayer from the gameplay camera.
+		# Swim shorts follow the hip contour instead of using a single box primitive.
 		var swim_waist := _part(_torus(0.145, 0.025), Vector3(0, 0.94, 0), shirt.darkened(0.10))
 		swim_waist.scale = Vector3(1.52, 1.0, 1.18)
 		var left_short_leg := _part(_capsule(0.105, 0.30), Vector3(-0.115, 0.76, 0), shirt.darkened(0.08))
