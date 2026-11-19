@@ -13,6 +13,7 @@ window/size/viewport_height=720
 window/size/window_width_override=960
 window/size/window_height_override=540
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [rendering]
 ; All world geometry is unshaded, so positional lights are unnecessary.
