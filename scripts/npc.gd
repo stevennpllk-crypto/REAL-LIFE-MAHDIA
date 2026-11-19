@@ -108,29 +108,35 @@ func _build_imported_character() -> bool:
 	return false
 
 
-func _play_imported_animation(key: String) -> void:
+func _play_imported_animation(key: String) -> bool:
 	if not is_instance_valid(imported_animation_player):
-		return
+		return false
 	var animations := imported_animation_player.get_animation_list()
 	if animations.is_empty():
-		return
-	var normalized_key := key.to_lower()
+		return false
+	# Only select clips whose names actually describe the requested action.
+	# Playing an arbitrary first clip as "idle" made some rigs loop a walk,
+	# dance or bind-pose animation while standing still.
+	var aliases := {
+		"idle": ["idle", "stand", "breath", "rest"],
+		"walk": ["walk", "walking", "locomotion", "run"],
+		"talk": ["talk", "conversation", "gesture", "speak"]
+	}
 	var selected_animation := ""
-	for animation_name in animations:
-		var normalized_name := str(animation_name).to_lower()
-		var matches := normalized_name.contains(normalized_key)
-		if normalized_key == "talk":
-			matches = normalized_name.contains("talk") or normalized_name.contains("conversation")
-		if matches:
-			selected_animation = str(animation_name)
+	for alias in aliases.get(key, [key]):
+		for animation_name in animations:
+			var normalized_name := str(animation_name).to_lower().replace(" ", "_")
+			if normalized_name.contains(str(alias)):
+				selected_animation = str(animation_name)
+				break
+		if not selected_animation.is_empty():
 			break
-	# Asset packs often use names such as "mixamo.com" instead of idle/walk.
-	# Keep a real rig animation running rather than leaving a textured model frozen.
 	if selected_animation.is_empty():
-		selected_animation = str(animations[0])
+		return false
 	if imported_animation_key != selected_animation:
 		imported_animation_key = selected_animation
 		imported_animation_player.play(imported_animation_key, 0.22)
+	return true
 var head_visual: Node3D
 var body_visual: Node3D
 var character_skin := Color(0.62, 0.39, 0.28)
@@ -1084,12 +1090,15 @@ func _animate_imported_character(delta: float, moving: bool, pace: float, conver
 	# clock here; otherwise sin(clock) stays frozen and residents never walk.
 	if moving:
 		clock += delta
-	var has_clips := is_instance_valid(imported_animation_player) and not imported_animation_player.get_animation_list().is_empty()
-	if has_clips:
-		_play_imported_animation("walk" if moving else "talk" if conversational else "idle")
-		if moving:
-			imported_animation_player.speed_scale = clampf(pace / maxf(walk_speed, 0.1), 0.72, 1.28)
+	var requested_clip := "walk" if moving else "talk" if conversational else "idle"
+	var clip_playing := _play_imported_animation(requested_clip)
+	if clip_playing:
+		imported_animation_player.speed_scale = clampf(pace / maxf(walk_speed, 0.1), 0.72, 1.28) if moving else 1.0
 	elif is_instance_valid(imported_skeleton):
+		# No matching authored clip? Stop any unrelated clip and use the
+		# rig-aware gait below, so idle residents do not keep walking in place.
+		if is_instance_valid(imported_animation_player) and imported_animation_player.is_playing():
+			imported_animation_player.stop()
 		var gait := sin(clock * (4.8 + pace * 1.2))
 		# Keep leg stride and arm counter-swing independent: real walkers use
 		# a shorter, softer arm arc than their leg stride.
