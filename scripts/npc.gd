@@ -331,15 +331,14 @@ func _build_character() -> void:
 	var shoulder_mesh := _part(shoulders, Vector3(0, 1.48, 0), skin if is_beachgoer else shirt)
 	shoulder_mesh.scale = Vector3(1.22, 0.78, 0.92)
 	if is_beachgoer:
-		# Adult beachwear: compact, opaque swim top and short swim bottoms.
-		# Coverage remains non-explicit; no nudity or transparent materials.
-		_part(_box_mesh(Vector3(0.39, 0.19, 0.045)), Vector3(0, 1.39, -0.215), shirt)
-		_part(_capsule(0.018, 0.20), Vector3(-0.13, 1.51, -0.205), shirt.darkened(0.08))
-		_part(_capsule(0.018, 0.20), Vector3(0.13, 1.51, -0.205), shirt.darkened(0.08))
-		_part(_box_mesh(Vector3(0.43, 0.25, 0.25)), Vector3(0, 0.84, 0), shirt.darkened(0.08))
-	else:
-		_part(_torus(0.105, 0.025), Vector3(0, 1.56, -0.005), shirt.darkened(0.18))
-		_part(_capsule(0.045, 0.16), Vector3(0, 1.49, -0.19), shirt.lightened(0.16))
+		# Adult beach set: smaller opaque two-piece swimwear, with secure coverage.
+		# No nudity, transparency, or exposure of intimate areas.
+		var left_cup := _part(_sphere(0.105, 0.13), Vector3(-0.105, 1.405, -0.222), shirt)
+		left_cup.scale = Vector3(0.92, 0.62, 0.34)
+		var right_cup := _part(_sphere(0.105, 0.13), Vector3(0.105, 1.405, -0.222), shirt)
+		right_cup.scale = Vector3(0.92, 0.62, 0.34)
+		_part(_capsule(0.012, 0.22), Vector3(0, 1.49, -0.205), shirt.darkened(0.08))
+		_part(_box_mesh(Vector3(0.34, 0.14, 0.22)), Vector3(0, 0.85, 0), shirt.darkened(0.08))
 	else:
 		# Layered everyday clothing: collar, placket, hem, seams and pockets.
 		_part(_torus(0.205, 0.018), Vector3(0, 1.55, 0), shirt.lightened(0.24))
