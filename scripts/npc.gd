@@ -1151,7 +1151,7 @@ func _animate_imported_character(delta: float, moving: bool, pace: float, conver
 		_pose_imported_bone("head", sin(idle_phase * 0.7 + personal_phase) * 0.025)
 	if moving and not imported_gait_verified and clock >= 0.35:
 		imported_gait_verified = true
-		var gait_mode := "animation_player" if has_clips else "procedural_bones"
+		var gait_mode := "animation_player" if clip_playing else "procedural_bones"
 		var left_leg_pose := imported_skeleton.get_bone_pose_rotation(int(imported_bones["left_leg"])) if is_instance_valid(imported_skeleton) and imported_bones.has("left_leg") else Quaternion.IDENTITY
 		var right_leg_pose := imported_skeleton.get_bone_pose_rotation(int(imported_bones["right_leg"])) if is_instance_valid(imported_skeleton) and imported_bones.has("right_leg") else Quaternion.IDENTITY
 		print("MAHDIA_IMPORTED_GAIT_ACTIVE mode=", gait_mode, " clock=", snappedf(clock, 0.01), " left_leg_pose=", left_leg_pose, " right_leg_pose=", right_leg_pose)
