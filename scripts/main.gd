@@ -852,12 +852,14 @@ func _build_hud() -> void:
 
 	# Lightweight chat input for the currently selected resident.
 	chat_row = HBoxContainer.new()
-	chat_row.anchor_left = 0.02
-	chat_row.anchor_right = 0.36
+	# Keep the resident chat in the central lower safe zone. The old
+	# bottom-left placement overlapped the movement joystick on phones.
+	chat_row.anchor_left = 0.18
+	chat_row.anchor_right = 0.82
 	chat_row.anchor_top = 1.0
 	chat_row.anchor_bottom = 1.0
-	chat_row.offset_top = -58
-	chat_row.offset_bottom = -12
+	chat_row.offset_top = -202
+	chat_row.offset_bottom = -150
 	chat_row.visible = false
 	layer.add_child(chat_row)
 	chat_input = LineEdit.new()
