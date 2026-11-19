@@ -318,14 +318,16 @@ func _build_character() -> void:
 	var hair: Color = hair_palette[posmod(personal_seed * 5 + 2, hair_palette.size())]
 	var height_variation := 0.94 + float(posmod(personal_seed * 7, 13)) * 0.01
 	visual_root.scale = Vector3(1.0, height_variation, 1.0)
-	# Tailored torso: a tapered body, collar, waist and subtle clothing panels.
-	var torso := CylinderMesh.new()
+	# Smooth, high-resolution ellipsoid torso replaces the visibly faceted cylinder.
+	# The mesh is shared in silhouette but scaled per resident for natural variation.
+	var torso := SphereMesh.new()
 	var body_width := 0.94 + float(posmod(personal_seed * 11, 7)) * 0.02
-	torso.top_radius = 0.19 * body_width
-	torso.bottom_radius = 0.275 * body_width
-	torso.height = 0.78
-	torso.radial_segments = 12
+	torso.radius = 0.34
+	torso.height = 0.92
+	torso.radial_segments = 24
+	torso.rings = 16
 	body_visual = _part(torso, Vector3(0, 1.18, 0), skin if is_beachgoer else shirt)
+	body_visual.scale = Vector3(body_width, 1.0, 0.76)
 	# Rounded shoulder line and layered fabric give the torso a less primitive silhouette.
 	var shoulders := _sphere(0.285, 0.30)
 	var shoulder_mesh := _part(shoulders, Vector3(0, 1.48, 0), skin if is_beachgoer else shirt)
@@ -347,8 +349,13 @@ func _build_character() -> void:
 		left_hip.scale = Vector3(0.92, 0.82, 0.90)
 		var right_hip := _part(_sphere(0.105, 0.19), Vector3(0.145, 0.80, 0.005), skin)
 		right_hip.scale = Vector3(0.92, 0.82, 0.90)
-		# Opaque swim briefs fully enclose the hidden body volume on every side.
-		_part(_box_mesh(Vector3(0.46, 0.31, 0.34)), Vector3(0, 0.84, 0), shirt.darkened(0.08))
+		# Opaque swim shorts follow the hip contour instead of using a box primitive.
+		var swim_waist := _part(_torus(0.145, 0.025), Vector3(0, 0.94, 0), shirt.darkened(0.10))
+		swim_waist.scale = Vector3(1.52, 1.0, 1.18)
+		var left_short_leg := _part(_capsule(0.105, 0.30), Vector3(-0.115, 0.76, 0), shirt.darkened(0.08))
+		left_short_leg.scale = Vector3(1.0, 0.82, 1.12)
+		var right_short_leg := _part(_capsule(0.105, 0.30), Vector3(0.115, 0.76, 0), shirt.darkened(0.08))
+		right_short_leg.scale = Vector3(1.0, 0.82, 1.12)
 	else:
 		# Layered everyday clothing: collar, placket, hem, seams and pockets.
 		_part(_torus(0.205, 0.018), Vector3(0, 1.55, 0), shirt.lightened(0.24))
