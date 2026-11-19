@@ -1204,11 +1204,14 @@ func _animate_imported_character(delta: float, moving: bool, pace: float, conver
 		# rig-aware gait below, so idle residents do not keep walking in place.
 		if is_instance_valid(imported_animation_player) and imported_animation_player.is_playing():
 			imported_animation_player.stop()
-		var gait := sin(clock * (4.8 + pace * 1.2))
-		# Keep leg stride and arm counter-swing independent: real walkers use
-		# a shorter, softer arm arc than their leg stride.
-		var stride := 0.42 if moving else 0.0
-		var arm_swing := 0.24 if moving else 0.0
+		var gait_rate := 4.8 + pace * 1.2
+		var gait_phase := clock * gait_rate + float(personal_seed) * 0.11
+		var gait := sin(gait_phase)
+		var opposite_gait := sin(gait_phase + PI)
+		# Slightly soften the swing at slow speeds to avoid a mechanical march.
+		var pace_factor := clampf(pace / maxf(walk_speed, 0.1), 0.55, 1.25) if moving else 0.0
+		var stride := 0.42 * pace_factor if moving else 0.0
+		var arm_swing := 0.24 * pace_factor if moving else 0.0
 		var personal_phase := float(personal_seed) * 0.73
 		var talk := sin(idle_phase * 3.4 + personal_phase) * (0.13 if conversational else 0.025)
 		var breathing := sin(idle_phase * 1.65 + personal_phase) * 0.018
@@ -1223,12 +1226,16 @@ func _animate_imported_character(delta: float, moving: bool, pace: float, conver
 		_pose_imported_bone("right_forearm", -0.10 - maxf(0.0, -gait * arm_swing) * 0.16 - (0.12 if conversational else 0.0))
 		_pose_imported_bone("left_hand", sin(clock * 1.1 + personal_phase) * (0.08 if moving else 0.025))
 		_pose_imported_bone("right_hand", -sin(clock * 1.1 + personal_phase) * (0.08 if moving else 0.025))
-		_pose_imported_bone("left_leg", -gait * stride * 1.15)
-		_pose_imported_bone("right_leg", gait * stride * 1.15)
-		_pose_imported_bone("left_knee", maxf(0.0, gait * stride) * 0.42)
-		_pose_imported_bone("right_knee", maxf(0.0, -gait * stride) * 0.42)
-		_pose_imported_bone("left_foot", -maxf(0.0, gait * stride) * 0.18)
-		_pose_imported_bone("right_foot", -maxf(0.0, -gait * stride) * 0.18)
+		_pose_imported_bone("left_leg", -gait * stride * 1.08)
+		_pose_imported_bone("right_leg", -opposite_gait * stride * 1.08)
+		# Knees flex during swing and relax during stance for a less rigid gait.
+		_pose_imported_bone("left_knee", maxf(0.0, gait) * stride * 0.95)
+		_pose_imported_bone("right_knee", maxf(0.0, opposite_gait) * stride * 0.95)
+		# Gentle toe-off and landing counter-rotation at the ankles.
+		_pose_imported_bone("left_foot", -gait * stride * 0.22)
+		_pose_imported_bone("right_foot", -opposite_gait * stride * 0.22)
+		# Counter-rotate the upper body slightly to balance the alternating hips.
+		_pose_imported_bone("spine", breathing - gait * (0.025 if moving else 0.0))
 		_pose_imported_bone("head", sin(idle_phase * 0.7 + personal_phase) * 0.025)
 	if moving and not imported_gait_verified and clock >= 0.35:
 		imported_gait_verified = true
