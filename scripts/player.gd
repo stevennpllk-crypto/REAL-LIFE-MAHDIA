@@ -131,7 +131,7 @@ func _log_imported_player_orientation() -> void:
 	var head_y := imported_player_skeleton.get_bone_global_rest(head_index).origin.y
 	var hips_y := imported_player_skeleton.get_bone_global_rest(hips_index).origin.y
 	var orientation := "UPRIGHT" if head_y > hips_y + 0.05 else "INVERTED"
-	print("MAHDIA_PLAYER_ORIENTATION=", orientation, " head_y=", snappedf(head_y, 0.001), " hips_y=", snappedf(hips_y, 0.001))
+	print("MAHDIA_PLAYER_ORIENTATION=" + orientation + " head_y=" + str(snappedf(head_y, 0.001)) + " hips_y=" + str(snappedf(hips_y, 0.001)))
 
 
 func _fit_imported_player_model(model_instance: Node3D) -> void:
