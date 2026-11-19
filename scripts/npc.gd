@@ -1014,8 +1014,10 @@ func _physics_process(delta: float) -> void:
 	simulation_accumulator += delta
 	if simulation_accumulator < simulation_interval:
 		return
-	var step_delta := minf(simulation_accumulator, simulation_interval * 2.0)
-	simulation_accumulator = 0.0
+	# Preserve elapsed simulation time instead of discarding it on slow frames.
+	# Limit each catch-up step to avoid a large one-frame movement/physics spike.
+	var step_delta := minf(simulation_accumulator, 0.25)
+	simulation_accumulator -= step_delta
 	_simulate_resident(step_delta)
 
 func _simulate_resident(delta: float) -> void:
