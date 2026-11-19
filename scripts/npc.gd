@@ -338,11 +338,17 @@ func _build_character() -> void:
 		var right_cup := _part(_sphere(0.105, 0.13), Vector3(0.105, 1.405, -0.222), shirt)
 		right_cup.scale = Vector3(0.92, 0.62, 0.34)
 		_part(_capsule(0.012, 0.22), Vector3(0, 1.49, -0.205), shirt.darkened(0.08))
-		# A neutral adult pelvic underlayer exists beneath the opaque swim briefs.
-		# It is fully enclosed by the garment: no intimate anatomy is rendered or exposed.
-		var concealed_pelvis := _part(_sphere(0.17, 0.20), Vector3(0, 0.85, 0), skin)
-		concealed_pelvis.scale = Vector3(0.88, 0.54, 0.72)
-		_part(_box_mesh(Vector3(0.34, 0.14, 0.22)), Vector3(0, 0.85, 0), shirt.darkened(0.08))
+		# Smooth adult lower-torso volume under the swimwear: hips and upper-pelvis
+		# are modeled as a single neutral anatomical mass, fully hidden by opaque fabric.
+		var concealed_pelvis := _part(_sphere(0.205, 0.30), Vector3(0, 0.84, 0), skin)
+		concealed_pelvis.scale = Vector3(1.10, 0.72, 0.88)
+		# Subtle left/right hip transitions avoid a box-shaped silhouette.
+		var left_hip := _part(_sphere(0.105, 0.19), Vector3(-0.145, 0.80, 0.005), skin)
+		left_hip.scale = Vector3(0.92, 0.82, 0.90)
+		var right_hip := _part(_sphere(0.105, 0.19), Vector3(0.145, 0.80, 0.005), skin)
+		right_hip.scale = Vector3(0.92, 0.82, 0.90)
+		# Opaque swim briefs fully enclose the hidden body volume on every side.
+		_part(_box_mesh(Vector3(0.46, 0.31, 0.34)), Vector3(0, 0.84, 0), shirt.darkened(0.08))
 	else:
 		# Layered everyday clothing: collar, placket, hem, seams and pockets.
 		_part(_torus(0.205, 0.018), Vector3(0, 1.55, 0), shirt.lightened(0.24))
