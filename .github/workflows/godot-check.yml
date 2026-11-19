@@ -21,6 +21,6 @@ jobs:
       - name: Import and parse project
         run: godot --headless --editor --path . --quit
       - name: Test mobile joystick movement
-        run: timeout 150s godot --headless --path . --script res://tests/test_mobile_movement.gd
+        run: timeout 75s godot --headless --path . --script res://tests/test_mobile_movement.gd
       - name: Run main scene briefly
         run: timeout 20s godot --headless --path . --quit-after 5
