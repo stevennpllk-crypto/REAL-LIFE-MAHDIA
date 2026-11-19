@@ -16,7 +16,7 @@ permissions:
 jobs:
   android-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -227,15 +227,15 @@ jobs:
       - name: Test APK on cloud Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
-          target: aosp_atd
+          api-level: 35
+          target: google_apis
           arch: x86_64
-          profile: pixel_2
-          ram-size: 1536M
-          heap-size: 384M
-          emulator-boot-timeout: 300
+          profile: pixel_6
+          ram-size: 3072M
+          heap-size: 512M
+          emulator-boot-timeout: 420
           disable-linux-hw-accel: false
-          # Prefer KVM when the runner exposes it; SwiftShader remains the graphics backend.
+          # Use a newer Pixel 6 / Android 15 image with more memory; KVM is preferred when available.
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-metrics
           disable-animations: true
           script: bash .github/scripts/android-emulator-smoke-test.sh
