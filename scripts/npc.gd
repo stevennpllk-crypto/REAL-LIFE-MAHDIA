@@ -624,6 +624,14 @@ func _choose_daily_goal(hour: float) -> void:
 	var food_score := hunger * 1.45
 	var work_score := 0.78 + personal_schedule_offset if occupation != "resident" and is_work_hours else 0.12
 	var home_score := (0.92 + personal_schedule_offset if is_evening else 0.48 if is_night else 0.08)
+	# Critical needs override ordinary preferences, while personality and routine
+	# still decide behavior when needs are within a comfortable range.
+	if hunger >= 0.82:
+		food_score = maxf(food_score, 1.55 + (hunger - 0.82) * 2.0)
+	if energy <= 0.16:
+		rest_score = maxf(rest_score, 1.65 + (0.16 - energy) * 2.0)
+	if social_need >= 0.90 and personality in ["friendly", "curious"]:
+		social_score = maxf(social_score, 1.25 + (social_need - 0.90) * 1.5)
 	# Past outcomes influence future choices; residents gradually develop individual habits.
 	food_score *= 1.0 + float(learned_preferences.get("food", 0.0))
 	rest_score *= 1.0 + float(learned_preferences.get("rest", 0.0))
