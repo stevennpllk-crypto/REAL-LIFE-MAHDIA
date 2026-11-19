@@ -56,7 +56,7 @@ for attempt in $(seq 1 40); do
 done
 if [[ "$player_ready" != "true" ]]; then
   echo "Player scene did not initialize. Recent Godot log:"
-  cat "$LIVE_LOG" -s godot:I godot:E GodotActivity:V | tail -n 120 || true
+  grep -E "godot|GodotActivity" "$LIVE_LOG" | tail -n 120 || true
   exit 1
 fi
 
@@ -87,7 +87,7 @@ for attempt in $(seq 1 120); do
 done
 if [[ "$scene_ready" != "true" ]]; then
   echo "City scene did not finish initializing. Recent Godot log:"
-  cat "$LIVE_LOG" -s godot:I godot:E GodotActivity:V | tail -n 160 || true
+  grep -E "godot|GodotActivity" "$LIVE_LOG" | tail -n 160 || true
   exit 1
 fi
 
