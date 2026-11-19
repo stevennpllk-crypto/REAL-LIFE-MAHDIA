@@ -935,7 +935,31 @@ func _update_autonomous_decisions(delta: float) -> void:
 		if not player_nearby:
 			_choose_daily_goal(_current_hour())
 
+# Distance-based simulation LOD: nearby residents stay responsive while
+# distant residents use fewer physics/AI updates to protect mobile frame time.
+var simulation_accumulator := 0.0
+var simulation_interval := 0.033
+
 func _physics_process(delta: float) -> void:
+	var player_distance := INF
+	if is_instance_valid(player) and player.is_inside_tree() and not player.is_queued_for_deletion():
+		player_distance = global_position.distance_to(player.global_position)
+	# 30 Hz near the player, 15 Hz in the mid-field, 10 Hz in the distance.
+	# AI timers receive accumulated time, so daily needs and decisions do not slow down.
+	if player_distance <= 18.0:
+		simulation_interval = 0.033
+	elif player_distance <= 45.0:
+		simulation_interval = 0.066
+	else:
+		simulation_interval = 0.10
+	simulation_accumulator += delta
+	if simulation_accumulator < simulation_interval:
+		return
+	var step_delta := minf(simulation_accumulator, simulation_interval * 2.0)
+	simulation_accumulator = 0.0
+	_simulate_resident(step_delta)
+
+func _simulate_resident(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y -= 9.8 * delta
 	need_update_elapsed += delta

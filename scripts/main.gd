@@ -37,6 +37,8 @@ var material_cache: Dictionary = {}
 var water_waves: Array[MeshInstance3D] = []
 var water_wave_origins: Array[Vector3] = []
 var water_clock := 0.0
+var water_visual_elapsed := 0.0
+var hud_refresh_elapsed := 0.0
 var autosave_elapsed := 0.0
 var quality_level := 2
 var quality_button: Button
@@ -1252,20 +1254,21 @@ func _save_ai_settings() -> void:
 		print("MAHDIA_AI_SETTINGS_INVALID")
 
 func _process(delta: float) -> void:
-	# _process continues while _ready() yields during town generation.
+	# Keep visual water animation smooth enough while avoiding per-frame work.
 	water_clock += delta
-	for wave_index in range(water_waves.size()):
-		var wave := water_waves[wave_index]
-		if is_instance_valid(wave):
-			var origin := water_wave_origins[wave_index]
-			var phase := water_clock * 0.72 + float(wave_index) * 1.37
-			# Let each foam streak drift, rise and shorten independently to suggest
-			# overlapping small swells without adding shaders or physics bodies.
-			wave.position.x = origin.x + fposmod(water_clock * 0.42 + float(wave_index) * 2.1, 8.0) - 4.0
-			wave.position.y = origin.y + sin(phase) * 0.035
-			wave.position.z = origin.z + sin(phase * 0.83) * 0.18
-			wave.rotation.y = sin(phase * 0.6) * 0.025
-			wave.scale.x = 0.78 + (0.22 * (0.5 + 0.5 * sin(phase)))
+	water_visual_elapsed += delta
+	if water_visual_elapsed >= 0.05:
+		water_visual_elapsed = 0.0
+		for wave_index in range(water_waves.size()):
+			var wave := water_waves[wave_index]
+			if is_instance_valid(wave):
+				var origin := water_wave_origins[wave_index]
+				var phase := water_clock * 0.72 + float(wave_index) * 1.37
+				wave.position.x = origin.x + fposmod(water_clock * 0.42 + float(wave_index) * 2.1, 8.0) - 4.0
+				wave.position.y = origin.y + sin(phase) * 0.035
+				wave.position.z = origin.z + sin(phase * 0.83) * 0.18
+				wave.rotation.y = sin(phase * 0.6) * 0.025
+				wave.scale.x = 0.78 + (0.22 * (0.5 + 0.5 * sin(phase)))
 	autosave_elapsed += delta
 	if autosave_elapsed >= AUTOSAVE_INTERVAL:
 		autosave_elapsed = 0.0
@@ -1281,14 +1284,17 @@ func _process(delta: float) -> void:
 		elif is_instance_valid(life_manager):
 			life_manager.try_interact()
 		player.interact_requested = false
-	if is_instance_valid(planet_navigation) and is_instance_valid(player):
-		planet_navigation.update_from_player(player.global_position)
-	_update_mission_hud()
-	if is_instance_valid(wallet_label) and is_instance_valid(life_manager):
-		wallet_label.text = "💵 %d د.ت  ＋" % int(life_manager.money)
-	if is_instance_valid(status_label):
-		var hour_value: float = world_systems.hour if is_instance_valid(world_systems) else 8.0
-		status_label.text = "%s • %s • %02d:%02d • %s • %d د.ت • طاقة %d%% • جوع %d%%" % [planet_navigation.get_region_name(), planet_navigation.get_coordinate_text(), int(hour_value), int(fposmod(hour_value * 60.0, 60.0)), world_systems.weather, life_manager.money, int(life_manager.energy), int(life_manager.hunger)]
+	hud_refresh_elapsed += delta
+	if hud_refresh_elapsed >= 0.20:
+		hud_refresh_elapsed = 0.0
+		if is_instance_valid(planet_navigation) and is_instance_valid(player):
+			planet_navigation.update_from_player(player.global_position)
+		_update_mission_hud()
+		if is_instance_valid(wallet_label) and is_instance_valid(life_manager):
+			wallet_label.text = "💵 %d د.ت  ＋" % int(life_manager.money)
+		if is_instance_valid(status_label):
+			var hour_value: float = world_systems.hour if is_instance_valid(world_systems) else 8.0
+			status_label.text = "%s • %s • %02d:%02d • %s • %d د.ت • طاقة %d%% • جوع %d%%" % [planet_navigation.get_region_name(), planet_navigation.get_coordinate_text(), int(hour_value), int(fposmod(hour_value * 60.0, 60.0)), world_systems.weather, life_manager.money, int(life_manager.energy), int(life_manager.hunger)]
 
 
 func _restore_world_progress() -> void:
