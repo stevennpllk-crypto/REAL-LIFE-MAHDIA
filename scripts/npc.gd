@@ -1160,14 +1160,28 @@ func _correct_imported_model_orientation(model_instance: Node3D) -> void:
 		return
 	var head_index := int(imported_bones["head"])
 	var hips_index := int(imported_bones["hips"])
-	var head_height := imported_skeleton.get_bone_global_rest(head_index).origin.y
-	var hips_height := imported_skeleton.get_bone_global_rest(hips_index).origin.y
+	# Rebuild skeleton-space rest transforms from local bone rests. Some GLB
+	# imports expose zeroed global-rest origins, which would silently skip a
+	# required correction for an upside-down resident.
+	var head_rest := Transform3D.IDENTITY
+	var parent_index := head_index
+	while parent_index >= 0:
+		head_rest = imported_skeleton.get_bone_rest(parent_index) * head_rest
+		parent_index = imported_skeleton.get_bone_parent(parent_index)
+	var hips_rest := Transform3D.IDENTITY
+	parent_index = hips_index
+	while parent_index >= 0:
+		hips_rest = imported_skeleton.get_bone_rest(parent_index) * hips_rest
+		parent_index = imported_skeleton.get_bone_parent(parent_index)
+	var head_height := head_rest.origin.y
+	var hips_height := hips_rest.origin.y
+	if absf(head_height - hips_height) <= 0.05:
+		print("MAHDIA_IMPORTED_ORIENTATION_UNVERIFIED head_y=", snappedf(head_height, 0.01), " hips_y=", snappedf(hips_height, 0.01))
+		return
 	if head_height + 0.15 < hips_height:
 		# Rotate around the hips, not around the model root. Rotating a rig
 		# around a foot/root origin can send the corrected body underground.
-		var hip_pivot := model_instance.to_local(
-			imported_skeleton.to_global(imported_skeleton.get_bone_global_rest(hips_index).origin)
-		)
+		var hip_pivot := model_instance.to_local(imported_skeleton.to_global(hips_rest.origin))
 		var flip_basis := Basis(Vector3.BACK, PI)
 		model_instance.position += hip_pivot - flip_basis * hip_pivot
 		model_instance.rotation.z += PI
