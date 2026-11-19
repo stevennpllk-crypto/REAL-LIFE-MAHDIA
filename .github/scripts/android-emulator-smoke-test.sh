@@ -26,7 +26,7 @@ for attempt in $(seq 1 120); do
     package_ready=true
     break
   fi
-  sleep 2
+  sleep 1
 done
 
 if [[ "$package_ready" != "true" ]]; then
@@ -47,7 +47,7 @@ adb shell am start -W -n com.jassim.reallifemahdia/com.godot.game.GodotApp
 # Require the first playable frame before waiting for the complete city.
 player_ready=false
 for attempt in $(seq 1 40); do
-  if cat "$LIVE_LOG" | grep -q "MAHDIA_PLAYER_READY"; then
+  if grep -q "MAHDIA_PLAYER_READY" "$LIVE_LOG"; then
     player_ready=true
     echo "Playable player/camera/HUD initialized on attempt $attempt."
     break
@@ -61,9 +61,9 @@ if [[ "$player_ready" != "true" ]]; then
 fi
 
 # Confirm the player itself uses the imported human asset, not the old blocky fallback.
-if ! cat "$LIVE_LOG" | grep -q "MAHDIA_PLAYER_IMPORTED=1"; then
+if ! grep -q "MAHDIA_PLAYER_IMPORTED=1" "$LIVE_LOG"; then
   echo "Imported human player model was not confirmed in the Android runtime."
-  cat "$LIVE_LOG" | grep "MAHDIA_PLAYER_" | tail -n 40 || true
+  grep "MAHDIA_PLAYER_" "$LIVE_LOG" | tail -n 40 || true
   exit 1
 fi
 
@@ -78,7 +78,7 @@ grep 'MAHDIA_PLAYER_ORIENTATION=' "$LIVE_LOG" | tail -n 5
 
 scene_ready=false
 for attempt in $(seq 1 120); do
-  if cat "$LIVE_LOG" | grep -q "MAHDIA_WORLD_READY"; then
+  if grep -q "MAHDIA_WORLD_READY" "$LIVE_LOG"; then
     scene_ready=true
     echo "Main world scene reported ready on attempt $attempt."
     break
@@ -93,19 +93,19 @@ fi
 
 # A successful world render is not enough: require imported human GLB assets
 # to instantiate in the live Android scene, not merely exist in the build ZIP.
-if ! cat "$LIVE_LOG" | grep -Eq 'MAHDIA_IMPORTED_RESIDENTS=[1-9][0-9]*/'; then
+if ! grep -Eq 'MAHDIA_IMPORTED_RESIDENTS=[1-9][0-9]*/' "$LIVE_LOG"; then
   echo "No imported human resident model was confirmed in the Android runtime."
-  cat "$LIVE_LOG" | grep 'MAHDIA_IMPORTED_' | tail -n 40 || true
+  grep 'MAHDIA_IMPORTED_' "$LIVE_LOG" | tail -n 40 || true
   exit 1
 fi
-cat "$LIVE_LOG" | grep 'MAHDIA_IMPORTED_' | tail -n 20
+grep 'MAHDIA_IMPORTED_' "$LIVE_LOG" | tail -n 20
 
 # Confirm all imported residents are present. Current GLB assets report
 # animations=[], so the game uses procedural skeleton gait rather than an
 # authored AnimationPlayer clip; absence of the clip diagnostic is not fatal.
 residents_ready=false
 for attempt in $(seq 1 20); do
-  if cat "$LIVE_LOG" | grep -q 'MAHDIA_IMPORTED_RESIDENTS=11/12'; then
+  if grep -q 'MAHDIA_IMPORTED_RESIDENTS=11/12' "$LIVE_LOG"; then
     residents_ready=true
     echo "11 imported residents and one beachwear resident loaded."
     break
@@ -114,17 +114,17 @@ for attempt in $(seq 1 20); do
 done
 if [[ "$residents_ready" != "true" ]]; then
   echo "Imported resident load check failed."
-  cat "$LIVE_LOG" | grep -E 'MAHDIA_IMPORTED_|MAHDIA_WORLD_READY' | tail -n 60 || true
+  grep -E 'MAHDIA_IMPORTED_|MAHDIA_WORLD_READY' "$LIVE_LOG" | tail -n 60 || true
   exit 1
 fi
-if ! cat "$LIVE_LOG" | grep -q 'MAHDIA_BEACHGOERS=1/12'; then
+if ! grep -q 'MAHDIA_BEACHGOERS=1/12' "$LIVE_LOG"; then
   echo "The beachwear resident variant was not confirmed in the live scene."
-  cat "$LIVE_LOG" | grep -E 'MAHDIA_IMPORTED_|MAHDIA_BEACHGOERS=' | tail -n 40 || true
+  grep -E 'MAHDIA_IMPORTED_|MAHDIA_BEACHGOERS=' "$LIVE_LOG" | tail -n 40 || true
   exit 1
 fi
-if cat "$LIVE_LOG" | grep -q 'MAHDIA_IMPORTED_GAIT_ACTIVE'; then
+if grep -q 'MAHDIA_IMPORTED_GAIT_ACTIVE' "$LIVE_LOG"; then
   echo "Resident gait diagnostic:"
-  cat "$LIVE_LOG" | grep 'MAHDIA_IMPORTED_GAIT_ACTIVE' | tail -n 8
+  grep 'MAHDIA_IMPORTED_GAIT_ACTIVE' "$LIVE_LOG" | tail -n 8
 else
   echo "No authored gait clip diagnostic; current animation-free GLBs use procedural gait fallback."
 fi
@@ -137,7 +137,7 @@ if ! grep -q 'com.jassim.reallifemahdia' <<< "$activity_state"; then
 fi
 
 # Allow a few rendered frames after scene initialization before inspecting pixels.
-sleep 5
+sleep 3
 adb shell screencap -p /sdcard/mahdia-emulator.png >/dev/null
 adb pull /sdcard/mahdia-emulator.png build/mahdia-emulator.png >/dev/null
 cat "$LIVE_LOG" > build/emulator-logcat.txt
