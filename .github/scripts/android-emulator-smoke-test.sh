@@ -3,8 +3,12 @@ set -Eeuo pipefail
 
 mkdir -p build
 
+LIVE_LOG="build/emulator-live-logcat.txt"
+LOGCAT_PID=""
+
 capture_emulator_evidence() {
-  adb logcat -d -t 8000 > build/emulator-logcat.txt 2>&1 || true
+  if [[ -n "$LOGCAT_PID" ]]; then kill "$LOGCAT_PID" >/dev/null 2>&1 || true; fi
+  adb logcat -d -t 3000 > build/emulator-logcat.txt 2>&1 || true
   adb shell screencap -p /sdcard/mahdia-emulator.png >/dev/null 2>&1 || true
   adb pull /sdcard/mahdia-emulator.png build/mahdia-emulator.png >/dev/null 2>&1 || true
 }
@@ -34,62 +38,74 @@ test -s build/REAL_LIFE_MAHDIA-debug.apk
 adb shell cmd package list packages >/dev/null
 adb install -r build/REAL_LIFE_MAHDIA-debug.apk
 adb logcat -c
+LIVE_LOG="build/emulator-live-logcat.txt"
+adb logcat -v brief > "$LIVE_LOG" 2>&1 &
+LOGCAT_PID=$!
 adb shell am force-stop com.jassim.reallifemahdia
 adb shell am start -W -n com.jassim.reallifemahdia/com.godot.game.GodotApp
 
 # Require the first playable frame before waiting for the complete city.
 player_ready=false
-for attempt in $(seq 1 30); do
-  if adb logcat -d | grep -q "MAHDIA_PLAYER_READY"; then
+for attempt in $(seq 1 40); do
+  if cat "$LIVE_LOG" | grep -q "MAHDIA_PLAYER_READY"; then
     player_ready=true
     echo "Playable player/camera/HUD initialized on attempt $attempt."
     break
   fi
-  sleep 2
+  sleep 0.5
 done
 if [[ "$player_ready" != "true" ]]; then
   echo "Player scene did not initialize. Recent Godot log:"
-  adb logcat -d -s godot:I godot:E GodotActivity:V | tail -n 120 || true
+  cat "$LIVE_LOG" -s godot:I godot:E GodotActivity:V | tail -n 120 || true
   exit 1
 fi
 
 # Confirm the player itself uses the imported human asset, not the old blocky fallback.
-if ! adb logcat -d | grep -q "MAHDIA_PLAYER_IMPORTED=1"; then
+if ! cat "$LIVE_LOG" | grep -q "MAHDIA_PLAYER_IMPORTED=1"; then
   echo "Imported human player model was not confirmed in the Android runtime."
-  adb logcat -d | grep "MAHDIA_PLAYER_" | tail -n 40 || true
+  cat "$LIVE_LOG" | grep "MAHDIA_PLAYER_" | tail -n 40 || true
   exit 1
 fi
 
+# Validate the actual rig hierarchy: the head rest position must be above the hips.
+# This catches upside-down imported characters even when the world renders normally.
+if ! grep -q 'MAHDIA_PLAYER_ORIENTATION=UPRIGHT' "$LIVE_LOG"; then
+  echo "Player rig is inverted or its head/hips bones could not be verified."
+  grep 'MAHDIA_PLAYER_ORIENTATION=' "$LIVE_LOG" | tail -n 10 || true
+  exit 1
+fi
+grep 'MAHDIA_PLAYER_ORIENTATION=' "$LIVE_LOG" | tail -n 5
+
 scene_ready=false
 for attempt in $(seq 1 120); do
-  if adb logcat -d | grep -q "MAHDIA_WORLD_READY"; then
+  if cat "$LIVE_LOG" | grep -q "MAHDIA_WORLD_READY"; then
     scene_ready=true
     echo "Main world scene reported ready on attempt $attempt."
     break
   fi
-  sleep 2
+  sleep 0.5
 done
 if [[ "$scene_ready" != "true" ]]; then
   echo "City scene did not finish initializing. Recent Godot log:"
-  adb logcat -d -s godot:I godot:E GodotActivity:V | tail -n 160 || true
+  cat "$LIVE_LOG" -s godot:I godot:E GodotActivity:V | tail -n 160 || true
   exit 1
 fi
 
 # A successful world render is not enough: require imported human GLB assets
 # to instantiate in the live Android scene, not merely exist in the build ZIP.
-if ! adb logcat -d | grep -Eq 'MAHDIA_IMPORTED_RESIDENTS=[1-9][0-9]*/'; then
+if ! cat "$LIVE_LOG" | grep -Eq 'MAHDIA_IMPORTED_RESIDENTS=[1-9][0-9]*/'; then
   echo "No imported human resident model was confirmed in the Android runtime."
-  adb logcat -d | grep 'MAHDIA_IMPORTED_' | tail -n 40 || true
+  cat "$LIVE_LOG" | grep 'MAHDIA_IMPORTED_' | tail -n 40 || true
   exit 1
 fi
-adb logcat -d | grep 'MAHDIA_IMPORTED_' | tail -n 20
+cat "$LIVE_LOG" | grep 'MAHDIA_IMPORTED_' | tail -n 20
 
 # Confirm all imported residents are present. Current GLB assets report
 # animations=[], so the game uses procedural skeleton gait rather than an
 # authored AnimationPlayer clip; absence of the clip diagnostic is not fatal.
 residents_ready=false
 for attempt in $(seq 1 20); do
-  if adb logcat -d | grep -q 'MAHDIA_IMPORTED_RESIDENTS=11/12'; then
+  if cat "$LIVE_LOG" | grep -q 'MAHDIA_IMPORTED_RESIDENTS=11/12'; then
     residents_ready=true
     echo "11 imported residents and one beachwear resident loaded."
     break
@@ -98,17 +114,17 @@ for attempt in $(seq 1 20); do
 done
 if [[ "$residents_ready" != "true" ]]; then
   echo "Imported resident load check failed."
-  adb logcat -d | grep -E 'MAHDIA_IMPORTED_|MAHDIA_WORLD_READY' | tail -n 60 || true
+  cat "$LIVE_LOG" | grep -E 'MAHDIA_IMPORTED_|MAHDIA_WORLD_READY' | tail -n 60 || true
   exit 1
 fi
-if ! adb logcat -d | grep -q 'MAHDIA_BEACHGOERS=1/12'; then
+if ! cat "$LIVE_LOG" | grep -q 'MAHDIA_BEACHGOERS=1/12'; then
   echo "The beachwear resident variant was not confirmed in the live scene."
-  adb logcat -d | grep -E 'MAHDIA_IMPORTED_|MAHDIA_BEACHGOERS=' | tail -n 40 || true
+  cat "$LIVE_LOG" | grep -E 'MAHDIA_IMPORTED_|MAHDIA_BEACHGOERS=' | tail -n 40 || true
   exit 1
 fi
-if adb logcat -d | grep -q 'MAHDIA_IMPORTED_GAIT_ACTIVE'; then
+if cat "$LIVE_LOG" | grep -q 'MAHDIA_IMPORTED_GAIT_ACTIVE'; then
   echo "Resident gait diagnostic:"
-  adb logcat -d | grep 'MAHDIA_IMPORTED_GAIT_ACTIVE' | tail -n 8
+  cat "$LIVE_LOG" | grep 'MAHDIA_IMPORTED_GAIT_ACTIVE' | tail -n 8
 else
   echo "No authored gait clip diagnostic; current animation-free GLBs use procedural gait fallback."
 fi
@@ -124,7 +140,7 @@ fi
 sleep 5
 adb shell screencap -p /sdcard/mahdia-emulator.png >/dev/null
 adb pull /sdcard/mahdia-emulator.png build/mahdia-emulator.png >/dev/null
-adb logcat -d -t 8000 > build/emulator-logcat.txt
+cat "$LIVE_LOG" > build/emulator-logcat.txt
 
 # Decode the PNG using only Python's standard library. The old Godot splash
 # was almost entirely black (<2% bright pixels); a rendered outdoor scene
