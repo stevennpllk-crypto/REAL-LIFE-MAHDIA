@@ -93,6 +93,7 @@ func _build_imported_character() -> bool:
 		if not skeleton_nodes.is_empty():
 			imported_skeleton = skeleton_nodes[0] as Skeleton3D
 			_cache_imported_bones()
+			_correct_imported_model_orientation(model_instance)
 		imported_model_loaded = true
 		var animation_names: Array[String] = []
 		if is_instance_valid(imported_animation_player):
@@ -1069,6 +1070,8 @@ func _cache_imported_bones() -> void:
 			imported_bones["left_foot"] = bone_index
 		elif bone_name.contains("rfoot") or bone_name.ends_with("rightfoot"):
 			imported_bones["right_foot"] = bone_index
+		elif bone_name == "hips" or bone_name.ends_with("pelvis") or bone_name.ends_with("hip"):
+			imported_bones["hips"] = bone_index
 		elif bone_name.ends_with("spine1") or bone_name.ends_with("spine2"):
 			if not imported_bones.has("spine"):
 				imported_bones["spine"] = bone_index
@@ -1076,6 +1079,26 @@ func _cache_imported_bones() -> void:
 			imported_bones["neck"] = bone_index
 		elif bone_name.ends_with("head"):
 			imported_bones["head"] = bone_index
+
+
+func _correct_imported_model_orientation(model_instance: Node3D) -> void:
+	# Some third-party GLB rigs are authored with their local vertical axis
+	# inverted. Detect this from the skeleton rest pose instead of applying a
+	# blind 180-degree rotation to every resident model.
+	if not is_instance_valid(imported_skeleton):
+		return
+	if not imported_bones.has("head") or not imported_bones.has("hips"):
+		push_warning("Resident rig has no head/hips pair; orientation auto-check skipped.")
+		return
+	var head_index := int(imported_bones["head"])
+	var hips_index := int(imported_bones["hips"])
+	var head_height := imported_skeleton.get_bone_global_rest(head_index).origin.y
+	var hips_height := imported_skeleton.get_bone_global_rest(hips_index).origin.y
+	if head_height + 0.15 < hips_height:
+		model_instance.rotation.z = PI
+		print("MAHDIA_IMPORTED_ORIENTATION_CORRECTED head_y=", snappedf(head_height, 0.01), " hips_y=", snappedf(hips_height, 0.01))
+	else:
+		print("MAHDIA_IMPORTED_ORIENTATION_OK head_y=", snappedf(head_height, 0.01), " hips_y=", snappedf(hips_height, 0.01))
 
 
 func _pose_imported_bone(key: String, angle: float) -> void:
