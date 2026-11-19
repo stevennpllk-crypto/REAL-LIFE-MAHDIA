@@ -332,6 +332,20 @@ func _build_character() -> void:
 	var shoulders := _sphere(0.285, 0.30)
 	var shoulder_mesh := _part(shoulders, Vector3(0, 1.48, 0), skin if is_beachgoer else shirt)
 	shoulder_mesh.scale = Vector3(1.22, 0.78, 0.92)
+	# Add continuous anatomical transitions instead of a single primitive torso:
+	# chest, waist and abdomen volumes are smooth and remain beneath clothing.
+	if is_beachgoer:
+		var upper_chest := _part(_sphere(0.255, 0.34), Vector3(0, 1.36, 0), skin)
+		upper_chest.scale = Vector3(1.12, 0.68, 0.82)
+		var abdomen := _part(_sphere(0.205, 0.40), Vector3(0, 1.08, 0.008), skin)
+		abdomen.scale = Vector3(0.86, 0.92, 0.78)
+		var waist := _part(_sphere(0.185, 0.29), Vector3(0, 0.91, 0.012), skin)
+		waist.scale = Vector3(0.94, 0.78, 0.82)
+		# Rounded deltoids blend the shoulders into the upper arms.
+		var left_deltoid := _part(_sphere(0.105, 0.22), Vector3(-0.285, 1.43, 0), skin)
+		left_deltoid.scale = Vector3(0.94, 1.12, 0.92)
+		var right_deltoid := _part(_sphere(0.105, 0.22), Vector3(0.285, 1.43, 0), skin)
+		right_deltoid.scale = Vector3(0.94, 1.12, 0.92)
 	if is_beachgoer:
 		# Adult beach set: smaller opaque two-piece swimwear, with secure coverage.
 		# No nudity, transparency, or exposure of intimate areas.
@@ -427,11 +441,12 @@ func _build_character() -> void:
 	# Wrist/hand skin and footwear are separate from the cloth meshes.
 	_part(_sphere(0.055, 0.10), Vector3(-0.30, 1.02, 0), skin)
 	_part(_sphere(0.055, 0.10), Vector3(0.30, 1.02, 0), skin)
-	# Shoes now have a distinct sole, upper and toe instead of reading as bare dark capsules.
-	for foot_x in [-0.14, 0.14]:
-		_part(_box_mesh(Vector3(0.22, 0.055, 0.34)), Vector3(foot_x, 0.045, -0.105), Color(0.035, 0.038, 0.042))
-		_part(_capsule(0.085, 0.22), Vector3(foot_x, 0.12, -0.035), Color(0.075, 0.072, 0.068))
-		_part(_sphere(0.082, 0.12), Vector3(foot_x, 0.12, -0.135), Color(0.075, 0.072, 0.068))
+	# Street residents wear shoes; adult beachgoers remain barefoot on the sand.
+	if not is_beachgoer:
+		for foot_x in [-0.14, 0.14]:
+			_part(_box_mesh(Vector3(0.22, 0.055, 0.34)), Vector3(foot_x, 0.045, -0.105), Color(0.035, 0.038, 0.042))
+			_part(_capsule(0.085, 0.22), Vector3(foot_x, 0.12, -0.035), Color(0.075, 0.072, 0.068))
+			_part(_sphere(0.082, 0.12), Vector3(foot_x, 0.12, -0.135), Color(0.075, 0.072, 0.068))
 	_part(_torus(0.105, 0.012), Vector3(0, 0.82, 0), Color(0.42, 0.34, 0.22))
 	_build_occupation_details()
 	var arm_color := character_skin if is_beachgoer else shirt
@@ -475,8 +490,9 @@ func _build_occupation_details() -> void:
 			_detail_box(details, Vector3(0.38, 0.10, 0.32), Vector3(0, 2.05, 0), Color(0.16, 0.20, 0.25))
 			_detail_box(details, Vector3(0.44, 0.06, 0.26), Vector3(0, 1.99, -0.06), Color(0.16, 0.20, 0.25))
 		"beachgoer", "swimmer":
-			_detail_box(details, Vector3(0.43, 0.28, 0.24), Vector3(0, 0.88, 0), Color(0.92, 0.82, 0.62))
-			_detail_box(details, Vector3(0.08, 0.035, 0.26), Vector3(0, 0.73, 0), Color(0.92, 0.82, 0.62))
+			# Swimwear is built from fitted meshes in _build_character().
+			# Do not add box-shaped overlays that distort the body silhouette.
+			pass
 		_:
 			_detail_box(details, Vector3(0.42, 0.12, 0.30), Vector3(0, 1.66, 0), Color(0.78, 0.68, 0.48))
 
