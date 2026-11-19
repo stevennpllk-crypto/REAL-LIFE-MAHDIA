@@ -128,9 +128,26 @@ func _log_imported_player_orientation() -> void:
 	if head_index < 0 or hips_index < 0:
 		print("MAHDIA_PLAYER_ORIENTATION=UNVERIFIED head_bone=", head_index, " hips_bone=", hips_index)
 		return
-	var head_y := imported_player_skeleton.get_bone_global_rest(head_index).origin.y
-	var hips_y := imported_player_skeleton.get_bone_global_rest(hips_index).origin.y
-	var orientation := "UPRIGHT" if head_y > hips_y + 0.05 else "INVERTED"
+	# Some imported GLB skeletons expose zeroed global-rest origins even
+	# though their local rest transforms contain the actual hierarchy offsets.
+	# Reconstruct each bone's skeleton-space rest transform from its parents.
+	var head_rest := Transform3D.IDENTITY
+	var parent_index := head_index
+	while parent_index >= 0:
+		head_rest = imported_player_skeleton.get_bone_rest(parent_index) * head_rest
+		parent_index = imported_player_skeleton.get_bone_parent(parent_index)
+	var hips_rest := Transform3D.IDENTITY
+	parent_index = hips_index
+	while parent_index >= 0:
+		hips_rest = imported_player_skeleton.get_bone_rest(parent_index) * hips_rest
+		parent_index = imported_player_skeleton.get_bone_parent(parent_index)
+	var head_y := head_rest.origin.y
+	var hips_y := hips_rest.origin.y
+	var difference := head_y - hips_y
+	if absf(difference) <= 0.05:
+		print("MAHDIA_PLAYER_ORIENTATION=UNVERIFIED head_y=", snappedf(head_y, 0.001), " hips_y=", snappedf(hips_y, 0.001), " reason=rest_hierarchy_has_no_vertical_separation")
+		return
+	var orientation := "UPRIGHT" if difference > 0.0 else "INVERTED"
 	print("MAHDIA_PLAYER_ORIENTATION=" + orientation + " head_y=" + str(snappedf(head_y, 0.001)) + " hips_y=" + str(snappedf(hips_y, 0.001)))
 
 
