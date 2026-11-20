@@ -18,6 +18,9 @@ var indicator_clock := 0.0
 var indicator_on := false
 var front_wheels: Array[MeshInstance3D] = []
 var wheel_hubs: Array[MeshInstance3D] = []
+# Optional sculpted sedan body (from the corniche's car generator). When set,
+# it replaces the box body; wheels, lamps and indicators stay functional.
+var body_mesh_override: Mesh = null
 @export var braking_deceleration := 18.0
 @export var coasting_deceleration := 2.8
 @export var steering_response := 4.0
@@ -99,15 +102,22 @@ func _box(size: Vector3, pos: Vector3, color: Color, metallic := 0.0) -> MeshIns
 func _build_car() -> void:
 	var paint := Color(0.025, 0.035, 0.045)
 	var glass := _mat(Color(0.045, 0.075, 0.095), 0.30)
-	_box(Vector3(1.92, 0.58, 3.65), Vector3(0, 0.66, 0), paint, 0.62)
-	_box(Vector3(1.58, 0.78, 1.85), Vector3(0, 1.27, -0.18), Color(0.045, 0.055, 0.065), 0.58)
-	_box(Vector3(1.28, 0.20, 0.12), Vector3(0, 0.66, -1.87), Color(0.55, 0.58, 0.60), 0.78)
-	_box(Vector3(1.48, 0.55, 0.06), Vector3(0, 1.34, -1.12), Color(0.11, 0.23, 0.29))
-	_box(Vector3(1.48, 0.52, 0.06), Vector3(0, 1.34, 0.76), Color(0.11, 0.23, 0.29))
-	_box(Vector3(0.06, 0.52, 0.78), Vector3(-0.79, 1.34, -0.18), Color(0.12, 0.25, 0.31))
-	_box(Vector3(0.06, 0.52, 0.78), Vector3(0.79, 1.34, -0.18), Color(0.12, 0.25, 0.31))
-	_box(Vector3(2.0, 0.16, 0.18), Vector3(0, 0.48, -1.83), Color(0.22, 0.23, 0.24), 0.5)
-	_box(Vector3(2.0, 0.16, 0.18), Vector3(0, 0.48, 1.83), Color(0.22, 0.23, 0.24), 0.5)
+	if body_mesh_override != null:
+		var body_item := MeshInstance3D.new()
+		body_item.name = "SedanBody"
+		body_item.mesh = body_mesh_override
+		body_item.scale = Vector3(1.0, 1.0, 0.77)
+		add_child(body_item)
+	else:
+		_box(Vector3(1.92, 0.58, 3.65), Vector3(0, 0.66, 0), paint, 0.62)
+		_box(Vector3(1.58, 0.78, 1.85), Vector3(0, 1.27, -0.18), Color(0.045, 0.055, 0.065), 0.58)
+		_box(Vector3(1.28, 0.20, 0.12), Vector3(0, 0.66, -1.87), Color(0.55, 0.58, 0.60), 0.78)
+		_box(Vector3(1.48, 0.55, 0.06), Vector3(0, 1.34, -1.12), Color(0.11, 0.23, 0.29))
+		_box(Vector3(1.48, 0.52, 0.06), Vector3(0, 1.34, 0.76), Color(0.11, 0.23, 0.29))
+		_box(Vector3(0.06, 0.52, 0.78), Vector3(-0.79, 1.34, -0.18), Color(0.12, 0.25, 0.31))
+		_box(Vector3(0.06, 0.52, 0.78), Vector3(0.79, 1.34, -0.18), Color(0.12, 0.25, 0.31))
+		_box(Vector3(2.0, 0.16, 0.18), Vector3(0, 0.48, -1.83), Color(0.22, 0.23, 0.24), 0.5)
+		_box(Vector3(2.0, 0.16, 0.18), Vector3(0, 0.48, 1.83), Color(0.22, 0.23, 0.24), 0.5)
 	for side in [-1.0, 1.0]:
 		var headlamp := _box(Vector3(0.32, 0.18, 0.42), Vector3(side * 0.66, 0.91, -1.78), Color(0.96, 0.88, 0.63), 0.2)
 		var head_mat := _mat(Color(0.92, 0.86, 0.68), 0.15)
@@ -156,18 +166,19 @@ func _build_car() -> void:
 			hub.material_override = _mat(Color(0.58, 0.60, 0.62), 0.8)
 			add_child(hub)
 			wheel_hubs.append(hub)
-	# Front fascia: grille, bumper inserts and readable headlamp shapes.
-	_box(Vector3(0.78, 0.20, 0.07), Vector3(0, 0.66, -1.88), Color(0.10, 0.12, 0.13), 0.25)
-	_box(Vector3(0.44, 0.055, 0.075), Vector3(0, 0.69, -1.925), Color(0.34, 0.38, 0.39), 0.45)
-	_box(Vector3(0.38, 0.13, 0.055), Vector3(0, 0.39, -1.91), Color(0.88, 0.88, 0.78))
-	# Rear plate and trim.
-	_box(Vector3(0.62, 0.18, 0.045), Vector3(0, 0.63, 1.88), Color(0.82, 0.84, 0.78))
-	_box(Vector3(1.72, 0.10, 0.10), Vector3(0, 0.36, 1.89), Color(0.18, 0.19, 0.20), 0.35)
-	# Mirrors, door handles and subtle lower side skirts.
-	for side in [-1.0, 1.0]:
-		_box(Vector3(0.22, 0.12, 0.18), Vector3(side * 0.91, 1.43, -0.63), Color(0.10, 0.13, 0.15), 0.3)
-		_box(Vector3(0.055, 0.045, 0.12), Vector3(side * 0.972, 1.16, -0.10), Color(0.82, 0.78, 0.66), 0.35)
-		_box(Vector3(0.10, 0.12, 2.65), Vector3(side * 0.965, 0.42, 0.0), Color(0.20, 0.21, 0.22), 0.25)
+	if body_mesh_override == null:
+		# Front fascia: grille, bumper inserts and readable headlamp shapes.
+		_box(Vector3(0.78, 0.20, 0.07), Vector3(0, 0.66, -1.88), Color(0.10, 0.12, 0.13), 0.25)
+		_box(Vector3(0.44, 0.055, 0.075), Vector3(0, 0.69, -1.925), Color(0.34, 0.38, 0.39), 0.45)
+		_box(Vector3(0.38, 0.13, 0.055), Vector3(0, 0.39, -1.91), Color(0.88, 0.88, 0.78))
+		# Rear plate and trim.
+		_box(Vector3(0.62, 0.18, 0.045), Vector3(0, 0.63, 1.88), Color(0.82, 0.84, 0.78))
+		_box(Vector3(1.72, 0.10, 0.10), Vector3(0, 0.36, 1.89), Color(0.18, 0.19, 0.20), 0.35)
+		# Mirrors, door handles and subtle lower side skirts.
+		for side in [-1.0, 1.0]:
+			_box(Vector3(0.22, 0.12, 0.18), Vector3(side * 0.91, 1.43, -0.63), Color(0.10, 0.13, 0.15), 0.3)
+			_box(Vector3(0.055, 0.045, 0.12), Vector3(side * 0.972, 1.16, -0.10), Color(0.82, 0.78, 0.66), 0.35)
+			_box(Vector3(0.10, 0.12, 2.65), Vector3(side * 0.965, 0.42, 0.0), Color(0.20, 0.21, 0.22), 0.25)
 	# A visible cabin through the windows: dashboard, seats and steering wheel.
 	_box(Vector3(1.34, 0.16, 0.38), Vector3(0, 1.05, -0.86), Color(0.075, 0.085, 0.09))
 	for z in [-0.30, 0.43]:

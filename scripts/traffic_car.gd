@@ -8,6 +8,7 @@ class_name MahdiaTrafficCar
 @export var build_visuals := true
 
 const ROAD_LIMIT := 78.0
+const VERTICAL_SEA_END := -38.0
 var lane_progress := 0.0
 var body_mesh: MeshInstance3D
 var rear_lamp_materials: Array[StandardMaterial3D] = []
@@ -28,9 +29,12 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	lane_progress += cruise_speed * direction * delta
+	# The north-south avenue now ends at the corniche road instead of running
+	# into the sea, so vertical lanes wrap between the corniche and the north.
+	var low := -ROAD_LIMIT if horizontal else VERTICAL_SEA_END
 	if lane_progress > ROAD_LIMIT:
-		lane_progress = -ROAD_LIMIT
-	elif lane_progress < -ROAD_LIMIT:
+		lane_progress = low
+	elif lane_progress < low:
 		lane_progress = ROAD_LIMIT
 	_update_transform()
 

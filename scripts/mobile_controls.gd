@@ -15,81 +15,92 @@ var crouch_button: Button
 var dodge_button: Button
 var stick_max_radius := 46.0
 
+const ICON_BUTTON = preload("res://scripts/hud_icon_button.gd")
+
 func setup(player: CharacterBody3D) -> void:
 	target = player
 	var platform := OS.get_name()
-	if not OS.has_feature("mobile") and platform != "Android" and platform != "iOS":
+	var forced := is_inside_tree() and get_tree().root.has_meta("mahdia_force_touch_ui")
+	if not forced and not OS.has_feature("mobile") and platform != "Android" and platform != "iOS":
 		return
 
 	var root := Control.new()
 	root.name = "TouchControls"
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root.mouse_filter = Control.MOUSE_FILTER_PASS
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 
+	# Reference layout: joystick bottom-left above the chat log.
 	stick_base = Control.new()
 	stick_base.name = "MovementJoystick"
 	stick_base.anchor_left = 0.0
 	stick_base.anchor_right = 0.0
 	stick_base.anchor_top = 1.0
 	stick_base.anchor_bottom = 1.0
-	stick_base.offset_left = 20.0
-	stick_base.offset_top = -158.0
-	stick_base.offset_right = 158.0
-	stick_base.offset_bottom = -20.0
+	stick_base.offset_left = 34.0
+	stick_base.offset_top = -232.0
+	stick_base.offset_right = 172.0
+	stick_base.offset_bottom = -94.0
 	stick_base.mouse_filter = Control.MOUSE_FILTER_STOP
 	stick_base.draw.connect(_draw_stick)
 	stick_base.gui_input.connect(_on_stick_input)
 	root.add_child(stick_base)
 
-	run_button = _make_button(root, "🏃", Vector2(-90, -258))
-	jump_button = _make_button(root, "⬆", Vector2(-90, -80))
-	interact_button = _make_button(root, "💬", Vector2(-90, -350))
-	attack_button = _make_button(root, "👊", Vector2(-178, -166))
-	crouch_button = _make_button(root, "🧎", Vector2(-178, -80))
-	dodge_button = _make_button(root, "⚡", Vector2(-178, -258))
+	# Action cluster bottom-right, matching the reference image:
+	# run (top right), punch (left), crouch (bottom left), jump (bottom right).
+	run_button = _make_button(root, "run", Vector2(-71, -201), 80.0)
+	attack_button = _make_button(root, "punch", Vector2(-208, -147), 80.0)
+	crouch_button = _make_button(root, "crouch", Vector2(-181, -59), 66.0)
+	jump_button = _make_button(root, "jump", Vector2(-71, -80), 74.0)
+	interact_button = _make_button(root, "hand", Vector2(-208, -250), 62.0)
+	dodge_button = _make_button(root, "bolt", Vector2(-300, -64), 56.0)
 
 	run_button.button_down.connect(func(): target.set_mobile_run(true))
 	run_button.button_up.connect(func(): target.set_mobile_run(false))
 	jump_button.pressed.connect(func(): target.request_jump())
 	interact_button.pressed.connect(func(): target.request_interact())
 	attack_button.pressed.connect(func(): target.request_attack())
-	crouch_button.pressed.connect(func(): target.toggle_crouch())
+	crouch_button.pressed.connect(func():
+		target.toggle_crouch()
+		crouch_button.set("toggled_on", bool(target.get("crouching")))
+		crouch_button.queue_redraw()
+	)
 	dodge_button.pressed.connect(func(): target.request_dodge())
 
-func _make_button(parent: Control, caption: String, offset: Vector2) -> Button:
-	var button := Button.new()
-	button.text = caption
-	button.custom_minimum_size = Vector2(72, 72)
-	button.add_theme_font_size_override("font_size", 25)
+# center is measured from the bottom-right corner of the screen.
+func _make_button(parent: Control, icon: String, center: Vector2, diameter: float) -> Button:
+	var button: Button = ICON_BUTTON.new()
+	button.call("setup", icon, diameter)
+	button.name = "Action_" + icon
 	button.anchor_left = 1.0
 	button.anchor_right = 1.0
 	button.anchor_top = 1.0
 	button.anchor_bottom = 1.0
-	button.offset_left = offset.x
-	button.offset_right = offset.x + 72.0
-	button.offset_top = offset.y
-	button.offset_bottom = offset.y + 72.0
-	button.focus_mode = Control.FOCUS_NONE
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.035, 0.055, 0.075, 0.72)
-	normal.set_corner_radius_all(36)
-	normal.set_border_width_all(1)
-	normal.border_color = Color(0.84, 0.89, 0.92, 0.60)
-	button.add_theme_stylebox_override("normal", normal)
-	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.22, 0.29, 0.33, 0.92)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_color_override("font_color", Color.WHITE)
-	button.add_theme_font_size_override("font_size", 24)
+	button.offset_left = center.x - diameter * 0.5
+	button.offset_right = center.x + diameter * 0.5
+	button.offset_top = center.y - diameter * 0.5
+	button.offset_bottom = center.y + diameter * 0.5
 	parent.add_child(button)
 	return button
 
 func _draw_stick() -> void:
 	var center := stick_base.size * 0.5
-	stick_base.draw_circle(center, stick_max_radius + 8.0, Color(0.04, 0.07, 0.12, 0.38))
-	stick_base.draw_arc(center, stick_max_radius + 8.0, 0.0, TAU, 48, Color(0.82, 0.88, 0.98, 0.72), 3.0)
-	stick_base.draw_circle(center + stick_value * stick_max_radius, 21.0, Color(0.78, 0.87, 1.0, 0.92))
+	var outer := stick_max_radius + 18.0
+	stick_base.draw_circle(center, outer, Color(0.03, 0.05, 0.08, 0.30))
+	stick_base.draw_arc(center, outer, 0.0, TAU, 64, Color(1, 1, 1, 0.50), 2.0, true)
+	stick_base.draw_arc(center, outer - 9.0, 0.0, TAU, 64, Color(1, 1, 1, 0.16), 1.0, true)
+	# Direction ticks on the ring.
+	for i in range(4):
+		var a := TAU * float(i) / 4.0
+		var d := Vector2(cos(a), sin(a))
+		var p := Vector2(-d.y, d.x)
+		var tip := center + d * (outer - 4.0)
+		stick_base.draw_colored_polygon(PackedVector2Array([tip, tip - d * 7.0 + p * 5.0, tip - d * 7.0 - p * 5.0]), Color(1, 1, 1, 0.55))
+	var knob := center + stick_value * stick_max_radius
+	stick_base.draw_circle(knob + Vector2(0, 2), 25.0, Color(0, 0, 0, 0.22))
+	stick_base.draw_circle(knob, 24.0, Color(0.86, 0.88, 0.90, 0.95))
+	stick_base.draw_circle(knob - Vector2(4, 5), 15.0, Color(1, 1, 1, 0.55))
+	stick_base.draw_arc(knob, 24.0, 0.0, TAU, 40, Color(0.55, 0.58, 0.62, 0.9), 1.5, true)
 
 func _on_stick_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:

@@ -23,14 +23,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache resident models and PBR textures
+      - name: Cache resident models, PBR textures and HDRI sky
         id: assets-cache
         uses: actions/cache@v4
         with:
           path: |
             assets/characters
             assets/textures
-          key: mahdia-assets-v1-${{ runner.os }}
+            assets/hdri
+          # v2: corniche textures + Poly Haven HDRI added.
+          key: mahdia-assets-v2-${{ runner.os }}
 
       - name: Cache Godot 4.3 export templates
         id: templates-cache
@@ -106,27 +108,21 @@ jobs:
           du -h assets/characters/*.glb
 
 
-      - name: Download CC0 PBR textures for Mahdia streets and facades
+      - name: Download CC0 Poly Haven textures and HDRI for the corniche
         if: steps.assets-cache.outputs.cache-hit != 'true'
-        run: |
-          set -euxo pipefail
-          mkdir -p assets/textures
-          for asset in plastered_wall cobblestone_pavement; do
-            base="https://dl.polyhaven.org/file/ph-assets/Textures"
-            curl --fail --location --retry 3 "$base/jpg/1k/$asset/${asset}_diff_1k.jpg" -o "assets/textures/${asset}_diff_1k.jpg"
-            curl --fail --location --retry 3 "$base/png/1k/$asset/${asset}_nor_gl_1k.png" -o "assets/textures/${asset}_nor_gl_1k.png"
-            curl --fail --location --retry 3 "$base/jpg/1k/$asset/${asset}_rough_1k.jpg" -o "assets/textures/${asset}_rough_1k.jpg"
-            test -s "assets/textures/${asset}_diff_1k.jpg"
-          done
-          du -h assets/textures/*
+        run: bash .github/scripts/fetch-visual-assets.sh
 
       - name: Verify cached and downloaded visual assets
         run: |
           set -euxo pipefail
           test "$(find assets/characters -maxdepth 1 -name '*.glb' -type f | wc -l)" -eq 4
-          test -s assets/textures/plastered_wall_diff_1k.jpg
-          test -s assets/textures/cobblestone_pavement_diff_1k.jpg
-          du -h assets/characters/*.glb assets/textures/*
+          for asset in plastered_wall cobblestone_pavement precast_stone_paving large_sandstone_blocks_01 beige_wall_001 coast_land_rocks_01 asphalt_02; do
+            test -s "assets/textures/${asset}_diff_1k.jpg"
+            test -s "assets/textures/${asset}_nor_gl_1k.png"
+            test -s "assets/textures/${asset}_rough_1k.jpg"
+          done
+          test -s assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr
+          du -h assets/characters/*.glb assets/textures/* assets/hdri/*
 
       - name: Configure Godot Android export paths
         run: |
@@ -172,46 +168,43 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # Keep the GLES Compatibility APK for older devices, but test a
-      # Vulkan Mobile-renderer build separately. SwiftShader GLES has a known
-      # 261-uniform linker failure unrelated to this project's light settings.
-      - name: Export Android Mobile Vulkan variant
+      # The main APK above uses the Mobile (Vulkan) renderer, the project
+      # default since the corniche visual overhaul. Also export a GLES3
+      # Compatibility build for older devices without usable Vulkan.
+      - name: Export Android GLES Compatibility variant
         run: |
           set -euxo pipefail
+          cp project.godot /tmp/project.godot.mobile
           python3 - <<'PY'
           from pathlib import Path
           p = Path("project.godot")
           s = p.read_text()
-          s = s.replace('config/features=PackedStringArray("4.3", "GL Compatibility")', 'config/features=PackedStringArray("4.3", "Mobile")')
-          s = s.replace('renderer/rendering_method="gl_compatibility"', 'renderer/rendering_method="mobile"')
-          s = s.replace('renderer/rendering_method.mobile="gl_compatibility"', 'renderer/rendering_method.mobile="mobile"')
-          assert 'renderer/rendering_method.mobile="mobile"' in s
+          s = s.replace('config/features=PackedStringArray("4.3", "Mobile")', 'config/features=PackedStringArray("4.3", "GL Compatibility")')
+          s = s.replace('renderer/rendering_method="mobile"', 'renderer/rendering_method="gl_compatibility"')
+          s = s.replace('renderer/rendering_method.mobile="mobile"', 'renderer/rendering_method.mobile="gl_compatibility"')
+          assert 'renderer/rendering_method.mobile="gl_compatibility"' in s
           p.write_text(s)
           PY
           godot --headless --editor --path . --quit
-          godot --headless --path . --export-debug "Android" build/REAL_LIFE_MAHDIA-mobile.apk
-          test -s build/REAL_LIFE_MAHDIA-mobile.apk
-          file build/REAL_LIFE_MAHDIA-mobile.apk
+          godot --headless --path . --export-debug "Android" build/REAL_LIFE_MAHDIA-gles-compat.apk
+          test -s build/REAL_LIFE_MAHDIA-gles-compat.apk
+          cp /tmp/project.godot.mobile project.godot
 
-      - name: Upload Android Mobile Vulkan APK
+      - name: Upload Android GLES Compatibility APK
         uses: actions/upload-artifact@v4
         with:
-          name: REAL-LIFE-MAHDIA-Android-Mobile-Vulkan-APK
-          path: build/REAL_LIFE_MAHDIA-mobile.apk
+          name: REAL-LIFE-MAHDIA-Android-GLES-Compatibility-APK
+          path: build/REAL_LIFE_MAHDIA-gles-compat.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Select Vulkan APK for emulator smoke test
+      - name: Confirm the emulator tests the main Mobile Vulkan APK
         run: |
           set -euxo pipefail
-          test -s build/REAL_LIFE_MAHDIA-mobile.apk
-          file build/REAL_LIFE_MAHDIA-mobile.apk
-          unzip -t build/REAL_LIFE_MAHDIA-mobile.apk >/dev/null
-          cp build/REAL_LIFE_MAHDIA-mobile.apk build/REAL_LIFE_MAHDIA-debug.apk
-          file build/REAL_LIFE_MAHDIA-debug.apk
+          test -s build/REAL_LIFE_MAHDIA-debug.apk
           unzip -t build/REAL_LIFE_MAHDIA-debug.apk >/dev/null
           # SwiftShader GLES on hosted runners can fail to link Godot's scene
-          # shader; validate the Vulkan Mobile build on the emulator instead.
+          # shader; the emulator validates the Vulkan Mobile build.
 
       - name: Prepare KVM and ADB for emulator
         run: |

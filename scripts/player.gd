@@ -46,6 +46,17 @@ var dodge_requested := false
 var dodge_time := 0.0
 var dodge_cooldown := 0.0
 var dodge_direction := Vector3.ZERO
+# Wardrobe: the HUD shirt button cycles these outfits (shirt, shorts, shoes).
+const OUTFITS := [
+	[Color(0.025, 0.027, 0.03), Color(0.03, 0.032, 0.036), Color(0.93, 0.93, 0.92)],
+	[Color(0.93, 0.93, 0.91), Color(0.10, 0.16, 0.30), Color(0.95, 0.95, 0.94)],
+	[Color(0.06, 0.28, 0.58), Color(0.86, 0.80, 0.66), Color(0.20, 0.15, 0.11)],
+	[Color(0.62, 0.08, 0.10), Color(0.04, 0.045, 0.05), Color(0.06, 0.06, 0.07)]
+]
+var outfit_index := 0
+var shirt_materials: Array[StandardMaterial3D] = []
+var shorts_materials: Array[StandardMaterial3D] = []
+var shoe_materials: Array[StandardMaterial3D] = []
 
 func _ready() -> void:
 	_add_action("move_forward", KEY_W)
@@ -73,10 +84,10 @@ func _ready() -> void:
 	# Reference-image framing: a close, centered third-person follow camera.
 	# The slightly narrower lens keeps the player prominent without extreme
 	# perspective distortion on a tall mobile display.
-	camera.position = Vector3(0.10, 0.30, 1.55)
-	camera.rotation_degrees.x = -8.5
+	camera.position = Vector3(0.0, 0.38, 2.75)
+	camera.rotation_degrees.x = -8.0
 	camera.current = true
-	camera.fov = 51.0
+	camera.fov = 58.0
 	camera.near = 0.08
 	camera_pivot.add_child(camera)
 	if not OS.has_feature("mobile"):
@@ -270,6 +281,8 @@ func _pose_imported_player_bone(key: String, angle: float) -> void:
 	imported_player_skeleton.set_bone_pose_rotation(bone_index, pose_rotation)
 
 
+const SKIN := Color(0.66, 0.46, 0.34)
+
 func _mat(color: Color, roughness := 0.82) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
@@ -295,23 +308,25 @@ func _build_human_figure() -> void:
 	torso.bottom_radius = 0.285
 	torso.height = 0.82
 	torso.radial_segments = 16
-	_part(visual_root, torso, Vector3(0, 1.22, 0), Color(0.035, 0.045, 0.065))
+	shirt_materials.append(_part(visual_root, torso, Vector3(0, 1.22, 0), OUTFITS[0][0]).material_override)
 	# Add a fitted collar, front zip, cuffs and subtle fabric panels.
 	var collar := TorusMesh.new()
 	collar.inner_radius = 0.09
 	collar.outer_radius = 0.12
 	collar.rings = 16
 	collar.ring_segments = 8
-	_part(visual_root, collar, Vector3(0, 1.59, -0.012), Color(0.10, 0.12, 0.15))
-	var zip := BoxMesh.new()
-	zip.size = Vector3(0.012, 0.34, 0.012)
-	_part(visual_root, zip, Vector3(0, 1.23, -0.252), Color(0.32, 0.34, 0.37))
-	var shirt_panel := BoxMesh.new()
-	shirt_panel.size = Vector3(0.12, 0.15, 0.014)
-	_part(visual_root, shirt_panel, Vector3(-0.14, 1.30, -0.246), Color(0.07, 0.085, 0.11))
-	var shirt_panel_right := BoxMesh.new()
-	shirt_panel_right.size = Vector3(0.12, 0.15, 0.014)
-	_part(visual_root, shirt_panel_right, Vector3(0.14, 1.30, -0.246), Color(0.07, 0.085, 0.11))
+	shirt_materials.append(_part(visual_root, collar, Vector3(0, 1.59, -0.012), OUTFITS[0][0]).material_override)
+	# Small chest logo and a shorts waistband.
+	var logo := BoxMesh.new()
+	logo.size = Vector3(0.10, 0.035, 0.012)
+	var logo_item := _part(visual_root, logo, Vector3(-0.10, 1.40, -0.236), Color(0.92, 0.92, 0.9))
+	logo_item.rotation.z = 0.25
+	var waist := CylinderMesh.new()
+	waist.top_radius = 0.29
+	waist.bottom_radius = 0.30
+	waist.height = 0.16
+	waist.radial_segments = 16
+	shorts_materials.append(_part(visual_root, waist, Vector3(0, 0.84, 0), OUTFITS[0][1]).material_override)
 	var neck := CylinderMesh.new()
 	neck.top_radius = 0.105
 	neck.bottom_radius = 0.12
@@ -330,6 +345,18 @@ func _build_human_figure() -> void:
 	hair.height = 0.18
 	var hair_cap := _part(visual_root, hair, Vector3(0, 2.015, 0.018), Color(0.075, 0.055, 0.045))
 	hair_cap.scale = Vector3(1.0, 0.62, 1.0)
+	# Fuller short dark hair covering the back and sides of the head.
+	var back_hair := SphereMesh.new()
+	back_hair.radius = 0.212
+	back_hair.height = 0.36
+	var back_item := _part(visual_root, back_hair, Vector3(0, 1.925, 0.03), Color(0.06, 0.045, 0.035))
+	back_item.scale = Vector3(1.02, 1.0, 1.0)
+	for k in range(7):
+		var a := TAU * float(k) / 7.0
+		var curl := SphereMesh.new()
+		curl.radius = 0.06
+		curl.height = 0.1
+		_part(visual_root, curl, Vector3(cos(a) * 0.14, 2.06, sin(a) * 0.12 + 0.02), Color(0.07, 0.05, 0.04))
 	var ear := SphereMesh.new()
 	ear.radius = 0.052
 	ear.height = 0.13
@@ -367,22 +394,18 @@ func _build_human_figure() -> void:
 	mouth.height = 0.05
 	var mouth_item := _part(visual_root, mouth, Vector3(0, 1.78, -0.194), Color(0.25, 0.09, 0.075))
 	mouth_item.rotation.z = PI * 0.5
-	left_arm = _make_limb(Vector3(-0.31, 1.48, 0), Color(0.055, 0.24, 0.78), 0.66, 0.105)
-	right_arm = _make_limb(Vector3(0.31, 1.48, 0), Color(0.055, 0.24, 0.78), 0.66, 0.105)
-	left_leg = _make_limb(Vector3(-0.145, 0.78, 0), Color(0.10, 0.12, 0.17), 0.76, 0.125)
-	right_leg = _make_limb(Vector3(0.145, 0.78, 0), Color(0.10, 0.12, 0.17), 0.76, 0.125)
-	_make_shoe(Vector3(-0.145, 0.095, -0.075))
-	_make_shoe(Vector3(0.145, 0.095, -0.075))
+	# T-shirt sleeves over bare arms; shorts over bare lower legs.
+	left_arm = _make_limb(Vector3(-0.31, 1.48, 0), SKIN, 0.66, 0.095)
+	right_arm = _make_limb(Vector3(0.31, 1.48, 0), SKIN, 0.66, 0.095)
+	left_leg = _make_limb(Vector3(-0.145, 0.78, 0), OUTFITS[0][1], 0.76, 0.125)
+	right_leg = _make_limb(Vector3(0.145, 0.78, 0), OUTFITS[0][1], 0.76, 0.125)
 	# Visible hands and a wrist watch break the mannequin silhouette.
-	var hand_mesh := SphereMesh.new()
-	hand_mesh.radius = 0.065
-	hand_mesh.height = 0.12
-	_part(visual_root, hand_mesh, Vector3(-0.31, 1.00, -0.01), Color(0.69, 0.48, 0.35))
-	_part(visual_root, hand_mesh, Vector3(0.31, 1.00, -0.01), Color(0.69, 0.48, 0.35))
 	var watch := TorusMesh.new()
 	watch.inner_radius = 0.075
 	watch.outer_radius = 0.09
-	_part(visual_root, watch, Vector3(-0.31, 1.14, 0), Color(0.58, 0.54, 0.42))
+	var watch_item := _part(visual_root, watch, Vector3(0, -0.24, 0), Color(0.08, 0.08, 0.09))
+	if is_instance_valid(left_elbow):
+		watch_item.reparent(left_elbow, false)
 
 func _make_limb(pos: Vector3, color: Color, length: float, radius: float) -> Node3D:
 	# Separate upper/lower segments let elbows and knees bend naturally.
@@ -395,18 +418,35 @@ func _make_limb(pos: Vector3, color: Color, length: float, radius: float) -> Nod
 	var upper := CapsuleMesh.new()
 	upper.radius = radius
 	upper.height = upper_length
-	_part(pivot, upper, Vector3(0, -upper_length * 0.48, 0), color)
+	var upper_item := _part(pivot, upper, Vector3(0, -upper_length * 0.48, 0), color)
+	if is_arm:
+		# Short t-shirt sleeve over the upper arm.
+		var sleeve := CylinderMesh.new()
+		sleeve.top_radius = radius * 1.12
+		sleeve.bottom_radius = radius * 1.2
+		sleeve.height = upper_length * 0.55
+		sleeve.radial_segments = 12
+		shirt_materials.append(_part(pivot, sleeve, Vector3(0, -upper_length * 0.26, 0), OUTFITS[0][0]).material_override)
+	else:
+		shorts_materials.append(upper_item.material_override)
+		# White side stripes on the shorts.
+		var stripe := BoxMesh.new()
+		stripe.size = Vector3(0.012, upper_length * 0.85, 0.03)
+		for k in range(3):
+			_part(pivot, stripe, Vector3((1.0 if pos.x > 0.0 else -1.0) * (radius + 0.003), -upper_length * 0.45, -0.035 + float(k) * 0.035), Color(0.95, 0.95, 0.95))
 	var joint := Node3D.new()
 	joint.position = Vector3(0, -upper_length * 0.92, 0)
 	pivot.add_child(joint)
 	var joint_mesh := SphereMesh.new()
 	joint_mesh.radius = radius * 0.94
 	joint_mesh.height = radius * 1.9
-	_part(joint, joint_mesh, Vector3.ZERO, color.darkened(0.025))
+	var joint_item := _part(joint, joint_mesh, Vector3.ZERO, color.darkened(0.025) if is_arm else SKIN)
+	if not is_arm:
+		joint_item.scale = Vector3(0.8, 0.8, 0.8)
 	var lower := CapsuleMesh.new()
-	lower.radius = radius * (0.82 if is_arm else 0.88)
+	lower.radius = radius * (0.82 if is_arm else 0.68)
 	lower.height = lower_length
-	_part(joint, lower, Vector3(0, -lower_length * 0.48, 0), color)
+	_part(joint, lower, Vector3(0, -lower_length * 0.48, 0), color if is_arm else SKIN)
 	if is_arm:
 		var hand := SphereMesh.new()
 		hand.radius = 0.065
@@ -417,11 +457,21 @@ func _make_limb(pos: Vector3, color: Color, length: float, radius: float) -> Nod
 		else:
 			right_elbow = joint
 	else:
+		var sock := CylinderMesh.new()
+		sock.top_radius = radius * 0.72
+		sock.bottom_radius = radius * 0.74
+		sock.height = 0.09
+		_part(joint, sock, Vector3(0, -lower_length * 0.84, 0), Color(0.95, 0.95, 0.95))
 		var shoe := CapsuleMesh.new()
-		shoe.radius = 0.105
-		shoe.height = 0.25
-		var shoe_item := _part(joint, shoe, Vector3(0, -lower_length * 0.93, -0.045), Color(0.045, 0.05, 0.06))
+		shoe.radius = 0.1
+		shoe.height = 0.29
+		var shoe_item := _part(joint, shoe, Vector3(0, -lower_length * 0.95, -0.05), OUTFITS[0][2])
 		shoe_item.rotation.x = PI * 0.5
+		shoe_item.scale = Vector3(1.0, 1.0, 0.72)
+		shoe_materials.append(shoe_item.material_override)
+		var sole := BoxMesh.new()
+		sole.size = Vector3(0.17, 0.035, 0.3)
+		_part(joint, sole, Vector3(0, -lower_length * 0.95 - 0.07, -0.05), Color(0.97, 0.97, 0.96))
 		if pos.x < 0.0:
 			left_knee = joint
 		else:
@@ -500,7 +550,27 @@ func toggle_crouch() -> void:
 		running = false
 
 func is_in_water() -> bool:
+	# The rocky Borj el Kebir point is solid ground inside the sea zone.
+	if global_position.x > -52.0 and global_position.x < -6.0 and global_position.z > -82.0:
+		return false
 	return global_position.z < -59.0 and absf(global_position.x) < 90.0
+
+func set_outfit(index: int) -> void:
+	outfit_index = posmod(index, OUTFITS.size())
+	var outfit: Array = OUTFITS[outfit_index]
+	for m in shirt_materials:
+		if m != null:
+			m.albedo_color = outfit[0]
+	for m in shorts_materials:
+		if m != null:
+			m.albedo_color = outfit[1]
+	for m in shoe_materials:
+		if m != null:
+			m.albedo_color = outfit[2]
+
+func cycle_outfit() -> int:
+	set_outfit(outfit_index + 1)
+	return outfit_index
 
 func _physics_process(delta: float) -> void:
 	is_swimming = is_in_water()

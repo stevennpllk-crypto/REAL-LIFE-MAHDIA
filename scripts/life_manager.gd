@@ -23,6 +23,18 @@ var inside_station_kind := ""
 var autosave_elapsed := 0.0
 var base_run_speed := 4.8
 var base_walk_speed := 2.6
+# Experience earned from real progress (missions, work, conversations).
+var xp := 0
+const XP_PER_LEVEL := 100
+
+func add_xp(amount: int) -> void:
+	xp = maxi(0, xp + amount)
+
+func get_level() -> int:
+	return 1 + xp / XP_PER_LEVEL
+
+func get_level_progress() -> float:
+	return float(xp % XP_PER_LEVEL) / float(XP_PER_LEVEL)
 
 func set_ai_service(service: Node) -> void:
 	ai_service = service
@@ -56,6 +68,7 @@ func _on_npc_ai_reply(resident: Node3D, reply: String, success: bool) -> void:
 	if not is_instance_valid(resident):
 		return
 	if success:
+		add_xp(5)
 		_set_message("%s: %s" % [str(resident.get("display_name")), reply])
 	else:
 		_set_message("%s: %s" % [str(resident.get("display_name")), str(resident.call("get_dialogue"))])
@@ -74,6 +87,7 @@ func setup(target: CharacterBody3D, saver: Node) -> void:
 	job_claimed = bool(data.get("job_claimed", false))
 	delivery_state = str(data.get("delivery_state", "not_started"))
 	delivery_target_name = str(data.get("delivery_target_name", ""))
+	xp = maxi(0, int(data.get("xp", 0)))
 	_create_station("مقهى الميناء", "cafe", Vector3(-12, 0, -5), Color(0.65, 0.28, 0.12))
 	_create_station("مقهى الشاطئ", "cafe", Vector3(-63, 0, -46.5), Color(0.17, 0.38, 0.43))
 	_create_station("منزلك", "home", Vector3(15, 0, 8), Color(0.82, 0.76, 0.61))
@@ -122,7 +136,10 @@ func _create_station(title: String, kind: String, at: Vector3, tint: Color) -> v
 	sign.font_size = 34
 	sign.pixel_size = 0.008
 	building.add_child(sign)
-	get_tree().current_scene.add_child(building)
+	# The test harness and screenshot tool run without a current_scene;
+	# fall back to the world node that owns this manager.
+	var host: Node = get_tree().current_scene if get_tree().current_scene != null else get_parent()
+	host.add_child(building)
 	stations.append({"title": title, "kind": kind, "position": at, "building": building})
 
 func try_interact() -> void:
@@ -168,6 +185,7 @@ func try_interact() -> void:
 			if not job_claimed:
 				money += 30
 				job_claimed = true
+				add_xp(50)
 				_set_message("أنهيت عملاً في المهدية وربحت 30 د.ت!")
 			else:
 				_set_message("أنهيت عمل اليوم بالفعل. عد لاحقاً.")
@@ -177,6 +195,7 @@ func try_interact() -> void:
 				food += 1
 				if delivery_state == "accepted":
 					delivery_state = "ready"
+					add_xp(30)
 					_set_message("اشتريت الوجبة المطلوبة! عد إلى المواطن الذي طلبها.")
 				else:
 					_set_message("اشتريت وجبة. الطعام في حقيبتك: %d" % food)
@@ -215,6 +234,7 @@ func _interact_resident(resident: Node3D) -> void:
 			food -= 1
 			money += 20
 			delivery_state = "completed"
+			add_xp(60)
 			delivery_target_name = ""
 			delivery_npc = null
 			_set_message("أحسنت! سلّمت الوجبة إلى %s وربحت 20 د.ت!" % str(resident.get("display_name")))
@@ -229,6 +249,7 @@ func _interact_resident(resident: Node3D) -> void:
 		_set_message("%s: يعطيك الصحة! ساعدتني كثيراً." % resident_dialogue)
 	else:
 		delivery_state = "accepted"
+		add_xp(20)
 		delivery_npc = resident
 		delivery_target_name = str(resident.get("display_name"))
 		_set_message("%s: هل يمكنك إحضار وجبة من متجر الحي؟ المكافأة 20 د.ت!" % resident_dialogue)
@@ -250,7 +271,8 @@ func save_now() -> void:
 		"hunger": hunger,
 		"job_claimed": job_claimed,
 		"delivery_state": delivery_state,
-		"delivery_target_name": delivery_target_name
+		"delivery_target_name": delivery_target_name,
+		"xp": xp
 	}
 	var result: Error = save_manager.save_progress(all_data)
 	if result != OK:
