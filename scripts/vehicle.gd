@@ -206,8 +206,10 @@ func _physics_process(delta: float) -> void:
 	else:
 		speed = move_toward(speed, target_speed, acceleration * delta)
 	steering_input = move_toward(steering_input, steering, delta * steering_response)
-	var speed_ratio := clampf(absf(speed) / 3.0, 0.0, 1.0)
-	# Steering becomes progressively less aggressive at high speed for stability.
+	# Keep useful steering authority while crawling, then soften it at road speed.
+	# A zero-to-one linear multiplier made the car feel almost impossible to turn
+	# during slow manoeuvres on the mobile joystick.
+	var speed_ratio := maxf(0.38, clampf(absf(speed) / 3.0, 0.0, 1.0)) if absf(speed) > 0.08 else 0.0
 	var high_speed_limit := lerpf(1.0, 0.58, clampf(absf(speed) / maxf(max_speed, 0.1), 0.0, 1.0))
 	rotation.y -= steering_input * turn_speed * high_speed_limit * delta * speed_ratio * (1.0 if speed >= 0.0 else -1.0)
 	for wheel_index in range(front_wheels.size()):
@@ -226,23 +228,34 @@ func _physics_process(delta: float) -> void:
 	for hub in wheel_hubs:
 		hub.rotate_object_local(Vector3(0, 0, 1), speed * delta / 0.39)
 	driver.global_position = global_position + Vector3(0, 1.8, 0)
-	if Input.is_action_just_pressed("interact"):
-		exit_vehicle()
 
 func enter_vehicle(player: CharacterBody3D) -> void:
 	if driver != null:
 		return
 	driver = player
+	# Do not carry a held joystick/run/action state into the vehicle.
+	if driver.has_method("set_mobile_move"):
+		driver.call("set_mobile_move", Vector2.ZERO)
+	if driver.has_method("set_mobile_run"):
+		driver.call("set_mobile_run", false)
+	driver.set("interact_requested", false)
 	driver.visible = false
 	driver.set_physics_process(false)
 
 func exit_vehicle() -> void:
 	if driver == null:
 		return
-	driver.visible = true
-	driver.global_position = global_position + global_transform.basis.x * 2.0 + Vector3.UP
-	driver.velocity = Vector3.ZERO
-	driver.set_physics_process(true)
+	var exiting_driver := driver
+	# Restore a clean on-foot input state before physics resumes.
+	if exiting_driver.has_method("set_mobile_move"):
+		exiting_driver.call("set_mobile_move", Vector2.ZERO)
+	if exiting_driver.has_method("set_mobile_run"):
+		exiting_driver.call("set_mobile_run", false)
+	exiting_driver.set("interact_requested", false)
+	exiting_driver.visible = true
+	exiting_driver.global_position = global_position + global_transform.basis.x * 2.0 + Vector3(0.0, 0.08, 0.0)
+	exiting_driver.velocity = Vector3.ZERO
+	exiting_driver.set_physics_process(true)
 	driver = null
 	speed = 0.0
 	steering_input = 0.0
