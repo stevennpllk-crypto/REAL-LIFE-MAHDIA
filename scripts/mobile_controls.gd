@@ -47,7 +47,7 @@ func setup(player: CharacterBody3D) -> void:
 	interact_button = _make_button(root, "💬", Vector2(-90, -350))
 	attack_button = _make_button(root, "👊", Vector2(-178, -166))
 	crouch_button = _make_button(root, "🧎", Vector2(-178, -80))
-	dodge_button = null
+	dodge_button = _make_button(root, "⚡", Vector2(-178, -258))
 
 	run_button.button_down.connect(func(): target.set_mobile_run(true))
 	run_button.button_up.connect(func(): target.set_mobile_run(false))
@@ -55,6 +55,7 @@ func setup(player: CharacterBody3D) -> void:
 	interact_button.pressed.connect(func(): target.request_interact())
 	attack_button.pressed.connect(func(): target.request_attack())
 	crouch_button.pressed.connect(func(): target.toggle_crouch())
+	dodge_button.pressed.connect(func(): target.request_dodge())
 
 func _make_button(parent: Control, caption: String, offset: Vector2) -> Button:
 	var button := Button.new()
