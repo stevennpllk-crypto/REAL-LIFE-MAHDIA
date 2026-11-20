@@ -95,14 +95,19 @@ func _on_stick_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		if event.pressed and stick_touch == -1:
 			stick_touch = event.index
-			_update_stick(event.position)
+			_update_stick(_screen_to_stick_local(event.position))
 		elif not event.pressed and event.index == stick_touch:
 			stick_touch = -1
 			stick_value = Vector2.ZERO
 			target.set_mobile_move(Vector2.ZERO)
 			stick_base.queue_redraw()
 	elif event is InputEventScreenDrag and event.index == stick_touch:
-		_update_stick(event.position)
+		_update_stick(_screen_to_stick_local(event.position))
+
+func _screen_to_stick_local(screen_position: Vector2) -> Vector2:
+	# Screen-touch events use viewport coordinates, unlike Control-local GUI
+	# coordinates. Convert before comparing against the joystick's local center.
+	return stick_base.get_global_transform_with_canvas().affine_inverse() * screen_position
 
 func _update_stick(local_position: Vector2) -> void:
 	var center := stick_base.size * 0.5
