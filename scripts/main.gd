@@ -41,8 +41,9 @@ var water_clock := 0.0
 var water_visual_elapsed := 0.0
 var hud_refresh_elapsed := 0.0
 var autosave_elapsed := 0.0
-var quality_level := 2
+var quality_level := 1
 var quality_button: Button
+var world_ready := false
 var restored_vehicle_position := START_VEHICLE_POSITION
 var restore_vehicle_driver := false
 var mission_hud_label: Label
@@ -74,6 +75,7 @@ func _ready() -> void:
 	_spawn_residents()
 	_spawn_vehicle()
 	_spawn_traffic()
+	world_ready = true
 	print("MAHDIA_WORLD_READY")
 
 func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
@@ -716,7 +718,8 @@ func _spawn_residents() -> void:
 		Vector3(18.0, 0, -44.0), Vector3(13.0, 0, -50.0),
 		Vector3(7.0, 0, -44.2), Vector3(2.0, 0, -50.0)
 	]
-	var resident_budget: int = sidewalk_positions.size()
+	var resident_budgets := [5, 8, 12]
+	var resident_budget: int = resident_budgets[clampi(quality_level, 0, 2)]
 	for i in range(mini(sidewalk_positions.size(), resident_budget)):
 		var npc := CharacterBody3D.new()
 		npc.set_script(NPC_SCRIPT)
@@ -761,7 +764,8 @@ func _spawn_traffic() -> void:
 		[false, -1.65, -40.0, 1.0, 3.8],
 		[false, 1.65, 48.0, -1.0, 4.2]
 	]
-	var traffic_budget: int = traffic_specs.size()
+	var traffic_budgets := [2, 3, 4]
+	var traffic_budget: int = traffic_budgets[clampi(quality_level, 0, 2)]
 	for i in range(mini(traffic_specs.size(), traffic_budget)):
 		var spec: Array = traffic_specs[i]
 		var car := CharacterBody3D.new()
@@ -811,6 +815,16 @@ func _build_hud() -> void:
 	panel.custom_minimum_size = Vector2(300, 54)
 	panel.visible = false
 	layer.add_child(panel)
+	quality_button = Button.new()
+	quality_button.anchor_left = 1.0
+	quality_button.anchor_right = 1.0
+	quality_button.offset_left = -164
+	quality_button.offset_right = -16
+	quality_button.offset_top = 14
+	quality_button.offset_bottom = 56
+	quality_button.custom_minimum_size = Vector2(148, 42)
+	quality_button.pressed.connect(_cycle_graphics_quality)
+	layer.add_child(quality_button)
 	status_label = Label.new()
 	status_label.text = "MAHDIA • 08:00 • Prototype"
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1330,7 +1344,7 @@ func _restore_world_progress() -> void:
 		var car: Array = world.vehicle_position
 		restored_vehicle_position = START_VEHICLE_POSITION if migrate_legacy_start else Vector3(float(car[0]), float(car[1]), float(car[2]))
 	restore_vehicle_driver = bool(world.get("was_driving", false))
-	quality_level = 2
+	quality_level = clampi(int(world.get("graphics_quality", quality_level)), 0, 2)
 	print("MAHDIA_WORLD_PROGRESS_RESTORED")
 
 func _save_world_progress() -> void:
@@ -1358,18 +1372,51 @@ func _notification(what: int) -> void:
 		_save_world_progress()
 
 func _select_device_profile() -> void:
-	# The world uses one shared visual and simulation configuration everywhere.
-	quality_level = 2
+	# Start mobile devices at Medium; desktop builds start at High.
+	quality_level = 1 if OS.has_feature("mobile") else 2
+
+func _cycle_graphics_quality() -> void:
+	quality_level = (quality_level + 1) % 3
+	_apply_graphics_quality()
+	if world_ready:
+		await _rebuild_population_for_quality()
+	_save_world_progress()
+
+func _rebuild_population_for_quality() -> void:
+	# Persist each resident's memory before rebuilding the quality-tier population.
+	for resident in get_tree().get_nodes_in_group("mahdia_residents"):
+		if is_instance_valid(resident):
+			if resident.has_method("_save_memory"):
+				resident.call("_save_memory")
+			resident.queue_free()
+	for traffic_car in get_tree().get_nodes_in_group("mahdia_traffic"):
+		if is_instance_valid(traffic_car):
+			traffic_car.queue_free()
+	await get_tree().process_frame
+	_spawn_residents()
+	_spawn_traffic()
 
 func _apply_graphics_quality() -> void:
-	Engine.max_fps = 60
+	var fps_caps := [30, 45, 60]
+	var render_scales := [0.70, 0.82, 1.0]
+	var shadow_distances := [18.0, 30.0, 48.0]
+	var ambient_levels := [0.78, 0.86, 0.94]
+	var tier := clampi(quality_level, 0, 2)
+	Engine.max_fps = fps_caps[tier]
+	# Keep physics deterministic across visual tiers.
 	Engine.physics_ticks_per_second = 60
-	get_viewport().scaling_3d_scale = 1.0
+	get_viewport().scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+	get_viewport().scaling_3d_scale = render_scales[tier]
 	if is_instance_valid(sun):
 		sun.visible = true
-		sun.shadow_enabled = true
+		sun.shadow_enabled = tier == 2
+		sun.directional_shadow_max_distance = shadow_distances[tier]
 	if is_instance_valid(world_environment):
-		world_environment.ambient_light_energy = 0.94
+		world_environment.ambient_light_energy = ambient_levels[tier]
+	if is_instance_valid(quality_button):
+		var labels := ["منخفضة · 30 FPS", "متوسطة · 45 FPS", "عالية · 60 FPS"]
+		quality_button.text = "الجودة: " + labels[tier]
+		quality_button.tooltip_text = "اضغط لتغيير جودة الرسومات وعدد السكان والسيارات"
 
 
 func _surface_texture(kind: String) -> ImageTexture:
