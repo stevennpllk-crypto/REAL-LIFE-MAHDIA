@@ -25,3 +25,16 @@
 - Changing tiers saves resident memory, rebuilds the active population, and persists the selected quality level.
 - Updated Android smoke-test expectations for the mobile Medium default.
 - Occlusion culling and runtime object pooling are not claimed as complete: the current scene uses a small fixed set of traffic/resident instances. These need a renderer/device benchmark and a real dynamic spawn/despawn path before being enabled without risking CPU/RAM regressions.
+
+## 2026-11-20 — Object pooling, draw distance and occlusion culling
+
+- **Object pooling**: residents and traffic cars now live in fixed per-slot pools (12 residents, 4 cars). Changing the quality tier parks the extras (detached from the scene tree, so no render/physics/script cost, memory saved first) and re-attaches them when the tier rises. Nothing is freed and rebuilt. Only slots inside the active budget are ever created, so a Low-tier session never loads the full population.
+- **Draw distance per tier**: camera far plane Low 160 m / Medium 220 m / High 320 m. Small facade details (windows, balconies, AC units, rails) use `visibility_range_end` of 30 / 55 / 100 m and never cast shadows, so distant buildings render as shell + roof only.
+- **Occlusion culling**: `rendering/occlusion_culling/use_occlusion_culling=true`, and every building gets an inset `BoxOccluder3D`, so props, cars and residents fully behind buildings are skipped.
+- New test `tests/test_quality_pooling.gd` loads the real Main scene and checks the budgets, pool reuse, draw distance, detail range and occluders on every tier. It was added to the Godot validation workflow.
+
+### Verification status
+
+- Local, Godot 4.3 headless (Linux arm64): project import OK; `test_mobile_movement.gd` 72/72; `test_quality_pooling.gd` 38/38 (run twice).
+- Headless runs use the dummy renderer, so these numbers do not measure FPS. **30+ FPS on a 3 GB device still has to be confirmed on a real phone.** No such measurement is claimed.
+- APK export and the emulator smoke test still need the GitHub Actions run on this branch.

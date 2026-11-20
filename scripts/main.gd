@@ -44,6 +44,20 @@ var autosave_elapsed := 0.0
 var quality_level := 1
 var quality_button: Button
 var world_ready := false
+# Object pools: one slot per resident/traffic car. A node above the active
+# tier budget is detached from the tree (no render, physics or script cost)
+# and reattached when the budget rises, instead of being freed and rebuilt.
+var resident_slots: Dictionary = {}
+var traffic_slots: Dictionary = {}
+var pool_reuse_count := 0
+var pool_create_count := 0
+# Draw-distance LOD: small facade details fade out before the building shell.
+var building_detail_meshes: Array[GeometryInstance3D] = []
+var building_count := 0
+const CAMERA_FAR_BY_TIER := [160.0, 220.0, 320.0]
+const DETAIL_RANGE_BY_TIER := [30.0, 55.0, 100.0]
+const RESIDENT_BUDGETS := [5, 8, 12]
+const TRAFFIC_BUDGETS := [2, 3, 4]
 var restored_vehicle_position := START_VEHICLE_POSITION
 var restore_vehicle_driver := false
 var mission_hud_label: Label
@@ -655,6 +669,28 @@ func _create_building(origin: Vector3, size: Vector3, wall_color: Color, seed_va
 	collision.shape = shape
 	collision.position.y = h * 0.5
 	building.add_child(collision)
+	# The first two meshes are the plaster shell and roof slab; everything after
+	# them is small facade detail that the draw-distance LOD may hide.
+	var mesh_index := 0
+	for child in building.get_children():
+		if child is GeometryInstance3D:
+			if mesh_index >= 2:
+				var detail := child as GeometryInstance3D
+				detail.visibility_range_end = DETAIL_RANGE_BY_TIER[clampi(quality_level, 0, 2)]
+				detail.visibility_range_end_margin = 4.0
+				detail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				building_detail_meshes.append(detail)
+			mesh_index += 1
+	# A slightly inset box occluder lets the renderer skip props, cars and
+	# residents that are completely hidden behind this building.
+	var occluder := OccluderInstance3D.new()
+	var box_occluder := BoxOccluder3D.new()
+	box_occluder.size = Vector3(maxf(w - 0.2, 0.5), maxf(h - 0.1, 0.5), maxf(d - 0.2, 0.5))
+	occluder.occluder = box_occluder
+	occluder.position.y = h * 0.5
+	building.add_child(occluder)
+	building.add_to_group("mahdia_buildings")
+	building_count += 1
 	add_child(building)
 
 func _create_palm(pos: Vector3) -> void:
@@ -693,45 +729,40 @@ func _spawn_player() -> void:
 	player.name = "Player"
 	add_child(player)
 
+const RESIDENT_PERSONALITIES := [
+	"friendly", "shy", "busy", "curious", "grumpy", "friendly",
+	"curious", "busy", "friendly", "shy", "curious", "busy"
+]
+const RESIDENT_JOBS := [
+	"fisher", "shopkeeper", "mechanic", "student", "resident", "cook",
+	"driver", "beachgoer", "shopkeeper", "student", "fisher", "mechanic"
+]
+const RESIDENT_NAMES := [
+	"سامي", "مريم", "أيمن", "ليلى", "منير", "آمنة",
+	"يوسف", "سارة", "حاتم", "نجلاء", "وليد", "ريم"
+]
+# Public sidewalk spots, so residents never spawn inside buildings or lanes.
+const SIDEWALK_POSITIONS := [
+	Vector3(62.0, 0, -44.0), Vector3(57.0, 0, -50.0),
+	Vector3(51.0, 0, -44.2), Vector3(46.0, 0, -50.0),
+	Vector3(40.0, 0, -44.0), Vector3(35.0, 0, -50.0),
+	Vector3(29.0, 0, -44.2), Vector3(24.0, 0, -50.0),
+	Vector3(18.0, 0, -44.0), Vector3(13.0, 0, -50.0),
+	Vector3(7.0, 0, -44.2), Vector3(2.0, 0, -50.0)
+]
+# Four lightweight autonomous vehicles on the two main-road axes; they wrap
+# at the road ends, so each pooled car is reused continuously while active.
+const TRAFFIC_SPECS := [
+	[true, -1.65, -52.0, 1.0, 4.0],
+	[true, 1.65, 34.0, -1.0, 3.6],
+	[false, -1.65, -40.0, 1.0, 3.8],
+	[false, 1.65, 48.0, -1.0, 4.2]
+]
+
 func _spawn_residents() -> void:
-	# Keep active simulation population proportional to the selected device tier.
-	# Residents beyond this budget are not instantiated, avoiding hidden CPU/RAM cost.
-	# Place residents on public sidewalks rather than random points that may
-	# intersect buildings or spawn directly inside traffic lanes.
-	var personalities := [
-		"friendly", "shy", "busy", "curious", "grumpy", "friendly",
-		"curious", "busy", "friendly", "shy", "curious", "busy"
-	]
-	var jobs := [
-		"fisher", "shopkeeper", "mechanic", "student", "resident", "cook",
-		"driver", "beachgoer", "shopkeeper", "student", "fisher", "mechanic"
-	]
-	var resident_names := [
-		"سامي", "مريم", "أيمن", "ليلى", "منير", "آمنة",
-		"يوسف", "سارة", "حاتم", "نجلاء", "وليد", "ريم"
-	]
-	var sidewalk_positions := [
-		Vector3(62.0, 0, -44.0), Vector3(57.0, 0, -50.0),
-		Vector3(51.0, 0, -44.2), Vector3(46.0, 0, -50.0),
-		Vector3(40.0, 0, -44.0), Vector3(35.0, 0, -50.0),
-		Vector3(29.0, 0, -44.2), Vector3(24.0, 0, -50.0),
-		Vector3(18.0, 0, -44.0), Vector3(13.0, 0, -50.0),
-		Vector3(7.0, 0, -44.2), Vector3(2.0, 0, -50.0)
-	]
-	var resident_budgets := [5, 8, 12]
-	var resident_budget: int = resident_budgets[clampi(quality_level, 0, 2)]
-	for i in range(mini(sidewalk_positions.size(), resident_budget)):
-		var npc := CharacterBody3D.new()
-		npc.set_script(NPC_SCRIPT)
-		npc.position = sidewalk_positions[i]
-		npc.display_name = resident_names[i]
-		npc.personality = personalities[i]
-		npc.occupation = jobs[i]
-		npc.is_adult = jobs[i] == "beachgoer"
-		var work_spot: Vector3 = sidewalk_positions[i] + Vector3(0, 0, 5.0 if i % 2 == 0 else -5.0)
-		npc.set_ai_context(player, world_systems, work_spot, i, save_manager)
-		npc.set_ai_service(ai_service)
-		add_child(npc)
+	# Only residents inside the active tier budget are ever instantiated, so a
+	# Low-tier session never pays the RAM cost of the full population.
+	_apply_resident_budget()
 	var imported_resident_count := 0
 	var beachgoer_count := 0
 	var resident_nodes := get_tree().get_nodes_in_group("mahdia_residents")
@@ -742,8 +773,87 @@ func _spawn_residents() -> void:
 			beachgoer_count += 1
 	print("MAHDIA_IMPORTED_RESIDENTS=", imported_resident_count, "/", resident_nodes.size())
 	print("MAHDIA_BEACHGOERS=", beachgoer_count, "/", resident_nodes.size())
+
+func _create_resident(i: int) -> CharacterBody3D:
+	var npc := CharacterBody3D.new()
+	npc.set_script(NPC_SCRIPT)
+	npc.position = SIDEWALK_POSITIONS[i]
+	npc.display_name = RESIDENT_NAMES[i]
+	npc.personality = RESIDENT_PERSONALITIES[i]
+	npc.occupation = RESIDENT_JOBS[i]
+	npc.is_adult = RESIDENT_JOBS[i] == "beachgoer"
+	var work_spot: Vector3 = SIDEWALK_POSITIONS[i] + Vector3(0, 0, 5.0 if i % 2 == 0 else -5.0)
+	npc.set_ai_context(player, world_systems, work_spot, i, save_manager)
+	npc.set_ai_service(ai_service)
+	return npc
+
+func _apply_resident_budget() -> void:
+	var budget: int = mini(RESIDENT_BUDGETS[clampi(quality_level, 0, 2)], SIDEWALK_POSITIONS.size())
+	for i in range(SIDEWALK_POSITIONS.size()):
+		var npc: Node3D = resident_slots.get(i)
+		if i < budget:
+			if npc == null:
+				npc = _create_resident(i)
+				resident_slots[i] = npc
+				pool_create_count += 1
+				add_child(npc)
+			elif not npc.is_inside_tree():
+				# Reuse the parked resident: memory, model and mesh are kept.
+				if npc is CharacterBody3D:
+					(npc as CharacterBody3D).velocity = Vector3.ZERO
+				add_child(npc)
+				pool_reuse_count += 1
+		elif npc != null and npc.is_inside_tree():
+			if npc.has_method("_save_memory"):
+				npc.call("_save_memory")
+			remove_child(npc)
 	if is_instance_valid(life_manager):
+		var target = life_manager.get("delivery_npc")
+		if target is Node and not (target as Node).is_inside_tree():
+			life_manager.set("delivery_npc", null)
 		life_manager.call("resolve_delivery_target")
+
+func _apply_traffic_budget() -> void:
+	var budget: int = mini(TRAFFIC_BUDGETS[clampi(quality_level, 0, 2)], TRAFFIC_SPECS.size())
+	for i in range(TRAFFIC_SPECS.size()):
+		var car: Node3D = traffic_slots.get(i)
+		if i < budget:
+			if car == null:
+				var spec: Array = TRAFFIC_SPECS[i]
+				car = CharacterBody3D.new()
+				car.set_script(TRAFFIC_SCRIPT)
+				car.name = "TrafficCar_%02d" % (i + 1)
+				car.call("configure_traffic", bool(spec[0]), float(spec[1]), float(spec[2]), float(spec[3]), float(spec[4]))
+				traffic_slots[i] = car
+				pool_create_count += 1
+				add_child(car)
+			elif not car.is_inside_tree():
+				add_child(car)
+				pool_reuse_count += 1
+		elif car != null and car.is_inside_tree():
+			remove_child(car)
+
+func _exit_tree() -> void:
+	# Parked pool members are outside the tree, so free them explicitly.
+	for pool in [resident_slots, traffic_slots]:
+		for node in pool.values():
+			if is_instance_valid(node) and not node.is_inside_tree():
+				node.free()
+		pool.clear()
+
+func get_pool_status() -> Dictionary:
+	var parked := 0
+	for pool in [resident_slots, traffic_slots]:
+		for node in pool.values():
+			if is_instance_valid(node) and not node.is_inside_tree():
+				parked += 1
+	return {
+		"residents_active": get_tree().get_nodes_in_group("mahdia_residents").size(),
+		"traffic_active": get_tree().get_nodes_in_group("mahdia_traffic").size(),
+		"parked": parked,
+		"created": pool_create_count,
+		"reused": pool_reuse_count
+	}
 
 func _spawn_vehicle() -> void:
 	vehicle = CharacterBody3D.new()
@@ -756,23 +866,7 @@ func _spawn_vehicle() -> void:
 		vehicle.enter_vehicle(player)
 
 func _spawn_traffic() -> void:
-	# Four lightweight autonomous vehicles use the two existing main-road axes.
-	# They stay inside the asphalt lanes and wrap at the distant road ends.
-	var traffic_specs := [
-		[true, -1.65, -52.0, 1.0, 4.0],
-		[true, 1.65, 34.0, -1.0, 3.6],
-		[false, -1.65, -40.0, 1.0, 3.8],
-		[false, 1.65, 48.0, -1.0, 4.2]
-	]
-	var traffic_budgets := [2, 3, 4]
-	var traffic_budget: int = traffic_budgets[clampi(quality_level, 0, 2)]
-	for i in range(mini(traffic_specs.size(), traffic_budget)):
-		var spec: Array = traffic_specs[i]
-		var car := CharacterBody3D.new()
-		car.set_script(TRAFFIC_SCRIPT)
-		car.name = "TrafficCar_%02d" % (i + 1)
-		car.call("configure_traffic", bool(spec[0]), float(spec[1]), float(spec[2]), float(spec[3]), float(spec[4]))
-		add_child(car)
+	_apply_traffic_budget()
 
 func _setup_systems() -> void:
 	world_systems = Node.new()
@@ -1379,22 +1473,29 @@ func _cycle_graphics_quality() -> void:
 	quality_level = (quality_level + 1) % 3
 	_apply_graphics_quality()
 	if world_ready:
-		await _rebuild_population_for_quality()
+		_rebuild_population_for_quality()
 	_save_world_progress()
 
 func _rebuild_population_for_quality() -> void:
-	# Persist each resident's memory before rebuilding the quality-tier population.
-	for resident in get_tree().get_nodes_in_group("mahdia_residents"):
-		if is_instance_valid(resident):
-			if resident.has_method("_save_memory"):
-				resident.call("_save_memory")
-			resident.queue_free()
-	for traffic_car in get_tree().get_nodes_in_group("mahdia_traffic"):
-		if is_instance_valid(traffic_car):
-			traffic_car.queue_free()
-	await get_tree().process_frame
-	_spawn_residents()
-	_spawn_traffic()
+	# Pooled: park or reattach existing nodes instead of freeing and rebuilding.
+	_apply_resident_budget()
+	_apply_traffic_budget()
+	print("MAHDIA_POOL=", get_pool_status())
+
+func _apply_draw_distance(tier: int) -> void:
+	# Camera far plane is the hard draw distance; facade details use a shorter
+	# visibility range so distant buildings render as a few large boxes only.
+	var far: float = CAMERA_FAR_BY_TIER[tier]
+	var detail_range: float = DETAIL_RANGE_BY_TIER[tier]
+	var cam := get_viewport().get_camera_3d()
+	if cam != null:
+		cam.far = far
+	for detail in building_detail_meshes:
+		if is_instance_valid(detail):
+			detail.visibility_range_end = detail_range
+			detail.visibility_range_end_margin = 4.0
+	# Occlusion culling hides objects fully behind building occluders.
+	get_viewport().use_occlusion_culling = true
 
 func _apply_graphics_quality() -> void:
 	var fps_caps := [30, 45, 60]
@@ -1413,6 +1514,7 @@ func _apply_graphics_quality() -> void:
 		sun.directional_shadow_max_distance = shadow_distances[tier]
 	if is_instance_valid(world_environment):
 		world_environment.ambient_light_energy = ambient_levels[tier]
+	_apply_draw_distance(tier)
 	if is_instance_valid(quality_button):
 		var labels := ["منخفضة · 30 FPS", "متوسطة · 45 FPS", "عالية · 60 FPS"]
 		quality_button.text = "الجودة: " + labels[tier]
