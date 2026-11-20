@@ -53,6 +53,40 @@ func _run_tests() -> void:
 	player.call("set_mobile_move", Vector2(0.0, 1.0))
 	var vertical: Vector2 = player.get("move_vector")
 	_check(vertical.x == 0.0 and vertical.y > 0.0, "joystick direction is preserved")
+
+	# Exercise the real touch-control event path. Screen-touch positions are in
+	# viewport coordinates and must be transformed into the joystick Control.
+	var touch_controls := Node.new()
+	touch_controls.set_script(load("res://scripts/mobile_controls.gd"))
+	root.add_child(touch_controls)
+	var test_stick := Control.new()
+	test_stick.position = Vector2(140.0, 120.0)
+	test_stick.size = Vector2(138.0, 138.0)
+	touch_controls.add_child(test_stick)
+	touch_controls.set("stick_base", test_stick)
+	touch_controls.set("target", player)
+	await process_frame
+	var stick_screen_transform: Transform2D = test_stick.get_global_transform_with_canvas()
+	var stick_screen_center: Vector2 = stick_screen_transform * (test_stick.size * 0.5)
+	var simulated_touch := InputEventScreenTouch.new()
+	simulated_touch.index = 7
+	simulated_touch.pressed = true
+	simulated_touch.position = stick_screen_center + Vector2(46.0, 0.0)
+	touch_controls.call("_on_stick_input", simulated_touch)
+	_check(Vector2(player.get("move_vector")).x > 0.95 and absf(Vector2(player.get("move_vector")).y) < 0.05, "screen-space joystick touch maps to the correct local direction")
+	var simulated_drag := InputEventScreenDrag.new()
+	simulated_drag.index = 7
+	simulated_drag.position = stick_screen_center + Vector2(0.0, -46.0)
+	touch_controls.call("_on_stick_input", simulated_drag)
+	_check(Vector2(player.get("move_vector")).y < -0.95 and absf(Vector2(player.get("move_vector")).x) < 0.05, "screen-space joystick drag keeps its local direction")
+	var simulated_release := InputEventScreenTouch.new()
+	simulated_release.index = 7
+	simulated_release.pressed = false
+	simulated_release.position = stick_screen_center
+	touch_controls.call("_on_stick_input", simulated_release)
+	_check(Vector2(player.get("move_vector")) == Vector2.ZERO, "joystick releases to neutral after touch ends")
+	touch_controls.queue_free()
+	await process_frame
 	player.global_position = Vector3(0, 0, -65)
 	_check(bool(player.call("is_in_water")), "player enters the sea swimming zone")
 	player.call("request_jump")
