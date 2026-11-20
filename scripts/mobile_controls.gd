@@ -114,3 +114,15 @@ func _update_stick(local_position: Vector2) -> void:
 	stick_value = ((local_position - center) / stick_max_radius).limit_length(1.0)
 	target.set_mobile_move(stick_value)
 	stick_base.queue_redraw()
+
+
+func reset_input_state() -> void:
+	# Invalidate any finger still holding the joystick when changing control modes.
+	# Its later drag/release events must not leak movement into the next mode.
+	stick_touch = -1
+	stick_value = Vector2.ZERO
+	if is_instance_valid(target):
+		target.set_mobile_move(Vector2.ZERO)
+		target.set_mobile_run(false)
+	if is_instance_valid(stick_base):
+		stick_base.queue_redraw()
