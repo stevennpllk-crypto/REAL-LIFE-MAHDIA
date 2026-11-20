@@ -14,3 +14,14 @@
 
 - Source changes committed to branch `fix/android-smoke-procedural-player`.
 - A fresh GitHub Actions run is required to validate the patched smoke test. No post-patch APK or emulator result is claimed yet.
+
+## 2026-11-20 — Real mobile quality tiers
+
+- Implemented a visible in-game quality button with Low / Medium / High cycling.
+- Low: 30 FPS cap, 70% 3D render scale, shadows off, 5 residents, 2 traffic cars.
+- Medium: 45 FPS cap, 82% 3D render scale, shadows off, 8 residents, 3 traffic cars.
+- High: 60 FPS cap, full 3D render scale, shadows on, 12 residents, 4 traffic cars.
+- Android starts at Medium; desktop starts at High. Physics tick rate remains fixed at 60 Hz across tiers.
+- Changing tiers saves resident memory, rebuilds the active population, and persists the selected quality level.
+- Updated Android smoke-test expectations for the mobile Medium default.
+- Occlusion culling and runtime object pooling are not claimed as complete: the current scene uses a small fixed set of traffic/resident instances. These need a renderer/device benchmark and a real dynamic spawn/despawn path before being enabled without risking CPU/RAM regressions.
