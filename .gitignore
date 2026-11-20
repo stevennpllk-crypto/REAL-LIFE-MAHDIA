@@ -5,3 +5,14 @@ build/
 *.aab
 *.keystore
 *.jks
+
+# Downloaded free assets (see .github/scripts/fetch-visual-assets.sh and ASSET_LICENSES.md)
+assets/characters/*.glb
+assets/characters/*.glb.import
+assets/textures/*.jpg
+assets/textures/*.png
+assets/textures/*.import
+assets/hdri/*.hdr
+assets/hdri/*.import
+assets/characters/*.webp
+assets/characters/*.webp.import

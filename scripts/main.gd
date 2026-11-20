@@ -41,8 +41,23 @@ var water_clock := 0.0
 var water_visual_elapsed := 0.0
 var hud_refresh_elapsed := 0.0
 var autosave_elapsed := 0.0
-var quality_level := 2
+var quality_level := 1
 var quality_button: Button
+var world_ready := false
+# Object pools: one slot per resident/traffic car. A node above the active
+# tier budget is detached from the tree (no render, physics or script cost)
+# and reattached when the budget rises, instead of being freed and rebuilt.
+var resident_slots: Dictionary = {}
+var traffic_slots: Dictionary = {}
+var pool_reuse_count := 0
+var pool_create_count := 0
+# Draw-distance LOD: small facade details fade out before the building shell.
+var building_detail_meshes: Array[GeometryInstance3D] = []
+var building_count := 0
+const CAMERA_FAR_BY_TIER := [160.0, 220.0, 320.0]
+const DETAIL_RANGE_BY_TIER := [30.0, 55.0, 100.0]
+const RESIDENT_BUDGETS := [5, 8, 12]
+const TRAFFIC_BUDGETS := [2, 3, 4]
 var restored_vehicle_position := START_VEHICLE_POSITION
 var restore_vehicle_driver := false
 var mission_hud_label: Label
@@ -52,9 +67,30 @@ var wallet_label: Label
 var level_label: Label
 var chat_row: HBoxContainer
 var mission_hud_panel: PanelContainer
-const START_PLAYER_POSITION := Vector3(68.0, 0.03, -46.0)
-const START_PLAYER_ROTATION := PI * 0.5 - 0.25
-const START_VEHICLE_POSITION := Vector3(58.0, 0.1, -43.5)
+# Spawn on the corniche promenade, facing west along it toward Borj el Kebir.
+const START_PLAYER_POSITION := Vector3(68.0, 0.03, -48.5)
+const START_PLAYER_ROTATION := PI * 0.5 - 0.06
+# The player's black sedan is parked at the promenade curb, nose toward the spawn.
+const START_VEHICLE_POSITION := Vector3(61.5, 0.1, -41.7)
+const START_VEHICLE_ROTATION := -PI * 0.5
+const CORNICHE_SCRIPT = preload("res://scripts/corniche.gd")
+const ICON_BUTTON = preload("res://scripts/hud_icon_button.gd")
+const HDRI_PATH := "res://assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr"
+var corniche: Node3D
+var minimap_content: Control
+var minimap_overlay: Control
+var minimap_static_rects: Array = []
+var level_bar: ProgressBar
+var chat_log_label: RichTextLabel
+var chat_log_lines: Array[String] = []
+var info_panel: PanelContainer
+var info_title: Label
+var info_body: RichTextLabel
+var settings_panel: PanelContainer
+var voice_enabled := false
+var voice_button: Button
+var tts_voice := ""
+var renderer_name := ""
 const AUTOSAVE_INTERVAL := 12.0
 const WORLD_SAVE_KEY := "mahdia_world"
 
@@ -69,11 +105,14 @@ func _ready() -> void:
 	_build_hud()
 	print("MAHDIA_PLAYER_READY")
 	await get_tree().process_frame
+	await _build_corniche()
+	print("MAHDIA_CORNICHE_READY")
 	await _build_town()
 	print("MAHDIA_TOWN_READY")
 	_spawn_residents()
 	_spawn_vehicle()
 	_spawn_traffic()
+	world_ready = true
 	print("MAHDIA_WORLD_READY")
 
 func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
@@ -215,33 +254,84 @@ func _plaster_box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> 
 	return item
 
 func _build_environment() -> void:
+	renderer_name = str(ProjectSettings.get_setting_with_override("rendering/renderer/rendering_method"))
+	if RenderingServer.has_method("get_current_rendering_method"):
+		renderer_name = str(RenderingServer.call("get_current_rendering_method"))
 	var world_env := WorldEnvironment.new()
 	world_environment = Environment.new()
-	world_environment.background_mode = Environment.BG_COLOR
-	world_environment.background_color = Color(0.48, 0.69, 0.86)
-	# Avoid procedural-sky shader variants on low-limit GLES3/SwiftShader devices.
-	world_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	world_environment.ambient_light_color = Color(0.78, 0.82, 0.90)
-	world_environment.ambient_light_energy = 0.72
+	# Midday Mediterranean sky: CC0 Poly Haven HDRI when downloaded, with a
+	# matching procedural sky as fallback. It also lights the scene (ambient +
+	# reflections), which is what makes the white facades and the sea read.
+	var sky := Sky.new()
+	var panorama: Texture2D = null
+	if ResourceLoader.exists(HDRI_PATH):
+		panorama = load(HDRI_PATH) as Texture2D
+	if panorama != null:
+		var pano := PanoramaSkyMaterial.new()
+		pano.panorama = panorama
+		pano.filter = true
+		sky.sky_material = pano
+	else:
+		var procedural := ProceduralSkyMaterial.new()
+		procedural.sky_top_color = Color(0.16, 0.42, 0.80)
+		procedural.sky_horizon_color = Color(0.68, 0.82, 0.94)
+		procedural.ground_horizon_color = Color(0.68, 0.82, 0.94)
+		procedural.ground_bottom_color = Color(0.18, 0.32, 0.46)
+		procedural.sun_angle_max = 18.0
+		sky.sky_material = procedural
+	sky.radiance_size = Sky.RADIANCE_SIZE_128
+	world_environment.background_mode = Environment.BG_SKY
+	world_environment.sky = sky
+	world_environment.sky_rotation = Vector3(0, deg_to_rad(40.0), 0)
+	world_environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	world_environment.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	world_environment.ambient_light_sky_contribution = 1.0
+	world_environment.ambient_light_energy = 1.0
 	world_environment.tonemap_mode = Environment.TONE_MAPPER_ACES
+	world_environment.tonemap_exposure = 1.0
+	world_environment.tonemap_white = 6.0
+	# Glow, fog and colour adjustments are supported by the Mobile renderer.
+	world_environment.glow_enabled = true
+	world_environment.glow_intensity = 0.45
+	world_environment.glow_strength = 0.9
+	world_environment.glow_bloom = 0.02
+	world_environment.glow_hdr_threshold = 1.15
+	world_environment.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+	world_environment.fog_enabled = true
+	world_environment.fog_light_color = Color(0.70, 0.80, 0.90)
+	world_environment.fog_light_energy = 1.0
+	world_environment.fog_density = 0.0016
+	world_environment.fog_aerial_perspective = 0.35
+	world_environment.fog_sky_affect = 0.0
+	world_environment.fog_sun_scatter = 0.08
+	world_environment.adjustment_enabled = true
+	world_environment.adjustment_saturation = 1.12
+	world_environment.adjustment_contrast = 1.06
+	world_environment.adjustment_brightness = 1.0
+	# SSAO/SSIL/SDFGI/SSR exist only in Forward+; the Mobile and Compatibility
+	# renderers ignore them, so enable SSAO only where it actually runs.
+	world_environment.ssao_enabled = renderer_name == "forward_plus"
+	world_environment.ssao_radius = 1.2
+	world_environment.ssao_intensity = 1.6
+	world_environment.ssil_enabled = false
+	world_environment.sdfgi_enabled = false
+	world_environment.volumetric_fog_enabled = false
 	world_env.environment = world_environment
 	add_child(world_env)
 	sun = DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-48, -32, 0)
-	sun.light_energy = 1.28
-	# One directional sun provides real surface shading and shadows.
+	sun.name = "Sun"
+	sun.rotation_degrees = Vector3(-50, 135, 0)
+	sun.light_energy = 1.75
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 48.0
-	sun.shadow_opacity = 0.62
+	sun.shadow_bias = 0.04
+	sun.shadow_normal_bias = 1.2
+	sun.shadow_blur = 1.2
+	sun.directional_shadow_max_distance = 60.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.directional_shadow_blend_splits = true
+	sun.shadow_opacity = 0.9
 	sun.visible = true
 	add_child(sun)
-	# Explicitly disable costly environment passes for broad GLES3 compatibility.
-	world_environment.glow_enabled = false
-	world_environment.ssao_enabled = false
-	world_environment.ssil_enabled = false
-	world_environment.sdfgi_enabled = false
-	world_environment.fog_enabled = false
-	world_environment.volumetric_fog_enabled = false
 
 	# Solid land stops at the shoreline; the sea area remains swimmable.
 	var ground := StaticBody3D.new()
@@ -253,8 +343,10 @@ func _build_environment() -> void:
 	floor_shape.position = Vector3(0, -0.55, 30)
 	ground.add_child(floor_shape)
 	add_child(ground)
+	# The shore collider keeps its original extent (to z = -59, where the
+	# swimming zone starts); its visual stops at the corniche seawall.
 	var shore := StaticBody3D.new()
-	_box(shore, Vector3(180, 1, 29), Vector3(0, -0.55, -44.5), Color(0.82, 0.76, 0.64))
+	_box(shore, Vector3(180, 1, 26.7), Vector3(0, -0.6, -43.65), Color(0.82, 0.76, 0.64))
 	var shore_shape := CollisionShape3D.new()
 	var shore_box := BoxShape3D.new()
 	shore_box.size = Vector3(180, 1, 29)
@@ -263,114 +355,40 @@ func _build_environment() -> void:
 	shore.add_child(shore_shape)
 	add_child(shore)
 
-	# Mediterranean sea and a pale coastal promenade.
-	var sea := _box(self, Vector3(180, 0.16, 38), Vector3(0, -0.02, -78), Color(0.025, 0.29, 0.50))
-	var sea_material := _material(Color(0.025, 0.29, 0.50), 0.24)
-	sea_material.metallic = 0.12
-	sea_material.roughness = 0.24
-	sea_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-	sea.material_override = sea_material
-	_textured_box(self, Vector3(180, 0.18, 5.5), Vector3(0, 0.04, -57), Color(0.88, 0.84, 0.75), "stone", Vector3(1.0, 42.0, 1.0))
-	_create_coastal_scenery()
-	_create_waterfront_district()
+func _build_corniche() -> void:
+	corniche = Node3D.new()
+	corniche.set_script(CORNICHE_SCRIPT)
+	add_child(corniche)
+	await corniche.call("build", self, clampi(quality_level, 0, 2))
 	_create_beach_cafe()
+	_collect_minimap_rects()
 
-func _create_coastal_scenery() -> void:
-	# A small Mediterranean waterfront set: boats, wave crests, benches and shade.
-	for i in range(3):
-		var x := -25.0 + float(i) * 23.0
-		var z := -76.0 - float(i % 2) * 5.0
-		_box(self, Vector3(5.8, 0.42, 2.0), Vector3(x, 0.18, z), Color(0.32, 0.20, 0.13))
-		_box(self, Vector3(3.6, 0.12, 1.7), Vector3(x, 0.43, z), Color(0.92, 0.88, 0.77))
-		_box(self, Vector3(0.12, 2.1, 0.12), Vector3(x, 1.48, z), Color(0.34, 0.24, 0.15))
-		_box(self, Vector3(2.8, 0.08, 1.5), Vector3(x, 2.45, z), Color(0.88, 0.82, 0.68))
-	for i in range(10):
-		var wave := MeshInstance3D.new()
-		var wave_mesh := BoxMesh.new()
-		wave_mesh.size = Vector3(randf_range(3.0, 8.0), 0.025, 0.07)
-		wave.mesh = wave_mesh
-		wave.position = Vector3(randf_range(-82.0, 82.0), 0.075, -62.0 - float(i) * 2.5)
-		wave.material_override = _material(Color(0.42, 0.76, 0.82))
-		add_child(wave)
-		water_waves.append(wave)
-		water_wave_origins.append(wave.position)
-	for i in range(4):
-		var x := -18.0 + float(i) * 12.0
-		_box(self, Vector3(2.2, 0.12, 0.55), Vector3(x, 0.72, -54.0), Color(0.40, 0.23, 0.12))
-		_box(self, Vector3(2.2, 0.12, 0.12), Vector3(x, 1.18, -54.22), Color(0.40, 0.23, 0.12))
-	for i in range(3):
-		var x := -13.0 + float(i) * 13.0
-		var canopy := _box(self, Vector3(3.2, 0.12, 3.2), Vector3(x, 2.55, -50.5), [Color(0.86, 0.28, 0.18), Color(0.92, 0.84, 0.66), Color(0.16, 0.42, 0.48)][i])
-		canopy.rotation.z = 0.08
-		for side in [-1.0, 1.0]:
-			_box(self, Vector3(0.10, 2.5, 0.10), Vector3(x + side * 1.35, 1.25, -50.5), Color(0.35, 0.26, 0.18))
-	for i in range(7):
-		_create_palm(Vector3(-42.0 + float(i) * 14.0, 0, -47.0))
-	_create_borj_el_kebir_landmark()
-
-
-func _create_waterfront_district() -> void:
-	# Dense whitewashed Mahdia-style facades along the inland side of the promenade.
-	# Their street-facing sides look toward the sea-facing walking route.
-	var positions := [Vector3(34, 0, -29), Vector3(52, 0, -29), Vector3(70, 0, -29), Vector3(88, 0, -29), Vector3(106, 0, -29)]
-	var palettes := [
-		Color(0.91, 0.86, 0.76), Color(0.95, 0.91, 0.82),
-		Color(0.84, 0.80, 0.71), Color(0.93, 0.88, 0.78),
-		Color(0.87, 0.83, 0.75)
-	]
-	for i in range(positions.size()):
-		var dimensions := Vector3(13.0 if i % 2 == 0 else 11.5, 9.0 + float(i % 3), 10.0)
-		_create_building(positions[i], dimensions, palettes[i], 210 + i)
-		var facade := get_child(get_child_count() - 1) as Node3D
-		if is_instance_valid(facade):
-			facade.rotation.y = PI
-		# Ground-floor cafe/shop awnings, facing the pedestrian promenade.
-		var awning_color: Color = [Color(0.76, 0.16, 0.13), Color(0.90, 0.84, 0.69), Color(0.12, 0.36, 0.42)][i % 3]
-		_box(self, Vector3(4.4, 0.16, 1.25), positions[i] + Vector3(0, 3.0, 5.35), awning_color)
-		_box(self, Vector3(4.4, 0.12, 0.12), positions[i] + Vector3(0, 2.86, 5.96), Color(0.94, 0.90, 0.82))
-	# A line of palms and planters gives the promenade the dense coastal rhythm in the reference.
-	for i in range(5):
-		var x := 30.0 + float(i) * 18.0
-		_create_palm(Vector3(x, 0, -40.5))
-		_box(self, Vector3(1.8, 0.34, 0.9), Vector3(x + 5.5, 0.22, -42.2), Color(0.53, 0.39, 0.27))
-		_box(self, Vector3(1.55, 0.26, 0.72), Vector3(x + 5.5, 0.48, -42.2), Color(0.18, 0.39, 0.22))
-	_create_tunisian_flag(Vector3(58.0, 0.0, -39.0))
-
-
-func _create_tunisian_flag(pos: Vector3) -> void:
-	var pole := _box(self, Vector3(0.10, 6.8, 0.10), pos + Vector3(0, 3.4, 0), Color(0.16, 0.18, 0.20))
-	var flag := _box(self, Vector3(1.65, 1.05, 0.055), pos + Vector3(0.82, 5.55, 0), Color(0.83, 0.055, 0.09))
-	# White disc, red crescent and star are layered on the camera-facing side.
-	var disc := MeshInstance3D.new()
-	var disc_mesh := CylinderMesh.new()
-	disc_mesh.top_radius = 0.32
-	disc_mesh.bottom_radius = 0.32
-	disc_mesh.height = 0.035
-	disc_mesh.radial_segments = 32
-	disc.mesh = disc_mesh
-	disc.rotation_degrees.x = 90
-	disc.position = pos + Vector3(0.82, 5.55, 0.055)
-	disc.material_override = _material(Color(0.96, 0.94, 0.88))
-	add_child(disc)
-	var crescent := MeshInstance3D.new()
-	var crescent_mesh := TorusMesh.new()
-	crescent_mesh.inner_radius = 0.12
-	crescent_mesh.outer_radius = 0.20
-	crescent_mesh.rings = 24
-	crescent_mesh.ring_segments = 12
-	crescent.mesh = crescent_mesh
-	crescent.rotation_degrees.x = 90
-	crescent.position = pos + Vector3(0.79, 5.55, 0.083)
-	crescent.material_override = _material(Color(0.82, 0.055, 0.09))
-	add_child(crescent)
-	var star := MeshInstance3D.new()
-	var star_mesh := PrismMesh.new()
-	star_mesh.size = Vector3(0.19, 0.19, 0.025)
-	star.mesh = star_mesh
-	star.position = pos + Vector3(1.04, 5.55, 0.09)
-	star.material_override = _material(Color(0.82, 0.055, 0.09))
-	add_child(star)
-
+# Called by the corniche and by _create_building: registers a building for
+# occlusion culling, the per-tier facade-detail LOD and the minimap.
+func register_building(building: StaticBody3D, size: Vector3) -> void:
+	# The first two meshes are the shell and roof slab; everything after
+	# them is facade detail that the draw-distance LOD may hide.
+	var mesh_index := 0
+	for child in building.get_children():
+		if child is GeometryInstance3D:
+			if mesh_index >= 2:
+				var detail := child as GeometryInstance3D
+				detail.visibility_range_end = DETAIL_RANGE_BY_TIER[clampi(quality_level, 0, 2)]
+				detail.visibility_range_end_margin = 4.0
+				detail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				building_detail_meshes.append(detail)
+			mesh_index += 1
+	# A slightly inset box occluder lets the renderer skip props, cars and
+	# residents that are completely hidden behind this building.
+	var occluder := OccluderInstance3D.new()
+	var box_occluder := BoxOccluder3D.new()
+	box_occluder.size = Vector3(maxf(size.x - 0.2, 0.5), maxf(size.y - 0.1, 0.5), maxf(size.z - 0.2, 0.5))
+	occluder.occluder = box_occluder
+	occluder.position.y = size.y * 0.5
+	building.add_child(occluder)
+	building.set_meta("footprint", Vector2(size.x, size.z))
+	building.add_to_group("mahdia_buildings")
+	building_count += 1
 
 func _create_beach_cafe() -> void:
 	# A recognizable waterfront cafe with a shaded counter and outdoor seating.
@@ -416,70 +434,14 @@ func _create_beach_cafe() -> void:
 		_box(cafe, Vector3(0.12, 3.0, 0.12), Vector3(x, 1.55, 5.7), wood)
 
 
-func _create_borj_el_kebir_landmark() -> void:
-	var stone := Color(0.69, 0.62, 0.49)
-	var pale := Color(0.82, 0.75, 0.62)
-	var fortress_material := StandardMaterial3D.new()
-	fortress_material.albedo_color = stone
-	var fortress_diffuse := _pbr_texture("cobblestone_pavement", "diff")
-	if fortress_diffuse != null:
-		fortress_material.albedo_texture = fortress_diffuse
-		_apply_pbr_maps(fortress_material, "cobblestone_pavement")
-	fortress_material.uv1_scale = Vector3(3.0, 1.0, 1.0)
-	fortress_material.roughness = 0.94
-	var main_wall := _box(self, Vector3(19.0, 7.0, 1.25), Vector3(37.0, 3.5, -51.0), stone)
-	main_wall.material_override = fortress_material
-	var west_wall := _box(self, Vector3(1.25, 7.0, 10.0), Vector3(28.2, 3.5, -56.0), stone)
-	west_wall.material_override = fortress_material
-	var east_wall := _box(self, Vector3(1.25, 7.0, 10.0), Vector3(45.8, 3.5, -56.0), stone)
-	east_wall.material_override = fortress_material
-	_box(self, Vector3(3.0, 3.8, 0.12), Vector3(37.0, 1.9, -50.32), Color(0.12, 0.11, 0.10))
-	_box(self, Vector3(4.2, 0.55, 0.42), Vector3(37.0, 4.0, -50.15), pale)
-	# Carved horizontal masonry courses and parapet teeth give the fortress a stone silhouette.
-	for course in range(7):
-		var y := 0.72 + float(course) * 0.88
-		for block in range(19):
-			var bx := 28.0 + float(block) * 1.0
-			if bx > 46.0:
-				continue
-			if course > 1 and course < 5 and absf(bx - 37.0) < 2.2:
-				continue
-			_box(self, Vector3(0.82, 0.055, 0.045), Vector3(bx, y, -50.34), Color(0.77, 0.70, 0.57))
-	for crenel in range(11):
-		var cx := 28.8 + float(crenel) * 1.64
-		_box(self, Vector3(0.78, 0.62, 1.32), Vector3(cx, 7.28, -51.0), pale)
-	for x in [28.5, 45.5]:
-		var tower := MeshInstance3D.new()
-		var mesh := CylinderMesh.new()
-		mesh.top_radius = 1.55
-		mesh.bottom_radius = 2.0
-		mesh.height = 10.0 if x < 30.0 else 13.0
-		mesh.radial_segments = 16
-		tower.mesh = mesh
-		tower.position = Vector3(x, mesh.height * 0.5, -54.0)
-		tower.material_override = fortress_material
-		add_child(tower)
-		for j in range(12):
-			var a := TAU * float(j) / 12.0
-			_box(self, Vector3(0.34, 0.72, 0.34), Vector3(x + cos(a) * 1.62, mesh.height + 0.36, -54.0 + sin(a) * 1.62), pale)
-		for slit in range(4):
-			_box(self, Vector3(0.16, 1.05, 0.10), Vector3(x + cos(float(slit) * TAU / 4.0) * 1.72, mesh.height * 0.62, -54.0 + sin(float(slit) * TAU / 4.0) * 1.72), Color(0.20, 0.17, 0.13))
-	_box(self, Vector3(0.10, 10.0, 0.10), Vector3(25.0, 5.0, -49.5), Color(0.30, 0.27, 0.22))
-	_box(self, Vector3(2.6, 1.55, 0.08), Vector3(26.25, 8.45, -49.5), Color(0.82, 0.08, 0.12))
-	_box(self, Vector3(180.0, 0.78, 0.42), Vector3(0, 0.55, -55.2), pale)
-	for i in range(31):
-		var x := -88.0 + float(i) * 5.85
-		_box(self, Vector3(0.18, 0.95, 0.24), Vector3(x, 0.98, -55.2), stone)
-	_box(self, Vector3(180.0, 0.16, 0.56), Vector3(0, 1.48, -55.2), pale)
-
-
 func _build_town() -> void:
 	# Main asphalt streets crossing a compact Mahdia-inspired neighborhood.
 	_textured_box(self, Vector3(180, 0.12, 9), Vector3(0, 0.035, 0), Color(0.16, 0.18, 0.19), "asphalt", Vector3(4, 30, 1))
-	_textured_box(self, Vector3(9, 0.12, 180), Vector3(0, 0.04, 0), Color(0.16, 0.18, 0.19), "asphalt", Vector3(30, 4, 1))
+	# The north-south avenue now meets the corniche road instead of the sea.
+	_textured_box(self, Vector3(9, 0.12, 128), Vector3(0, 0.04, 26), Color(0.16, 0.18, 0.19), "asphalt", Vector3(22, 4, 1))
 	for x in range(-80, 81, 12):
 		_box(self, Vector3(5.0, 0.025, 0.16), Vector3(float(x), 0.11, 0), Color(0.92, 0.84, 0.58))
-	for z in range(-80, 81, 12):
+	for z in range(-32, 81, 12):
 		_box(self, Vector3(0.16, 0.025, 5.0), Vector3(0, 0.12, float(z)), Color(0.92, 0.84, 0.58))
 	# Pedestrian crossings and raised curbs.
 	for i in range(7):
@@ -494,7 +456,7 @@ func _build_town() -> void:
 	# Sidewalk strips.
 	for side in [-1.0, 1.0]:
 		_textured_box(self, Vector3(180, 0.2, 1.6), Vector3(0, 0.08, side * 5.5), Color(0.78, 0.75, 0.68), "stone", Vector3(2, 30, 1))
-		_textured_box(self, Vector3(1.6, 0.2, 180), Vector3(side * 5.5, 0.08, 0), Color(0.78, 0.75, 0.68), "stone", Vector3(30, 2, 1))
+		_textured_box(self, Vector3(1.6, 0.2, 124), Vector3(side * 5.5, 0.08, 29), Color(0.78, 0.75, 0.68), "stone", Vector3(22, 2, 1))
 
 	var palette := [
 		Color(0.88, 0.82, 0.70), Color(0.94, 0.89, 0.78),
@@ -506,6 +468,9 @@ func _build_town() -> void:
 			var x := float(i) * 17.0 - 34.0
 			var z := float(j) * 18.0 - 27.0
 			if absf(x) < 9.0 or absf(z) < 9.0:
+				continue
+			# The seafront row now belongs to the corniche buildings.
+			if z < -20.0:
 				continue
 			var height := randf_range(5.5, 9.0)
 			var width := randf_range(7.0, 9.0)
@@ -653,6 +618,7 @@ func _create_building(origin: Vector3, size: Vector3, wall_color: Color, seed_va
 	collision.shape = shape
 	collision.position.y = h * 0.5
 	building.add_child(collision)
+	register_building(building, size)
 	add_child(building)
 
 func _create_palm(pos: Vector3) -> void:
@@ -691,44 +657,40 @@ func _spawn_player() -> void:
 	player.name = "Player"
 	add_child(player)
 
+const RESIDENT_PERSONALITIES := [
+	"friendly", "shy", "busy", "curious", "grumpy", "friendly",
+	"curious", "busy", "friendly", "shy", "curious", "busy"
+]
+const RESIDENT_JOBS := [
+	"fisher", "shopkeeper", "mechanic", "student", "resident", "cook",
+	"driver", "beachgoer", "shopkeeper", "student", "fisher", "mechanic"
+]
+const RESIDENT_NAMES := [
+	"سامي", "مريم", "أيمن", "ليلى", "منير", "آمنة",
+	"يوسف", "سارة", "حاتم", "نجلاء", "وليد", "ريم"
+]
+# Public sidewalk spots, so residents never spawn inside buildings or lanes.
+const SIDEWALK_POSITIONS := [
+	Vector3(62.0, 0, -44.0), Vector3(57.0, 0, -50.0),
+	Vector3(51.0, 0, -44.2), Vector3(46.0, 0, -50.0),
+	Vector3(40.0, 0, -44.0), Vector3(35.0, 0, -50.0),
+	Vector3(29.0, 0, -44.2), Vector3(24.0, 0, -50.0),
+	Vector3(18.0, 0, -44.0), Vector3(13.0, 0, -50.0),
+	Vector3(7.0, 0, -44.2), Vector3(2.0, 0, -50.0)
+]
+# Four lightweight autonomous vehicles on the two main-road axes; they wrap
+# at the road ends, so each pooled car is reused continuously while active.
+const TRAFFIC_SPECS := [
+	[true, -1.65, -52.0, 1.0, 4.0],
+	[true, 1.65, 34.0, -1.0, 3.6],
+	[false, -1.65, -40.0, 1.0, 3.8],
+	[false, 1.65, 48.0, -1.0, 4.2]
+]
+
 func _spawn_residents() -> void:
-	# Keep active simulation population proportional to the selected device tier.
-	# Residents beyond this budget are not instantiated, avoiding hidden CPU/RAM cost.
-	# Place residents on public sidewalks rather than random points that may
-	# intersect buildings or spawn directly inside traffic lanes.
-	var personalities := [
-		"friendly", "shy", "busy", "curious", "grumpy", "friendly",
-		"curious", "busy", "friendly", "shy", "curious", "busy"
-	]
-	var jobs := [
-		"fisher", "shopkeeper", "mechanic", "student", "resident", "cook",
-		"driver", "beachgoer", "shopkeeper", "student", "fisher", "mechanic"
-	]
-	var resident_names := [
-		"سامي", "مريم", "أيمن", "ليلى", "منير", "آمنة",
-		"يوسف", "سارة", "حاتم", "نجلاء", "وليد", "ريم"
-	]
-	var sidewalk_positions := [
-		Vector3(62.0, 0, -44.0), Vector3(57.0, 0, -50.0),
-		Vector3(51.0, 0, -44.2), Vector3(46.0, 0, -50.0),
-		Vector3(40.0, 0, -44.0), Vector3(35.0, 0, -50.0),
-		Vector3(29.0, 0, -44.2), Vector3(24.0, 0, -50.0),
-		Vector3(18.0, 0, -44.0), Vector3(13.0, 0, -50.0),
-		Vector3(7.0, 0, -44.2), Vector3(2.0, 0, -50.0)
-	]
-	var resident_budget: int = sidewalk_positions.size()
-	for i in range(mini(sidewalk_positions.size(), resident_budget)):
-		var npc := CharacterBody3D.new()
-		npc.set_script(NPC_SCRIPT)
-		npc.position = sidewalk_positions[i]
-		npc.display_name = resident_names[i]
-		npc.personality = personalities[i]
-		npc.occupation = jobs[i]
-		npc.is_adult = jobs[i] == "beachgoer"
-		var work_spot: Vector3 = sidewalk_positions[i] + Vector3(0, 0, 5.0 if i % 2 == 0 else -5.0)
-		npc.set_ai_context(player, world_systems, work_spot, i, save_manager)
-		npc.set_ai_service(ai_service)
-		add_child(npc)
+	# Only residents inside the active tier budget are ever instantiated, so a
+	# Low-tier session never pays the RAM cost of the full population.
+	_apply_resident_budget()
 	var imported_resident_count := 0
 	var beachgoer_count := 0
 	var resident_nodes := get_tree().get_nodes_in_group("mahdia_residents")
@@ -739,36 +701,102 @@ func _spawn_residents() -> void:
 			beachgoer_count += 1
 	print("MAHDIA_IMPORTED_RESIDENTS=", imported_resident_count, "/", resident_nodes.size())
 	print("MAHDIA_BEACHGOERS=", beachgoer_count, "/", resident_nodes.size())
+
+func _create_resident(i: int) -> CharacterBody3D:
+	var npc := CharacterBody3D.new()
+	npc.set_script(NPC_SCRIPT)
+	npc.position = SIDEWALK_POSITIONS[i]
+	npc.display_name = RESIDENT_NAMES[i]
+	npc.personality = RESIDENT_PERSONALITIES[i]
+	npc.occupation = RESIDENT_JOBS[i]
+	npc.is_adult = RESIDENT_JOBS[i] == "beachgoer"
+	var work_spot: Vector3 = SIDEWALK_POSITIONS[i] + Vector3(0, 0, 5.0 if i % 2 == 0 else -5.0)
+	npc.set_ai_context(player, world_systems, work_spot, i, save_manager)
+	npc.set_ai_service(ai_service)
+	return npc
+
+func _apply_resident_budget() -> void:
+	var budget: int = mini(RESIDENT_BUDGETS[clampi(quality_level, 0, 2)], SIDEWALK_POSITIONS.size())
+	for i in range(SIDEWALK_POSITIONS.size()):
+		var npc: Node3D = resident_slots.get(i)
+		if i < budget:
+			if npc == null:
+				npc = _create_resident(i)
+				resident_slots[i] = npc
+				pool_create_count += 1
+				add_child(npc)
+			elif not npc.is_inside_tree():
+				# Reuse the parked resident: memory, model and mesh are kept.
+				if npc is CharacterBody3D:
+					(npc as CharacterBody3D).velocity = Vector3.ZERO
+				add_child(npc)
+				pool_reuse_count += 1
+		elif npc != null and npc.is_inside_tree():
+			if npc.has_method("_save_memory"):
+				npc.call("_save_memory")
+			remove_child(npc)
 	if is_instance_valid(life_manager):
+		var target = life_manager.get("delivery_npc")
+		if target is Node and not (target as Node).is_inside_tree():
+			life_manager.set("delivery_npc", null)
 		life_manager.call("resolve_delivery_target")
+
+func _apply_traffic_budget() -> void:
+	var budget: int = mini(TRAFFIC_BUDGETS[clampi(quality_level, 0, 2)], TRAFFIC_SPECS.size())
+	for i in range(TRAFFIC_SPECS.size()):
+		var car: Node3D = traffic_slots.get(i)
+		if i < budget:
+			if car == null:
+				var spec: Array = TRAFFIC_SPECS[i]
+				car = CharacterBody3D.new()
+				car.set_script(TRAFFIC_SCRIPT)
+				car.name = "TrafficCar_%02d" % (i + 1)
+				car.call("configure_traffic", bool(spec[0]), float(spec[1]), float(spec[2]), float(spec[3]), float(spec[4]))
+				traffic_slots[i] = car
+				pool_create_count += 1
+				add_child(car)
+			elif not car.is_inside_tree():
+				add_child(car)
+				pool_reuse_count += 1
+		elif car != null and car.is_inside_tree():
+			remove_child(car)
+
+func _exit_tree() -> void:
+	# Parked pool members are outside the tree, so free them explicitly.
+	for pool in [resident_slots, traffic_slots]:
+		for node in pool.values():
+			if is_instance_valid(node) and not node.is_inside_tree():
+				node.free()
+		pool.clear()
+
+func get_pool_status() -> Dictionary:
+	var parked := 0
+	for pool in [resident_slots, traffic_slots]:
+		for node in pool.values():
+			if is_instance_valid(node) and not node.is_inside_tree():
+				parked += 1
+	return {
+		"residents_active": get_tree().get_nodes_in_group("mahdia_residents").size(),
+		"traffic_active": get_tree().get_nodes_in_group("mahdia_traffic").size(),
+		"parked": parked,
+		"created": pool_create_count,
+		"reused": pool_reuse_count
+	}
 
 func _spawn_vehicle() -> void:
 	vehicle = CharacterBody3D.new()
 	vehicle.set_script(VEHICLE_SCRIPT)
 	vehicle.position = restored_vehicle_position
-	vehicle.rotation.y = START_PLAYER_ROTATION
+	vehicle.rotation.y = START_VEHICLE_ROTATION
+	if is_instance_valid(corniche) and corniche.has_method("car_mesh"):
+		vehicle.set("body_mesh_override", corniche.call("car_mesh", Color(0.015, 0.017, 0.02), false, false))
 	vehicle.name = "MahdiaCar"
 	add_child(vehicle)
 	if restore_vehicle_driver:
 		vehicle.enter_vehicle(player)
 
 func _spawn_traffic() -> void:
-	# Four lightweight autonomous vehicles use the two existing main-road axes.
-	# They stay inside the asphalt lanes and wrap at the distant road ends.
-	var traffic_specs := [
-		[true, -1.65, -52.0, 1.0, 4.0],
-		[true, 1.65, 34.0, -1.0, 3.6],
-		[false, -1.65, -40.0, 1.0, 3.8],
-		[false, 1.65, 48.0, -1.0, 4.2]
-	]
-	var traffic_budget: int = traffic_specs.size()
-	for i in range(mini(traffic_specs.size(), traffic_budget)):
-		var spec: Array = traffic_specs[i]
-		var car := CharacterBody3D.new()
-		car.set_script(TRAFFIC_SCRIPT)
-		car.name = "TrafficCar_%02d" % (i + 1)
-		car.call("configure_traffic", bool(spec[0]), float(spec[1]), float(spec[2]), float(spec[3]), float(spec[4]))
-		add_child(car)
+	_apply_traffic_budget()
 
 func _setup_systems() -> void:
 	world_systems = Node.new()
@@ -811,6 +839,16 @@ func _build_hud() -> void:
 	panel.custom_minimum_size = Vector2(300, 54)
 	panel.visible = false
 	layer.add_child(panel)
+	quality_button = Button.new()
+	quality_button.anchor_left = 1.0
+	quality_button.anchor_right = 1.0
+	quality_button.offset_left = -164
+	quality_button.offset_right = -16
+	quality_button.offset_top = 14
+	quality_button.offset_bottom = 56
+	quality_button.custom_minimum_size = Vector2(148, 42)
+	quality_button.pressed.connect(_cycle_graphics_quality)
+	# Lives inside the settings panel (gear icon); see _build_reference_hud.
 	status_label = Label.new()
 	status_label.text = "MAHDIA • 08:00 • Prototype"
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -848,7 +886,10 @@ func _build_hud() -> void:
 	life_manager.message_changed.connect(func(value: String):
 		message_label.text = value
 		var technical_status := value.contains("JASSIM AI") or value.contains("خادم") or value.contains("جارٍ الفحص")
-		message_panel.visible = not technical_status
+		# Game messages now flow into the reference-style chat log.
+		message_panel.visible = false
+		if not technical_status:
+			_push_chat_log(value)
 	)
 
 	# Lightweight chat input for the currently selected resident.
@@ -1023,8 +1064,10 @@ func _update_mission_hud() -> void:
 				has_target = true
 	var distance_text := ""
 	if has_target:
-		distance_text = "\nالمسافة: %.0f م" % player.global_position.distance_to(target_position)
-	var display := "◆ %s\n%s%s" % [title, objective, distance_text]
+		distance_text = " · %.0f م" % player.global_position.distance_to(target_position)
+	var display := "%s%s" % [objective, distance_text]
+	if is_instance_valid(mission_hud_panel):
+		mission_hud_panel.tooltip_text = title
 	if display != mission_last_text:
 		mission_hud_label.text = display
 		mission_last_text = display
@@ -1033,96 +1076,286 @@ func _update_mission_hud() -> void:
 		if has_target:
 			mission_target_marker.global_position = target_position + Vector3(0, 3.1, 0)
 
+func _hud_panel_style(radius := 10, alpha := 0.55) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.03, 0.05, 0.07, alpha)
+	style.set_corner_radius_all(radius)
+	style.set_border_width_all(1)
+	style.border_color = Color(1, 1, 1, 0.18)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	return style
+
+func _icon_button(layer: Node, icon: String, diameter: float, anchor_right: bool, pos: Vector2, callback: Callable) -> Button:
+	var button: Button = ICON_BUTTON.new()
+	button.call("setup", icon, diameter)
+	button.name = "Hud_" + icon
+	if anchor_right:
+		button.anchor_left = 1.0
+		button.anchor_right = 1.0
+		button.offset_left = pos.x - diameter
+		button.offset_right = pos.x
+	else:
+		button.offset_left = pos.x
+		button.offset_right = pos.x + diameter
+	button.offset_top = pos.y
+	button.offset_bottom = pos.y + diameter
+	if callback.is_valid():
+		button.pressed.connect(callback)
+	layer.add_child(button)
+	return button
+
 func _build_reference_hud(layer: CanvasLayer) -> void:
-	# Circular navigation map: fixed to the upper-left safe area.
-	var minimap := Control.new()
-	minimap.position = Vector2(18, 14)
-	minimap.custom_minimum_size = Vector2(124, 124)
-	minimap.draw.connect(func():
-		var center := Vector2(62, 62)
-		minimap.draw_circle(center, 59.0, Color(0.025, 0.055, 0.07, 0.84))
-		minimap.draw_arc(center, 58.0, 0.0, TAU, 72, Color(0.88, 0.91, 0.88, 0.92), 3.0)
-		for road in range(-2, 3):
-			var offset := float(road) * 22.0
-			minimap.draw_line(Vector2(8, 62 + offset), Vector2(116, 62 + offset), Color(0.60, 0.68, 0.65, 0.54), 3.0)
-			minimap.draw_line(Vector2(62 + offset, 8), Vector2(62 + offset, 116), Color(0.60, 0.68, 0.65, 0.54), 3.0)
-		minimap.draw_line(Vector2(10, 88), Vector2(114, 88), Color(0.18, 0.48, 0.64, 0.78), 5.0)
-		minimap.draw_circle(center, 5.0, Color(1.0, 0.82, 0.18))
-		minimap.draw_colored_polygon(PackedVector2Array([Vector2(62, 27), Vector2(54, 47), Vector2(70, 47)]), Color.WHITE)
+	# --- Round minimap (top-left): live plan of the real world around the
+	# player, rotated with the camera. Children are clipped to the circle.
+	var minimap_frame := Control.new()
+	minimap_frame.name = "Minimap"
+	minimap_frame.position = Vector2(14, 10)
+	minimap_frame.size = Vector2(136, 136)
+	minimap_frame.custom_minimum_size = Vector2(136, 136)
+	minimap_frame.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	minimap_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	minimap_frame.draw.connect(func(): minimap_frame.draw_circle(Vector2(68, 68), 66.0, Color(0.52, 0.62, 0.46, 1.0)))
+	layer.add_child(minimap_frame)
+	minimap_content = Control.new()
+	minimap_content.size = Vector2(136, 136)
+	minimap_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	minimap_content.draw.connect(_draw_minimap)
+	minimap_frame.add_child(minimap_content)
+	minimap_overlay = Control.new()
+	minimap_overlay.position = minimap_frame.position
+	minimap_overlay.size = Vector2(136, 136)
+	minimap_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	minimap_overlay.draw.connect(func():
+		var c := Vector2(68, 68)
+		minimap_overlay.draw_arc(c, 66.0, 0.0, TAU, 72, Color(1, 1, 1, 0.92), 3.0, true)
+		minimap_overlay.draw_arc(c, 69.0, 0.0, TAU, 72, Color(0, 0, 0, 0.35), 2.0, true)
+		minimap_overlay.draw_colored_polygon(PackedVector2Array([c + Vector2(0, -9), c + Vector2(6.5, 7), c + Vector2(0, 3.5), c + Vector2(-6.5, 7)]), Color.WHITE)
+		minimap_overlay.draw_polyline(PackedVector2Array([c + Vector2(0, -9), c + Vector2(6.5, 7), c + Vector2(0, 3.5), c + Vector2(-6.5, 7), c + Vector2(0, -9)]), Color(0, 0, 0, 0.6), 1.2, true)
 	)
-	layer.add_child(minimap)
-	var location := Label.new()
-	location.text = "📍 المهدية"
-	location.position = Vector2(22, 136)
-	location.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35))
-	location.add_theme_font_size_override("font_size", 15)
+	layer.add_child(minimap_overlay)
+	var location := HBoxContainer.new()
+	location.position = Vector2(22, 150)
+	location.add_theme_constant_override("separation", 4)
 	layer.add_child(location)
+	var pin := Control.new()
+	pin.custom_minimum_size = Vector2(18, 22)
+	pin.draw.connect(func(): ICON_BUTTON.draw_icon_shape(pin, "pin", Vector2(9, 11), 8.0, Color(1.0, 0.80, 0.18)))
+	location.add_child(pin)
+	var location_label := Label.new()
+	location_label.text = "المهدية"
+	location_label.add_theme_font_size_override("font_size", 15)
+	location_label.add_theme_color_override("font_color", Color.WHITE)
+	location_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	location_label.add_theme_constant_override("outline_size", 4)
+	location.add_child(location_label)
 
-	# A one-tap return-to-waterfront icon sits beside the minimap.
-	var home_button := Button.new()
-	home_button.text = "⌂"
-	home_button.position = Vector2(148, 18)
-	home_button.custom_minimum_size = Vector2(44, 44)
-	home_button.add_theme_font_size_override("font_size", 27)
-	home_button.focus_mode = Control.FOCUS_NONE
-	_style_round_hud_button(home_button)
-	home_button.pressed.connect(_return_to_start_view)
-	layer.add_child(home_button)
+	# Home (back to the corniche spawn) and wardrobe buttons beside the map.
+	_icon_button(layer, "home", 42.0, false, Vector2(158, 14), _return_to_start_view)
+	_icon_button(layer, "shirt", 42.0, false, Vector2(158, 64), _cycle_player_outfit)
 
+	# --- Mission panel (top centre).
 	mission_hud_panel = PanelContainer.new()
 	mission_hud_panel.anchor_left = 0.5
 	mission_hud_panel.anchor_right = 0.5
-	mission_hud_panel.offset_left = -148
-	mission_hud_panel.offset_right = 148
-	mission_hud_panel.offset_top = 12
-	mission_hud_panel.offset_bottom = 78
+	mission_hud_panel.offset_left = -170
+	mission_hud_panel.offset_right = 170
+	mission_hud_panel.offset_top = 10
+	mission_hud_panel.offset_bottom = 70
+	mission_hud_panel.add_theme_stylebox_override("panel", _hud_panel_style(8, 0.58))
+	mission_hud_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(mission_hud_panel)
+	var mission_col := VBoxContainer.new()
+	mission_col.add_theme_constant_override("separation", 0)
+	mission_hud_panel.add_child(mission_col)
+	var mission_head := HBoxContainer.new()
+	mission_head.alignment = BoxContainer.ALIGNMENT_END
+	mission_col.add_child(mission_head)
+	var mission_title := Label.new()
+	mission_title.name = "MissionTitle"
+	mission_title.text = "المهمة الحالية:"
+	mission_title.add_theme_font_size_override("font_size", 14)
+	mission_title.add_theme_color_override("font_color", Color(1, 1, 1))
+	mission_head.add_child(mission_title)
+	var diamond := Control.new()
+	diamond.custom_minimum_size = Vector2(16, 18)
+	diamond.draw.connect(func(): ICON_BUTTON.draw_icon_shape(diamond, "diamond", Vector2(8, 9), 6.5, Color(1.0, 0.70, 0.12)))
+	mission_head.add_child(diamond)
 	mission_hud_label = Label.new()
-	mission_hud_label.text = "◆ المهمة الحالية\nتحدث مع أحد سكان المهدية لبدء مغامرتك"
-	mission_hud_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	mission_hud_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	mission_hud_label.text = "تحدث مع أحد سكان المهدية لبدء مغامرتك"
+	mission_hud_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	mission_hud_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	mission_hud_label.add_theme_font_size_override("font_size", 14)
-	mission_hud_panel.add_child(mission_hud_label)
+	mission_hud_label.add_theme_font_size_override("font_size", 13)
+	mission_hud_label.add_theme_color_override("font_color", Color(0.92, 0.94, 0.96))
+	mission_col.add_child(mission_hud_label)
 
-	# Real wallet amount is read from the saved life simulation, not a fake HUD value.
+	# --- Wallet pill with cash icon and "+" (top right).
 	var wallet := PanelContainer.new()
 	wallet.anchor_left = 1.0
 	wallet.anchor_right = 1.0
-	wallet.offset_left = -258
-	wallet.offset_right = -82
-	wallet.offset_top = 12
-	wallet.offset_bottom = 52
+	wallet.offset_left = -300
+	wallet.offset_right = -96
+	wallet.offset_top = 14
+	wallet.offset_bottom = 50
+	var wallet_style := _hud_panel_style(18, 0.55)
+	wallet_style.content_margin_top = 2
+	wallet_style.content_margin_bottom = 2
+	wallet_style.content_margin_right = 4
+	wallet.add_theme_stylebox_override("panel", wallet_style)
 	layer.add_child(wallet)
+	var wallet_row := HBoxContainer.new()
+	wallet_row.add_theme_constant_override("separation", 6)
+	wallet.add_child(wallet_row)
+	var cash := Control.new()
+	cash.custom_minimum_size = Vector2(30, 30)
+	cash.draw.connect(func(): ICON_BUTTON.draw_icon_shape(cash, "cash", Vector2(15, 16), 12.0, Color.WHITE))
+	wallet_row.add_child(cash)
 	wallet_label = Label.new()
-	wallet_label.text = "💵 12,560 د.ت  ＋"
-	wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wallet_label.text = "12,560 د.ت"
+	wallet_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	wallet_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	wallet_label.add_theme_font_size_override("font_size", 15)
-	wallet.add_child(wallet_label)
+	wallet_label.add_theme_font_size_override("font_size", 16)
+	wallet_row.add_child(wallet_label)
+	var plus: Button = ICON_BUTTON.new()
+	plus.call("setup", "plus", 28.0)
+	plus.set("accent", Color(1, 1, 1, 0.18))
+	plus.pressed.connect(_show_earn_money)
+	wallet_row.add_child(plus)
 
+	# --- Level label + green XP bar under the wallet.
 	level_label = Label.new()
-	level_label.text = "Lv. 8   •   المهدية"
+	level_label.text = "Lv. 1"
 	level_label.anchor_left = 1.0
 	level_label.anchor_right = 1.0
-	level_label.offset_left = -252
-	level_label.offset_right = -86
-	level_label.offset_top = 56
-	level_label.offset_bottom = 80
-	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_label.offset_left = -296
+	level_label.offset_right = -200
+	level_label.offset_top = 52
+	level_label.offset_bottom = 70
 	level_label.add_theme_font_size_override("font_size", 13)
+	level_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	level_label.add_theme_constant_override("outline_size", 4)
 	layer.add_child(level_label)
+	level_bar = ProgressBar.new()
+	level_bar.anchor_left = 1.0
+	level_bar.anchor_right = 1.0
+	level_bar.offset_left = -296
+	level_bar.offset_right = -110
+	level_bar.offset_top = 72
+	level_bar.offset_bottom = 80
+	level_bar.show_percentage = false
+	level_bar.max_value = 1.0
+	level_bar.step = 0.001
+	var bar_bg := StyleBoxFlat.new()
+	bar_bg.bg_color = Color(0, 0, 0, 0.45)
+	bar_bg.set_corner_radius_all(4)
+	var bar_fill := StyleBoxFlat.new()
+	bar_fill.bg_color = Color(0.30, 0.85, 0.45)
+	bar_fill.set_corner_radius_all(4)
+	level_bar.add_theme_stylebox_override("background", bar_bg)
+	level_bar.add_theme_stylebox_override("fill", bar_fill)
+	layer.add_child(level_bar)
 
-	var profile := _make_hud_icon(layer, "👤", 12.0, 12.0, Callable())
-	profile.custom_minimum_size = Vector2(58, 58)
-	profile.offset_left = -70.0
-	profile.offset_right = -12.0
-	profile.offset_bottom = 70.0
+	# --- Avatar, then trophy / settings / friends row, chat and mic buttons.
+	var avatar := _icon_button(layer, "profile", 64.0, true, Vector2(-14, 8), _show_profile_panel)
+	avatar.set("accent", Color(0.16, 0.22, 0.30, 0.92))
+	avatar.set("ring", Color(1, 1, 1, 0.9))
+	_icon_button(layer, "friends", 40.0, true, Vector2(-14, 88), _show_friends_panel)
+	_icon_button(layer, "gear", 40.0, true, Vector2(-62, 88), _toggle_settings_panel)
+	_icon_button(layer, "trophy", 40.0, true, Vector2(-110, 88), _show_progress_panel)
+	_icon_button(layer, "chat", 46.0, true, Vector2(-20, 248), _toggle_chat_panel)
+	voice_button = _icon_button(layer, "mic", 46.0, true, Vector2(-20, 304), _toggle_voice)
 
-	_make_hud_icon(layer, "🏆", 12.0, 88.0, Callable(self, "_toggle_mission_panel"))
-	_make_hud_icon(layer, "⚙", 64.0, 88.0, Callable(self, "_toggle_ai_setup"))
-	_make_hud_icon(layer, "👥", 116.0, 88.0, Callable(self, "_show_resident_count"))
-	_make_hud_icon(layer, "💬", 12.0, 198.0, Callable(self, "_toggle_chat_panel"))
+	# --- Chat log (bottom-left): the latest real game / resident messages.
+	var log_panel := PanelContainer.new()
+	log_panel.anchor_top = 1.0
+	log_panel.anchor_bottom = 1.0
+	log_panel.offset_left = 10
+	log_panel.offset_right = 380
+	log_panel.offset_top = -84
+	log_panel.offset_bottom = -8
+	log_panel.add_theme_stylebox_override("panel", _hud_panel_style(6, 0.42))
+	log_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(log_panel)
+	chat_log_label = RichTextLabel.new()
+	chat_log_label.bbcode_enabled = true
+	chat_log_label.fit_content = true
+	chat_log_label.scroll_active = false
+	chat_log_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chat_log_label.add_theme_font_size_override("normal_font_size", 12)
+	chat_log_label.add_theme_font_size_override("bold_font_size", 12)
+	log_panel.add_child(chat_log_label)
+	_push_chat_log("مرحباً بك في كورنيش المهدية! اقترب من أحد السكان للتحدث.")
+
+	# --- Generic info panel used by trophy / profile / friends / "+" buttons.
+	info_panel = PanelContainer.new()
+	info_panel.anchor_left = 0.5
+	info_panel.anchor_right = 0.5
+	info_panel.anchor_top = 0.5
+	info_panel.anchor_bottom = 0.5
+	info_panel.offset_left = -220
+	info_panel.offset_right = 220
+	info_panel.offset_top = -150
+	info_panel.offset_bottom = 150
+	info_panel.add_theme_stylebox_override("panel", _hud_panel_style(12, 0.86))
+	info_panel.visible = false
+	layer.add_child(info_panel)
+	var info_col := VBoxContainer.new()
+	info_panel.add_child(info_col)
+	var info_head := HBoxContainer.new()
+	info_col.add_child(info_head)
+	var close_info: Button = ICON_BUTTON.new()
+	close_info.call("setup", "close", 34.0)
+	close_info.pressed.connect(func(): info_panel.visible = false)
+	info_head.add_child(close_info)
+	info_title = Label.new()
+	info_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	info_title.add_theme_font_size_override("font_size", 18)
+	info_head.add_child(info_title)
+	info_body = RichTextLabel.new()
+	info_body.bbcode_enabled = true
+	info_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	info_body.add_theme_font_size_override("normal_font_size", 15)
+	info_col.add_child(info_body)
+
+	# --- Settings panel (gear): graphics quality and AI setup.
+	settings_panel = PanelContainer.new()
+	settings_panel.anchor_left = 0.5
+	settings_panel.anchor_right = 0.5
+	settings_panel.anchor_top = 0.5
+	settings_panel.anchor_bottom = 0.5
+	settings_panel.offset_left = -200
+	settings_panel.offset_right = 200
+	settings_panel.offset_top = -120
+	settings_panel.offset_bottom = 120
+	settings_panel.add_theme_stylebox_override("panel", _hud_panel_style(12, 0.86))
+	settings_panel.visible = false
+	layer.add_child(settings_panel)
+	var settings_col := VBoxContainer.new()
+	settings_col.add_theme_constant_override("separation", 10)
+	settings_panel.add_child(settings_col)
+	var settings_title := Label.new()
+	settings_title.text = "الإعدادات"
+	settings_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	settings_title.add_theme_font_size_override("font_size", 18)
+	settings_col.add_child(settings_title)
+	quality_button.custom_minimum_size = Vector2(0, 46)
+	settings_col.add_child(quality_button)
+	var ai_button := Button.new()
+	ai_button.text = "إعداد الذكاء الاصطناعي للسكان"
+	ai_button.custom_minimum_size = Vector2(0, 42)
+	ai_button.pressed.connect(func():
+		settings_panel.visible = false
+		_toggle_ai_setup()
+	)
+	settings_col.add_child(ai_button)
+	var close_settings := Button.new()
+	close_settings.text = "إغلاق"
+	close_settings.custom_minimum_size = Vector2(0, 40)
+	close_settings.pressed.connect(func(): settings_panel.visible = false)
+	settings_col.add_child(close_settings)
 
 	mission_target_marker = Label3D.new()
 	mission_target_marker.name = "MissionWorldMarker"
@@ -1136,43 +1369,209 @@ func _build_reference_hud(layer: CanvasLayer) -> void:
 	add_child(mission_target_marker)
 
 
-func _style_round_hud_button(button: Button) -> void:
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.035, 0.055, 0.075, 0.78)
-	normal.set_corner_radius_all(22)
-	normal.set_border_width_all(1)
-	normal.border_color = Color(0.82, 0.88, 0.88, 0.78)
-	button.add_theme_stylebox_override("normal", normal)
-	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.11, 0.17, 0.20, 0.92)
-	button.add_theme_stylebox_override("hover", hover)
-	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.18, 0.25, 0.27, 0.96)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_color_override("font_color", Color.WHITE)
-	button.add_theme_color_override("font_hover_color", Color.WHITE)
-	button.add_theme_color_override("font_pressed_color", Color.WHITE)
-	button.focus_mode = Control.FOCUS_NONE
+# ------------------------------------------------------------- minimap
 
+func _collect_minimap_rects() -> void:
+	minimap_static_rects.clear()
+	var land := Color(0.60, 0.70, 0.52)
+	var road := Color(0.36, 0.38, 0.40)
+	var walk := Color(0.86, 0.82, 0.72)
+	var roof := Color(0.93, 0.90, 0.84)
+	if is_instance_valid(corniche):
+		for r in corniche.get("map_land"):
+			minimap_static_rects.append([r, Color(0.74, 0.68, 0.52)])
+		for r in corniche.get("map_walkways"):
+			minimap_static_rects.append([r, walk])
+		for r in corniche.get("map_roads"):
+			minimap_static_rects.append([r, road])
+	# Town streets built by _build_town / _create_outer_district.
+	for r in [Rect2(-90, -4.5, 180, 9), Rect2(-4.5, -38, 9, 128), Rect2(-90, 26.5, 180, 7), Rect2(-90, 54.5, 180, 7), Rect2(-55.5, -22, 7, 112), Rect2(48.5, -22, 7, 112)]:
+		minimap_static_rects.append([r, road])
+	for building in get_tree().get_nodes_in_group("mahdia_buildings"):
+		if building is Node3D and building.has_meta("footprint"):
+			var fp: Vector2 = building.get_meta("footprint")
+			var pos: Vector3 = (building as Node3D).global_position
+			minimap_static_rects.append([Rect2(pos.x - fp.x * 0.5, pos.z - fp.y * 0.5, fp.x, fp.y), roof])
+	minimap_static_rects.push_front([Rect2(-95, -57.3, 190, 150), land])
 
-func _make_hud_icon(layer: CanvasLayer, caption: String, right_offset: float, top_offset: float, callback: Callable) -> Button:
-	var button := Button.new()
-	button.text = caption
-	button.anchor_left = 1.0
-	button.anchor_right = 1.0
-	button.anchor_top = 0.0
-	button.anchor_bottom = 0.0
-	button.offset_left = -right_offset - 44.0
-	button.offset_right = -right_offset
-	button.offset_top = top_offset
-	button.offset_bottom = top_offset + 44.0
-	button.custom_minimum_size = Vector2(44, 44)
-	button.add_theme_font_size_override("font_size", 21)
-	_style_round_hud_button(button)
-	if callback.is_valid():
-		button.pressed.connect(callback)
-	layer.add_child(button)
-	return button
+func _draw_minimap() -> void:
+	if not is_instance_valid(minimap_content) or not is_instance_valid(player):
+		return
+	var cam := get_viewport().get_camera_3d()
+	var forward := Vector3(0, 0, -1)
+	if cam != null:
+		forward = -cam.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length_squared() < 0.0001:
+		forward = Vector3(0, 0, -1)
+	forward = forward.normalized()
+	var right := Vector3(-forward.z, 0, forward.x)
+	var origin := player.global_position
+	var map_scale := 1.05  # pixels per metre
+	var centre := Vector2(68, 68)
+	var to_map := func(x: float, z: float) -> Vector2:
+		var rel := Vector3(x - origin.x, 0, z - origin.z)
+		return centre + Vector2(rel.dot(right), -rel.dot(forward)) * map_scale
+	# Sea background, then land/streets/buildings as rotated quads.
+	minimap_content.draw_rect(Rect2(Vector2.ZERO, minimap_content.size), Color(0.20, 0.50, 0.72))
+	var view_radius := 70.0 / map_scale + 4.0
+	for entry in minimap_static_rects:
+		var r: Rect2 = entry[0]
+		var col: Color = entry[1]
+		var nearest := Vector2(clampf(origin.x, r.position.x, r.end.x), clampf(origin.z, r.position.y, r.end.y))
+		if nearest.distance_to(Vector2(origin.x, origin.z)) > view_radius:
+			continue
+		var quad := PackedVector2Array([
+			to_map.call(r.position.x, r.position.y), to_map.call(r.end.x, r.position.y),
+			to_map.call(r.end.x, r.end.y), to_map.call(r.position.x, r.end.y)
+		])
+		minimap_content.draw_colored_polygon(quad, col)
+	for resident in get_tree().get_nodes_in_group("mahdia_residents"):
+		if resident is Node3D and resident.is_inside_tree():
+			var rp: Vector3 = (resident as Node3D).global_position
+			minimap_content.draw_circle(to_map.call(rp.x, rp.z), 2.6, Color(1.0, 0.85, 0.25))
+	if is_instance_valid(vehicle):
+		minimap_content.draw_circle(to_map.call(vehicle.global_position.x, vehicle.global_position.z), 3.6, Color(0.2, 0.55, 1.0))
+	if is_instance_valid(mission_target_marker) and mission_target_marker.visible:
+		var mp: Vector3 = mission_target_marker.global_position
+		var m: Vector2 = to_map.call(mp.x, mp.z)
+		m = centre + (m - centre).limit_length(60.0)
+		minimap_content.draw_circle(m, 5.0, Color(1.0, 0.35, 0.2))
+		minimap_content.draw_arc(m, 5.0, 0.0, TAU, 16, Color.WHITE, 1.5, true)
+
+# ------------------------------------------------------- HUD button actions
+
+func _push_chat_log(value: String) -> void:
+	if not is_instance_valid(chat_log_label) or value.strip_edges().is_empty():
+		return
+	var line := value.strip_edges().replace("[", "(").replace("]", ")")
+	var colon := line.find(":")
+	if colon > 0 and colon < 24:
+		var palette := ["#5ec8ff", "#ffd75e", "#ff7aa8", "#8cf08c"]
+		var who := line.substr(0, colon)
+		var col: String = palette[absi(who.hash()) % palette.size()]
+		line = "[color=%s][b]%s[/b][/color]:%s" % [col, who, line.substr(colon + 1)]
+	else:
+		line = "[color=#ffe08a][b]المهدية[/b][/color]: " + line
+	chat_log_lines.append(line)
+	while chat_log_lines.size() > 3:
+		chat_log_lines.pop_front()
+	chat_log_label.text = "\n".join(chat_log_lines)
+	if voice_enabled:
+		_speak(value)
+
+func _show_info_panel(title: String, body: String) -> void:
+	if not is_instance_valid(info_panel):
+		return
+	if is_instance_valid(settings_panel):
+		settings_panel.visible = false
+	if info_panel.visible and info_title.text == title:
+		info_panel.visible = false
+		return
+	info_title.text = title
+	info_body.text = body
+	info_panel.visible = true
+
+func _cycle_player_outfit() -> void:
+	if is_instance_valid(player) and player.has_method("cycle_outfit"):
+		var index: int = player.call("cycle_outfit")
+		var names := ["أسود كلاسيكي", "أبيض صيفي", "أزرق المهدية", "أحمر رياضي"]
+		_push_chat_log("الملابس: %s" % names[index % names.size()])
+		_save_world_progress()
+
+func _show_earn_money() -> void:
+	var money_value := int(life_manager.get("money")) if is_instance_valid(life_manager) else 0
+	_show_info_panel("المحفظة", "الرصيد: [b]%s د.ت[/b]\n\nطرق كسب المال:\n• أكمل مهمة التوصيل لأحد السكان: +20 د.ت\n• اعمل في مكتب العمل: +30 د.ت\n\nلا توجد مشتريات حقيقية داخل اللعبة." % _format_thousands(money_value))
+
+func _show_profile_panel() -> void:
+	if not is_instance_valid(life_manager):
+		return
+	var lvl: int = life_manager.call("get_level")
+	_show_info_panel("ملفك الشخصي", "المستوى: [b]%d[/b]  (خبرة %d)\nالمال: %s د.ت\nالطاقة: %d%%\nالشبع: %d%%\nوجبات في الحقيبة: %d" % [lvl, int(life_manager.get("xp")), _format_thousands(int(life_manager.get("money"))), int(life_manager.get("energy")), int(life_manager.get("hunger")), int(life_manager.get("food"))])
+
+func _show_progress_panel() -> void:
+	if not is_instance_valid(life_manager):
+		return
+	var state := str(life_manager.get("delivery_state"))
+	var steps := [
+		["تحدث مع أحد السكان واقبل طلبه", state != "not_started"],
+		["اشترِ الوجبة من متجر الحي", state == "ready" or state == "completed"],
+		["سلّم الوجبة إلى صاحبها", state == "completed"],
+		["احصل على أجرك من مكتب العمل", bool(life_manager.get("job_claimed"))]
+	]
+	var lines: Array[String] = []
+	for step in steps:
+		lines.append(("[color=#8cf08c]✔[/color] " if bool(step[1]) else "○ ") + str(step[0]))
+	_show_info_panel("مهام البداية", "\n".join(lines))
+
+func _show_friends_panel() -> void:
+	var lines: Array[String] = []
+	if is_instance_valid(player):
+		var residents := get_tree().get_nodes_in_group("mahdia_residents")
+		residents.sort_custom(func(a, b): return (a as Node3D).global_position.distance_to(player.global_position) < (b as Node3D).global_position.distance_to(player.global_position))
+		for resident in residents:
+			if not (resident is Node3D) or not resident.is_inside_tree():
+				continue
+			var d := (resident as Node3D).global_position.distance_to(player.global_position)
+			lines.append("%s — %s · %d م · ثقة %d%%" % [str(resident.get("display_name")), str(resident.get("occupation")), int(d), int(float(resident.get("trust")) * 100.0)])
+			if lines.size() >= 8:
+				break
+	_show_info_panel("سكان قريبون", "\n".join(lines) if not lines.is_empty() else "لا يوجد سكان قريبون.")
+
+func _toggle_settings_panel() -> void:
+	if not is_instance_valid(settings_panel):
+		return
+	if is_instance_valid(info_panel):
+		info_panel.visible = false
+	settings_panel.visible = not settings_panel.visible
+
+# Mic button: reads resident replies and game messages aloud with the
+# device's text-to-speech voice (Arabic when the phone has one).
+func _toggle_voice() -> void:
+	if not voice_enabled:
+		var voices := DisplayServer.tts_get_voices_for_language("ar")
+		if voices.is_empty():
+			var all_voices := DisplayServer.tts_get_voices()
+			if not all_voices.is_empty():
+				voices = PackedStringArray([str((all_voices[0] as Dictionary).get("id", ""))])
+		if voices.is_empty() or str(voices[0]).is_empty():
+			_push_chat_log("القراءة الصوتية غير متوفرة على هذا الجهاز.")
+			return
+		tts_voice = voices[0]
+	voice_enabled = not voice_enabled
+	if is_instance_valid(voice_button):
+		voice_button.set("toggled_on", voice_enabled)
+		voice_button.queue_redraw()
+	var note := "القراءة الصوتية للردود: مفعّلة" if voice_enabled else "القراءة الصوتية للردود: متوقفة"
+	_push_chat_log(note)
+	if not voice_enabled:
+		DisplayServer.tts_stop()
+
+func _speak(value: String) -> void:
+	if tts_voice.is_empty():
+		return
+	DisplayServer.tts_stop()
+	DisplayServer.tts_speak(value, tts_voice)
+
+func _format_thousands(value: int) -> String:
+	var digits := str(absi(value))
+	var out := ""
+	var count := 0
+	for i in range(digits.length() - 1, -1, -1):
+		out = digits[i] + out
+		count += 1
+		if count % 3 == 0 and i > 0:
+			out = "," + out
+	return ("-" if value < 0 else "") + out
+
+func reset_view_for_capture() -> void:
+	_return_to_start_view()
+	if is_instance_valid(world_systems):
+		world_systems.set("hour", 13.0)
+		world_systems.call("set_weather", "مشمس")
+	var pivot = player.get("camera_pivot")
+	if pivot is Node3D:
+		(pivot as Node3D).rotation = Vector3.ZERO
 
 
 func _return_to_start_view() -> void:
@@ -1283,6 +1682,8 @@ func _process(delta: float) -> void:
 		_save_world_progress()
 	if not is_instance_valid(player):
 		return
+	if is_instance_valid(minimap_content):
+		minimap_content.queue_redraw()
 	var interact_pressed := InputMap.has_action("interact") and Input.is_action_just_pressed("interact")
 	if (interact_pressed or player.interact_requested) and is_instance_valid(vehicle):
 		if vehicle.driver == player:
@@ -1303,7 +1704,13 @@ func _process(delta: float) -> void:
 			planet_navigation.update_from_player(player.global_position)
 		_update_mission_hud()
 		if is_instance_valid(wallet_label) and is_instance_valid(life_manager):
-			wallet_label.text = "💵 %d د.ت  ＋" % int(life_manager.money)
+			wallet_label.text = "%s د.ت" % _format_thousands(int(life_manager.money))
+			if is_instance_valid(level_label):
+				level_label.text = "Lv. %d" % int(life_manager.call("get_level"))
+			if is_instance_valid(level_bar):
+				level_bar.value = float(life_manager.call("get_level_progress"))
+		if is_instance_valid(corniche) and is_instance_valid(world_systems):
+			corniche.call("set_night_factor", 1.0 - clampf(float(world_systems.call("get_daylight")) * 3.0, 0.0, 1.0))
 		if is_instance_valid(status_label):
 			var hour_value: float = world_systems.hour if is_instance_valid(world_systems) else 8.0
 			status_label.text = "%s • %s • %02d:%02d • %s • %d د.ت • طاقة %d%% • جوع %d%%" % [planet_navigation.get_region_name(), planet_navigation.get_coordinate_text(), int(hour_value), int(fposmod(hour_value * 60.0, 60.0)), world_systems.weather, life_manager.money, int(life_manager.energy), int(life_manager.hunger)]
@@ -1330,7 +1737,9 @@ func _restore_world_progress() -> void:
 		var car: Array = world.vehicle_position
 		restored_vehicle_position = START_VEHICLE_POSITION if migrate_legacy_start else Vector3(float(car[0]), float(car[1]), float(car[2]))
 	restore_vehicle_driver = bool(world.get("was_driving", false))
-	quality_level = 2
+	quality_level = clampi(int(world.get("graphics_quality", quality_level)), 0, 2)
+	if player.has_method("set_outfit"):
+		player.call("set_outfit", int(world.get("outfit", 0)))
 	print("MAHDIA_WORLD_PROGRESS_RESTORED")
 
 func _save_world_progress() -> void:
@@ -1347,7 +1756,8 @@ func _save_world_progress() -> void:
 		"player_rotation_y": player.rotation.y,
 		"vehicle_position": [car_position.x, car_position.y, car_position.z],
 		"was_driving": was_driving,
-		"graphics_quality": quality_level
+		"graphics_quality": quality_level,
+		"outfit": int(player.get("outfit_index"))
 	}
 	var result: Error = save_manager.save_progress(data)
 	if result != OK:
@@ -1358,18 +1768,72 @@ func _notification(what: int) -> void:
 		_save_world_progress()
 
 func _select_device_profile() -> void:
-	# The world uses one shared visual and simulation configuration everywhere.
-	quality_level = 2
+	# Start mobile devices at Medium; desktop builds start at High.
+	quality_level = 1 if OS.has_feature("mobile") else 2
+
+func _cycle_graphics_quality() -> void:
+	quality_level = (quality_level + 1) % 3
+	_apply_graphics_quality()
+	if world_ready:
+		_rebuild_population_for_quality()
+	_save_world_progress()
+
+func _rebuild_population_for_quality() -> void:
+	# Pooled: park or reattach existing nodes instead of freeing and rebuilding.
+	_apply_resident_budget()
+	_apply_traffic_budget()
+	print("MAHDIA_POOL=", get_pool_status())
+
+func _apply_draw_distance(tier: int) -> void:
+	# Camera far plane is the hard draw distance; facade details use a shorter
+	# visibility range so distant buildings render as a few large boxes only.
+	var far: float = CAMERA_FAR_BY_TIER[tier]
+	var detail_range: float = DETAIL_RANGE_BY_TIER[tier]
+	var cam := get_viewport().get_camera_3d()
+	if cam != null:
+		cam.far = far
+	for detail in building_detail_meshes:
+		if is_instance_valid(detail):
+			detail.visibility_range_end = detail_range
+			detail.visibility_range_end_margin = 4.0
+	# Occlusion culling hides objects fully behind building occluders.
+	get_viewport().use_occlusion_culling = true
 
 func _apply_graphics_quality() -> void:
-	Engine.max_fps = 60
+	# Low stays playable on 3 GB phones; High is the full visual target.
+	var fps_caps := [30, 45, 60]
+	var render_scales := [0.70, 0.82, 1.0]
+	var shadow_distances := [0.0, 40.0, 70.0]
+	var tier := clampi(quality_level, 0, 2)
+	Engine.max_fps = fps_caps[tier]
+	# Keep physics deterministic across visual tiers.
 	Engine.physics_ticks_per_second = 60
-	get_viewport().scaling_3d_scale = 1.0
+	var viewport := get_viewport()
+	viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+	viewport.scaling_3d_scale = render_scales[tier]
+	viewport.msaa_3d = [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X][tier]
+	viewport.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if tier == 0 else Viewport.SCREEN_SPACE_AA_DISABLED
+	viewport.mesh_lod_threshold = [4.0, 2.0, 1.0][tier]
+	RenderingServer.directional_shadow_atlas_set_size([1024, 2048, 4096][tier], true)
+	RenderingServer.directional_soft_shadow_filter_set_quality([RenderingServer.SHADOW_QUALITY_HARD, RenderingServer.SHADOW_QUALITY_SOFT_LOW, RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM][tier])
 	if is_instance_valid(sun):
 		sun.visible = true
-		sun.shadow_enabled = true
+		sun.shadow_enabled = tier > 0
+		sun.directional_shadow_max_distance = shadow_distances[tier] if tier > 0 else 30.0
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if tier == 2 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	if is_instance_valid(world_environment):
-		world_environment.ambient_light_energy = 0.94
+		world_environment.glow_enabled = tier > 0
+		world_environment.adjustment_enabled = tier > 0
+		world_environment.ssao_enabled = tier == 2 and renderer_name == "forward_plus"
+		if world_environment.sky != null:
+			world_environment.sky.radiance_size = [Sky.RADIANCE_SIZE_32, Sky.RADIANCE_SIZE_64, Sky.RADIANCE_SIZE_128][tier]
+	if is_instance_valid(corniche) and corniche.has_method("apply_quality"):
+		corniche.call("apply_quality", tier)
+	_apply_draw_distance(tier)
+	if is_instance_valid(quality_button):
+		var labels := ["منخفضة · 30 FPS", "متوسطة · 45 FPS", "عالية · 60 FPS"]
+		quality_button.text = "الجودة: " + labels[tier]
+		quality_button.tooltip_text = "اضغط لتغيير جودة الرسومات وعدد السكان والسيارات"
 
 
 func _surface_texture(kind: String) -> ImageTexture:
@@ -1511,16 +1975,6 @@ func _create_city_details() -> void:
 		_box(self, Vector3(0.19, 0.19, 0.08), corner + Vector3(0, 3.55, -0.17), Color(0.88, 0.66, 0.16))
 		_box(self, Vector3(0.19, 0.19, 0.08), corner + Vector3(0, 3.28, -0.17), Color(0.16, 0.58, 0.28))
 
-	# Planters, rubbish bins and short protective bollards on the promenade.
-	for i in range(6):
-		var x := -30.0 + float(i) * 12.0
-		_box(self, Vector3(1.35, 0.42, 0.72), Vector3(x, 0.28, -52.2), Color(0.58, 0.43, 0.30))
-		_box(self, Vector3(1.12, 0.22, 0.54), Vector3(x, 0.58, -52.2), Color(0.20, 0.40, 0.24))
-		if i % 2 == 0:
-			_box(self, Vector3(0.48, 0.85, 0.48), Vector3(x + 2.4, 0.53, -51.8), Color(0.16, 0.30, 0.31))
-	for i in range(12):
-		var x := -33.0 + float(i) * 6.0
-		_box(self, Vector3(0.22, 0.72, 0.22), Vector3(x, 0.42, -55.8), Color(0.78, 0.76, 0.68))
 
 	# Small storefront awnings make the ground-level blocks read as lived-in shops.
 	for i in range(5):

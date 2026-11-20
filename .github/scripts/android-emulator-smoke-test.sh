@@ -60,9 +60,15 @@ if [[ "$player_ready" != "true" ]]; then
   exit 1
 fi
 
-# Confirm the player itself uses the imported human asset, not the old blocky fallback.
-if ! grep -q "MAHDIA_PLAYER_IMPORTED=1" "$LIVE_LOG"; then
-  echo "Imported human player model was not confirmed in the Android runtime."
+# Accept either verified imported artwork or the intentional procedural human rig.
+# The current main-branch player setting disables the imported rig until its pose
+# is verified on-device; gameplay readiness must not fail solely because of that choice.
+if grep -q 'MAHDIA_PLAYER_VISUAL=IMPORTED' "$LIVE_LOG"; then
+  echo "Imported player visual confirmed in the Android runtime."
+elif grep -q 'MAHDIA_PLAYER_VISUAL=PROCEDURAL' "$LIVE_LOG"; then
+  echo "Procedural human player fallback confirmed in the Android runtime."
+else
+  echo "No usable player visual was confirmed in the Android runtime."
   grep "MAHDIA_PLAYER_" "$LIVE_LOG" | tail -n 40 || true
   exit 1
 fi
@@ -83,8 +89,10 @@ else
   grep 'MAHDIA_PLAYER_ORIENTATION=' "$LIVE_LOG" | tail -n 10 || true
 fi
 
+# The hosted runner exposes no KVM, so the emulator CPU is fully software
+# emulated (~30x slower than a phone). Allow up to 180 s for the full city.
 scene_ready=false
-for attempt in $(seq 1 120); do
+for attempt in $(seq 1 360); do
   if grep -q "MAHDIA_WORLD_READY" "$LIVE_LOG"; then
     scene_ready=true
     echo "Main world scene reported ready on attempt $attempt."
@@ -100,7 +108,7 @@ fi
 
 # A successful world render is not enough: require imported human GLB assets
 # to instantiate in the live Android scene, not merely exist in the build ZIP.
-if ! grep -Eq 'MAHDIA_IMPORTED_RESIDENTS=[1-9][0-9]*/' "$LIVE_LOG"; then
+if ! grep -Eq 'MAHDIA_IMPORTED_RESIDENTS=([6-9]|1[0-1])/(8|12)' "$LIVE_LOG"; then
   echo "No imported human resident model was confirmed in the Android runtime."
   grep 'MAHDIA_IMPORTED_' "$LIVE_LOG" | tail -n 40 || true
   exit 1
@@ -112,9 +120,9 @@ grep 'MAHDIA_IMPORTED_' "$LIVE_LOG" | tail -n 20
 # authored AnimationPlayer clip; absence of the clip diagnostic is not fatal.
 residents_ready=false
 for attempt in $(seq 1 20); do
-  if grep -q 'MAHDIA_IMPORTED_RESIDENTS=11/12' "$LIVE_LOG"; then
+  if grep -Eq 'MAHDIA_IMPORTED_RESIDENTS=(7/8|11/12)' "$LIVE_LOG"; then
     residents_ready=true
-    echo "11 imported residents and one beachwear resident loaded."
+    echo "Expected imported residents and one beachwear resident loaded for the active quality tier."
     break
   fi
   sleep 1
@@ -124,7 +132,7 @@ if [[ "$residents_ready" != "true" ]]; then
   grep -E 'MAHDIA_IMPORTED_|MAHDIA_WORLD_READY' "$LIVE_LOG" | tail -n 60 || true
   exit 1
 fi
-if ! grep -q 'MAHDIA_BEACHGOERS=1/12' "$LIVE_LOG"; then
+if ! grep -Eq 'MAHDIA_BEACHGOERS=1/(8|12)' "$LIVE_LOG"; then
   echo "The beachwear resident variant was not confirmed in the live scene."
   grep -E 'MAHDIA_IMPORTED_|MAHDIA_BEACHGOERS=' "$LIVE_LOG" | tail -n 40 || true
   exit 1

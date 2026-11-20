@@ -8,6 +8,8 @@ var environment: Environment
 var status_callback: Callable
 var weather_elapsed := 0.0
 var next_weather_change := 180.0
+const SUN_STRENGTH := 1.75
+var base_fog_density := 0.0016
 
 func configure(light: DirectionalLight3D, env: Environment) -> void:
 	sun = light
@@ -29,25 +31,34 @@ func _process(delta: float) -> void:
 	elif weather == "ممطر":
 		weather_light = 0.58
 	if is_instance_valid(sun):
-		# Move the sun across the Mediterranean sky instead of keeping noon-like
-		# shadows fixed all day. Keep the elevation shallow at dawn/night and
-		# highest around solar noon; the existing quality tier controls shadows.
-		var solar_phase := fposmod(hour - 6.0, 24.0) / 24.0
-		var sun_elevation := sin(clampf(daylight, 0.0, 1.0) * PI * 0.5)
+		# Mediterranean sun: highest around 13:00, coming from behind the
+		# player's spawn view over the sea so facades, people and Borj el
+		# Kebir are front-lit like the reference image. The quality tier
+		# controls shadows.
+		var sun_elevation := clampf(daylight, 0.0, 1.0)
 		sun.rotation_degrees = Vector3(
-			lerpf(-82.0, -18.0, sun_elevation),
-			-90.0 + solar_phase * 360.0,
+			lerpf(-6.0, -52.0, sun_elevation),
+			135.0 + (hour - 13.0) * 15.0,
 			0.0
 		)
-		var warm_light := 1.0 - clampf(absf(hour - 12.5) / 6.5, 0.0, 1.0)
-		sun.light_color = Color(1.0, 0.78, 0.62).lerp(Color(1.0, 0.96, 0.86), warm_light)
-		sun.light_energy = daylight * weather_light
+		var warm_light := 1.0 - clampf(absf(hour - 13.0) / 6.5, 0.0, 1.0)
+		sun.light_color = Color(1.0, 0.74, 0.55).lerp(Color(1.0, 0.95, 0.88), warm_light)
+		sun.light_energy = daylight * weather_light * SUN_STRENGTH
 	if is_instance_valid(environment):
-		# Lightweight sky colour cycle: no procedural sky shader or extra GPU passes.
 		var weather_tint := Color(0.78, 0.84, 0.92) if weather == "غائم" else Color(0.68, 0.75, 0.86) if weather == "ممطر" else Color.WHITE
+		# Colour-mode fallback (only used when no sky is configured).
 		environment.background_color = sky * weather_tint
 		environment.ambient_light_color = Color(0.34, 0.39, 0.52).lerp(Color(0.82, 0.86, 0.92), daylight) * weather_tint
-		environment.ambient_light_energy = lerpf(0.25, 1.0, daylight) * weather_light
+		environment.ambient_light_energy = lerpf(0.12, 1.0, daylight) * weather_light
+		# HDRI / procedural sky: dim it at night and under cloud.
+		environment.background_energy_multiplier = lerpf(0.035, 1.0, daylight) * weather_light
+		if environment.fog_enabled:
+			var haze := 0.0 if weather == "مشمس" else (0.004 if weather == "غائم" else 0.009)
+			environment.fog_density = base_fog_density + haze
+			environment.fog_light_color = Color(0.70, 0.80, 0.90).lerp(Color(0.10, 0.12, 0.18), 1.0 - daylight) * weather_tint
+
+func get_daylight() -> float:
+	return clampf(sin((hour - 6.0) / 12.0 * PI), 0.0, 1.0)
 
 func _sky_color_for_hour(value: float) -> Color:
 	var night := Color(0.035, 0.065, 0.13)

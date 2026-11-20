@@ -22,5 +22,7 @@ jobs:
         run: godot --headless --editor --path . --quit
       - name: Test mobile joystick movement
         run: timeout 75s godot --headless --path . --script res://tests/test_mobile_movement.gd
+      - name: Test graphics tiers, object pooling and occlusion
+        run: timeout 90s godot --headless --path . --script res://tests/test_quality_pooling.gd
       - name: Run main scene briefly
         run: timeout 20s godot --headless --path . --quit-after 5
