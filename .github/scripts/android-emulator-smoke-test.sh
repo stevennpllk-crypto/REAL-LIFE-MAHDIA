@@ -89,8 +89,10 @@ else
   grep 'MAHDIA_PLAYER_ORIENTATION=' "$LIVE_LOG" | tail -n 10 || true
 fi
 
+# The hosted runner exposes no KVM, so the emulator CPU is fully software
+# emulated (~30x slower than a phone). Allow up to 180 s for the full city.
 scene_ready=false
-for attempt in $(seq 1 120); do
+for attempt in $(seq 1 360); do
   if grep -q "MAHDIA_WORLD_READY" "$LIVE_LOG"; then
     scene_ready=true
     echo "Main world scene reported ready on attempt $attempt."

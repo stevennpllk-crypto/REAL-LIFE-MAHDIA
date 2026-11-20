@@ -46,6 +46,7 @@ var sea_material: ShaderMaterial
 var sea_instance: MeshInstance3D
 var frond_material: ShaderMaterial
 var car_mesh_cache: Dictionary = {}
+var facade_templates: Dictionary = {}
 var lamp_glass_material: StandardMaterial3D
 # Plan-view rectangles (x, z) for the HUD minimap.
 var map_roads: Array[Rect2] = []
@@ -61,17 +62,13 @@ func build(owner_world: Node, quality_tier: int) -> void:
 	var t0 := Time.get_ticks_msec()
 	_build_ground_and_streets()
 	_build_sea()
-	await get_tree().process_frame
 	_build_seawall_and_rocks()
-	await get_tree().process_frame
 	_build_balustrade()
 	await get_tree().process_frame
 	_build_headland_and_fortress()
-	await get_tree().process_frame
 	_build_building_row()
 	await get_tree().process_frame
 	_build_palms_and_lamps()
-	await get_tree().process_frame
 	_build_cafes()
 	_build_parked_cars()
 	_build_flags()
@@ -351,13 +348,19 @@ func _build_balustrade() -> void:
 		Vector2(0.085, 0.24), Vector2(0.085, 0.34), Vector2(0.04, 0.50), Vector2(0.035, 0.56),
 		Vector2(0.06, 0.60), Vector2(0.06, 0.65), Vector2(0.0, 0.65)
 	])
-	var segments := 6 if tier == 0 else 8
+	var segments := 8
+	# One shared baluster mesh drawn with MultiMesh: hundreds of turned
+	# balusters for one draw call per chunk and almost no build time.
+	var baluster_batch := MESH_BATCH.new()
+	baluster_batch.lathe("stone", stone, Transform3D.IDENTITY, baluster_profile, segments)
+	var baluster_mesh := baluster_batch.commit_mesh(true)
 	var chunk_len := 16.0
 	var start := HEADLAND_MAX.x + 0.6
 	var chunk_start := start
 	while chunk_start < X_EAST:
 		var chunk_end := minf(chunk_start + chunk_len, X_EAST)
 		var b := MESH_BATCH.new()
+		var baluster_xforms: Array[Transform3D] = []
 		var run_start := -1.0
 		var x := chunk_start
 		while x <= chunk_end:
@@ -374,7 +377,7 @@ func _build_balustrade() -> void:
 					b.box("stone", stone, _xf(Vector3(mid, 0.93, BALUSTRADE_Z)), Vector3(run_len, 0.05, 0.34))
 				run_start = -1.0
 			if not gap:
-				b.lathe("stone", stone, _xf(Vector3(x, 0.28, BALUSTRADE_Z)), baluster_profile, segments)
+				baluster_xforms.append(_xf(Vector3(x, 0.28, BALUSTRADE_Z)))
 			x += 0.3
 		# Square pillars every 4.2 m.
 		var px := ceilf(chunk_start / 4.2) * 4.2
@@ -384,6 +387,18 @@ func _build_balustrade() -> void:
 				b.box("stone", stone, _xf(Vector3(px, 1.15, BALUSTRADE_Z)), Vector3(0.58, 0.1, 0.6))
 			px += 4.2
 		var items := b.commit_instances(self)
+		if not baluster_xforms.is_empty():
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.mesh = baluster_mesh
+			mm.instance_count = baluster_xforms.size()
+			for k in range(baluster_xforms.size()):
+				mm.set_instance_transform(k, baluster_xforms[k])
+			var balusters := MultiMeshInstance3D.new()
+			balusters.multimesh = mm
+			add_child(balusters)
+			balusters.visibility_range_end = 140.0
+			balusters.visibility_range_end_margin = 10.0
 		for item in items:
 			item.visibility_range_end = 140.0
 			item.visibility_range_end_margin = 10.0
@@ -512,7 +527,7 @@ func _build_building_row() -> void:
 	var x := X_EAST - 2.0
 	var index := 0
 	while x > X_WEST + 8.0:
-		var width := rng.randf_range(10.5, 15.5)
+		var width: float = [11.0, 12.5, 14.0, 15.5][rng.randi_range(0, 3)]
 		var centre := x - width * 0.5
 		if absf(centre) < 7.0 + width * 0.5:
 			# Leave the junction with the town avenue (x = 0) open.
@@ -550,6 +565,20 @@ func _create_corniche_building(cx: float, width: float, floors: int, seed_value:
 	roof.material_override = plain(tint.darkened(0.12), 0.9)
 	building.add_child(roof)
 
+	# Facade detail meshes are generated once per (width, floors, style)
+	# template and shared, which keeps start-up fast on slow phones.
+	var template_key := "%.1f|%d|%d" % [width, floors, seed_value % 2]
+	if facade_templates.has(template_key):
+		for entry in facade_templates[template_key]:
+			var shared := MeshInstance3D.new()
+			shared.mesh = entry[0]
+			shared.material_override = entry[1]
+			shared.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			building.add_child(shared)
+		_finish_corniche_building(building, width, height)
+		return
+	rng = RandomNumberGenerator.new()
+	rng.seed = hash(template_key)
 	var b := MESH_BATCH.new()
 	var glass := plain(Color(0.07, 0.10, 0.13), 0.12, 0.2)
 	var shutter := plain(BLUE if seed_value % 5 != 3 else Color(0.10, 0.42, 0.55), 0.55)
@@ -587,8 +616,8 @@ func _create_corniche_building(cx: float, width: float, floors: int, seed_value:
 					b.box("shutter", shutter, _xf(Vector3(open_x, wy, fz - 0.05)), Vector3(0.52, 1.95, 0.05))
 				# Louvre lines catch the light.
 				var lx: float = wx + side * 0.255 if closed else open_x
-				for slat in range(6):
-					b.box("trim_dark", plain(BLUE.darkened(0.35), 0.6), _xf(Vector3(lx, wy - 0.75 + float(slat) * 0.3, fz - 0.085)), Vector3(0.44, 0.03, 0.02))
+				for slat in range(4):
+					b.box("trim_dark", plain(BLUE.darkened(0.35), 0.6), _xf(Vector3(lx, wy - 0.66 + float(slat) * 0.44, fz - 0.085)), Vector3(0.44, 0.035, 0.02))
 			if balcony_floor and not continuous:
 				var bw := 1.7
 				b.box("trim", trim, _xf(Vector3(wx, base_y + 0.42, fz - 0.45)), Vector3(bw, 0.12, 0.9))
@@ -628,8 +657,14 @@ func _create_corniche_building(cx: float, width: float, floors: int, seed_value:
 		if (ac + seed_value) % 3 == 0:
 			b.box("trim", plain(Color(0.86, 0.87, 0.85), 0.6), _xf(Vector3(-width * 0.5 + 0.9, ground_h + floor_h * float(ac) + 0.6, fz - 0.25)), Vector3(0.8, 0.55, 0.45))
 	var details := b.commit_instances(building)
+	var cached: Array = []
 	for item in details:
 		item.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		cached.append([item.mesh, item.material_override])
+	facade_templates[template_key] = cached
+	_finish_corniche_building(building, width, height)
+
+func _finish_corniche_building(building: StaticBody3D, width: float, height: float) -> void:
 	var collision := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(width, height, BUILDING_DEPTH)
