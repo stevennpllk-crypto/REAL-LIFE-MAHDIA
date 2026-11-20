@@ -11,6 +11,8 @@ class_name MahdiaPlayer
 @export var jump_velocity := 4.5
 @export var mouse_sensitivity := 0.0020
 @export var build_visuals := true
+# Keep the imported player rig disabled until its shoulder rest pose is verified on-device.
+@export var use_imported_player_character := false
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var move_vector := Vector2.ZERO
 var running := false
@@ -54,7 +56,7 @@ func _ready() -> void:
 	_add_action("jump", KEY_SPACE)
 	_add_action("interact", KEY_E)
 	if build_visuals:
-		if not _build_imported_player_character():
+		if not use_imported_player_character or not _build_imported_player_character():
 			_build_human_figure()
 	var collider := CollisionShape3D.new()
 	var shape := CapsuleShape3D.new()
