@@ -249,7 +249,7 @@ func _pose_imported_player_bone(key: String, angle: float) -> void:
 		# The cached Bip01 rest basis is mirrored across the shoulders. The
 		# previous signs lifted both forearms toward the head on Android; reverse
 		# the roll so the T-pose settles beside the torso.
-		var drop_angle := 1.20 if key == "left_arm" else -1.20
+		var drop_angle := -1.45 if key == "left_arm" else 1.45
 		pose_rotation = Quaternion(drop_axis, drop_angle) * Quaternion(swing_axis, angle)
 	elif key == "head" or key == "neck":
 		var head_axis := (inverse_rest * Vector3.UP).normalized()
