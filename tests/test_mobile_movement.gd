@@ -106,8 +106,17 @@ func _run_tests() -> void:
 	_check(player.get("crouching") == true, "player can enter crouch stance")
 	player.call("toggle_crouch")
 	_check(player.get("crouching") == false, "player can leave crouch stance")
+	# A dedicated dodge-button tap should work while stationary and use facing direction.
+	player.global_position = Vector3.ZERO
+	player.call("set_mobile_move", Vector2.ZERO)
+	player.set("dodge_cooldown", 0.0)
 	player.call("request_dodge")
-	_check(player.get("dodge_requested") == true, "player can request a directional dodge")
+	_check(player.get("dodge_requested") == true, "player accepts a dodge-button tap while standing still")
+	player.call("_physics_process", 0.016)
+	_check(float(player.get("dodge_time")) > 0.20 and float(player.get("dodge_cooldown")) > 1.0, "stationary dodge starts and applies its cooldown")
+	var expected_dodge_direction: Vector3 = -player.global_transform.basis.z
+	var actual_dodge_direction: Vector3 = player.get("dodge_direction")
+	_check(actual_dodge_direction.dot(expected_dodge_direction.normalized()) > 0.99, "stationary dodge follows the player's facing direction")
 	player.call("request_attack")
 	var first_attack_time: float = player.get("attack_time")
 	player.call("request_attack")
