@@ -14,6 +14,7 @@ const PLANET_NAV_SCRIPT = preload("res://scripts/planet_navigation.gd")
 const TERRAIN_STREAMER_SCRIPT = preload("res://scripts/terrain_streamer.gd")
 
 var player: CharacterBody3D
+var mobile_controls: Node
 var sun: DirectionalLight3D
 var world_environment: Environment
 var status_label: Label
@@ -964,10 +965,10 @@ func _build_hud() -> void:
 
 	_build_reference_hud(layer)
 
-	var controls := Node.new()
-	controls.set_script(MOBILE_CONTROLS)
-	layer.add_child(controls)
-	controls.setup(player)
+	mobile_controls = Node.new()
+	mobile_controls.set_script(MOBILE_CONTROLS)
+	layer.add_child(mobile_controls)
+	mobile_controls.setup(player)
 
 
 
@@ -1286,7 +1287,11 @@ func _process(delta: float) -> void:
 	if (interact_pressed or player.interact_requested) and is_instance_valid(vehicle):
 		if vehicle.driver == player:
 			vehicle.exit_vehicle()
+			if is_instance_valid(mobile_controls):
+				mobile_controls.reset_input_state()
 		elif player.global_position.distance_to(vehicle.global_position) < 4.0:
+			if is_instance_valid(mobile_controls):
+				mobile_controls.reset_input_state()
 			vehicle.enter_vehicle(player)
 		elif is_instance_valid(life_manager):
 			life_manager.try_interact()
