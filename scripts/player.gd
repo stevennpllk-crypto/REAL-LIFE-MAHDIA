@@ -557,7 +557,9 @@ func _physics_process(delta: float) -> void:
 		coyote_time = 0.0
 	if dodge_requested:
 		dodge_requested = false
-		if strength > 0.08 and dodge_cooldown <= 0.0 and not is_swimming and not crouching:
+		# The dodge button must work even from a standstill; use the current
+		# movement vector when present, otherwise dodge in the facing direction.
+		if dodge_cooldown <= 0.0 and not is_swimming and not crouching:
 			dodge_direction = direction if moving else -global_transform.basis.z
 			dodge_direction.y = 0.0
 			dodge_direction = dodge_direction.normalized()
