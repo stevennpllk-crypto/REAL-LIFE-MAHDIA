@@ -1385,9 +1385,10 @@ func _cycle_graphics_quality() -> void:
 func _rebuild_population_for_quality() -> void:
 	# Persist each resident's memory before rebuilding the quality-tier population.
 	for resident in get_tree().get_nodes_in_group("mahdia_residents"):
-		if is_instance_valid(resident) and resident.has_method("_save_memory"):
-			resident.call("_save_memory")
-		resident.queue_free()
+		if is_instance_valid(resident):
+			if resident.has_method("_save_memory"):
+				resident.call("_save_memory")
+			resident.queue_free()
 	for traffic_car in get_tree().get_nodes_in_group("mahdia_traffic"):
 		if is_instance_valid(traffic_car):
 			traffic_car.queue_free()
