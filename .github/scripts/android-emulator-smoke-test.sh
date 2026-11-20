@@ -60,9 +60,15 @@ if [[ "$player_ready" != "true" ]]; then
   exit 1
 fi
 
-# Confirm the player itself uses the imported human asset, not the old blocky fallback.
-if ! grep -q "MAHDIA_PLAYER_IMPORTED=1" "$LIVE_LOG"; then
-  echo "Imported human player model was not confirmed in the Android runtime."
+# Accept either verified imported artwork or the intentional procedural human rig.
+# The current main-branch player setting disables the imported rig until its pose
+# is verified on-device; gameplay readiness must not fail solely because of that choice.
+if grep -q 'MAHDIA_PLAYER_VISUAL=IMPORTED' "$LIVE_LOG"; then
+  echo "Imported player visual confirmed in the Android runtime."
+elif grep -q 'MAHDIA_PLAYER_VISUAL=PROCEDURAL' "$LIVE_LOG"; then
+  echo "Procedural human player fallback confirmed in the Android runtime."
+else
+  echo "No usable player visual was confirmed in the Android runtime."
   grep "MAHDIA_PLAYER_" "$LIVE_LOG" | tail -n 40 || true
   exit 1
 fi
