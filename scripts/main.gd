@@ -717,8 +717,8 @@ func _spawn_residents() -> void:
 		Vector3(51.0, 0, -44.2), Vector3(46.0, 0, -50.0),
 		Vector3(40.0, 0, -44.0), Vector3(35.0, 0, -50.0),
 		Vector3(29.0, 0, -44.2), Vector3(24.0, 0, -50.0),
-		Vector3(18.0, 0, -44.0), Vector3(13.0, 0, -50.0),
-		Vector3(-18.0, 0, -53.0), Vector3(2.0, 0, -50.0)
+		Vector3(18.0, 0, -44.0), Vector3(-18.0, 0, -53.0),
+		Vector3(7.0, 0, -44.2), Vector3(2.0, 0, -50.0)
 	]
 	var resident_budget: int = sidewalk_positions.size()
 	for i in range(mini(sidewalk_positions.size(), resident_budget)):
