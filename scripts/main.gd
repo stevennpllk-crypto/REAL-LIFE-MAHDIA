@@ -708,13 +708,17 @@ func _spawn_residents() -> void:
 		"سامي", "مريم", "أيمن", "ليلى", "منير", "آمنة",
 		"يوسف", "سارة", "حاتم", "نجلاء", "وليد", "ريم"
 	]
+	var resident_genders := [
+		"male", "female", "male", "female", "male", "female",
+		"male", "female", "male", "female", "male", "female"
+	]
 	var sidewalk_positions := [
 		Vector3(62.0, 0, -44.0), Vector3(57.0, 0, -50.0),
 		Vector3(51.0, 0, -44.2), Vector3(46.0, 0, -50.0),
 		Vector3(40.0, 0, -44.0), Vector3(35.0, 0, -50.0),
 		Vector3(29.0, 0, -44.2), Vector3(24.0, 0, -50.0),
 		Vector3(18.0, 0, -44.0), Vector3(13.0, 0, -50.0),
-		Vector3(7.0, 0, -44.2), Vector3(2.0, 0, -50.0)
+		Vector3(-18.0, 0, -53.0), Vector3(2.0, 0, -50.0)
 	]
 	var resident_budget: int = sidewalk_positions.size()
 	for i in range(mini(sidewalk_positions.size(), resident_budget)):
@@ -722,6 +726,7 @@ func _spawn_residents() -> void:
 		npc.set_script(NPC_SCRIPT)
 		npc.position = sidewalk_positions[i]
 		npc.display_name = resident_names[i]
+		npc.gender = resident_genders[i]
 		npc.personality = personalities[i]
 		npc.occupation = jobs[i]
 		npc.is_adult = jobs[i] == "beachgoer"
