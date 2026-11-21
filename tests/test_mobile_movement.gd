@@ -198,6 +198,10 @@ func _run_tests() -> void:
 	var visual_resident := CharacterBody3D.new()
 	visual_resident.set_script(load("res://scripts/npc.gd"))
 	visual_resident.set("build_visuals", true)
+	# Beachgoers intentionally use the procedural rig, keeping this test
+	# focused on articulated fallback anatomy even when imported GLBs exist.
+	visual_resident.set("occupation", "beachgoer")
+	visual_resident.set("is_adult", true)
 	visual_resident.call("set_ai_context", player, null, Vector3(8, 0, 0), 12, saver)
 	root.add_child(visual_resident)
 	await process_frame
@@ -206,6 +210,21 @@ func _run_tests() -> void:
 	_check(is_instance_valid(visual_resident.get("eye_white_left")) and is_instance_valid(visual_resident.get("mouth_visual")), "resident face contains layered eyes and an animated mouth")
 	_check(is_instance_valid(visual_resident.get("brow_left")) and is_instance_valid(visual_resident.get("head_visual")), "resident face supports expressive brows and independent head motion")
 	_check(float(visual_resident.get("conversation_gesture_elapsed")) >= 0.0, "resident has an independent conversation gesture clock")
+	# Exercise imported-character fitting independently of external GLB assets.
+	var fit_model := Node3D.new()
+	fit_model.name = "FitRegressionModel"
+	visual_resident.add_child(fit_model)
+	var fit_mesh := MeshInstance3D.new()
+	var fit_box := BoxMesh.new()
+	fit_box.size = Vector3(0.8, 2.2, 0.5)
+	fit_mesh.mesh = fit_box
+	fit_mesh.position.y = -0.3
+	fit_model.add_child(fit_mesh)
+	var fit_ok: bool = visual_resident.call("_fit_imported_character_model", fit_model)
+	_check(fit_ok, "imported character fitter accepts a valid mesh hierarchy")
+	_check(is_equal_approx(fit_model.scale.y, 1.72 / 2.2), "imported resident height is normalized to 1.72 metres")
+	_check(is_equal_approx(fit_model.position.y, 1.4 * (1.72 / 2.2)), "imported resident feet are aligned with the ground plane")
+	fit_model.queue_free()
 	visual_resident.set("ai_state", "socializing")
 	var gesture_before := float(visual_resident.get("conversation_gesture_side"))
 	visual_resident.call("_animate", 1.5, false)
