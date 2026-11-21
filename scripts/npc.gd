@@ -836,9 +836,13 @@ func _choose_target() -> void:
 	ai_state = "wander"
 
 func on_player_interacted() -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	# Ignore repeated interaction callbacks from a held/tapped button.
+	if now - last_player_interaction < 2.5:
+		return
+	last_player_interaction = now
 	_record_experience("player", "التقيت باللاعب وتحدثت معه", 0.10)
 	memory_meetings += 1
-	last_player_interaction = Time.get_ticks_msec() / 1000.0
 	mood = clampf(mood + 0.12, 0.0, 1.0)
 	trust = clampf(trust + (0.10 if personality != "shy" else 0.045), 0.0, 1.0)
 	social_need = clampf(social_need - 0.28, 0.0, 1.0)
@@ -847,6 +851,17 @@ func on_player_interacted() -> void:
 	memory_dirty = true
 	_save_memory()
 	_request_ai_thought()
+
+func get_relationship_status() -> String:
+	if memory_meetings <= 0:
+		return "غريب"
+	if trust >= 0.75:
+		return "صديق مقرّب"
+	if trust >= 0.45:
+		return "صديق"
+	if trust >= 0.18:
+		return "معروف"
+	return "وجه مألوف"
 
 func _load_memory() -> void:
 	if not is_instance_valid(memory_manager) or memory_id.is_empty():
