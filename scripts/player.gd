@@ -56,8 +56,11 @@ func _ready() -> void:
 	_add_action("jump", KEY_SPACE)
 	_add_action("interact", KEY_E)
 	if build_visuals:
-		if not use_imported_player_character or not _build_imported_player_character():
+		if use_imported_player_character and _build_imported_player_character():
+			print("MAHDIA_PLAYER_VISUAL=IMPORTED")
+		else:
 			_build_human_figure()
+			print("MAHDIA_PLAYER_VISUAL=PROCEDURAL")
 	var collider := CollisionShape3D.new()
 	var shape := CapsuleShape3D.new()
 	shape.radius = 0.31
