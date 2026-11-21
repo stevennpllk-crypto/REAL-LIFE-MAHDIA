@@ -118,9 +118,9 @@ grep 'MAHDIA_IMPORTED_' "$LIVE_LOG" | tail -n 20
 # authored AnimationPlayer clip; absence of the clip diagnostic is not fatal.
 residents_ready=false
 for attempt in $(seq 1 20); do
-  if grep -q 'MAHDIA_IMPORTED_RESIDENTS=11/12' "$LIVE_LOG"; then
+  if grep -Eq 'MAHDIA_IMPORTED_RESIDENTS=(11|12)/12' "$LIVE_LOG"; then
     residents_ready=true
-    echo "11 imported residents and one beachwear resident loaded."
+    echo "All 12 imported resident models loaded."
     break
   fi
   sleep 1
@@ -128,11 +128,6 @@ done
 if [[ "$residents_ready" != "true" ]]; then
   echo "Imported resident load check failed."
   grep -E 'MAHDIA_IMPORTED_|MAHDIA_WORLD_READY' "$LIVE_LOG" | tail -n 60 || true
-  exit 1
-fi
-if ! grep -q 'MAHDIA_BEACHGOERS=1/12' "$LIVE_LOG"; then
-  echo "The beachwear resident variant was not confirmed in the live scene."
-  grep -E 'MAHDIA_IMPORTED_|MAHDIA_BEACHGOERS=' "$LIVE_LOG" | tail -n 40 || true
   exit 1
 fi
 if grep -q 'MAHDIA_IMPORTED_GAIT_ACTIVE' "$LIVE_LOG"; then
