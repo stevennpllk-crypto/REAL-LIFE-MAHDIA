@@ -151,21 +151,51 @@ if ! grep -q 'com.jassim.reallifemahdia' <<< "$activity_state"; then
   exit 1
 fi
 
-# Dismiss Android's one-time immersive-mode confirmation using screen-relative coordinates.
-# The landscape "Got it" button is positioned in the lower-right portion of the dialog.
+# Dismiss Android's one-time immersive-mode confirmation.
+# Prefer the actual accessibility bounds for "Got it"; use a verified
+# landscape fallback (the button center is around x=71%, y=59%).
 screen_size="$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -n 1 | tr -d '\r')"
-if [[ -n "$screen_size" ]]; then
-  screen_width="${screen_size%x*}"
-  screen_height="${screen_size#*x}"
-  tap_x=$((screen_width * 71 / 100))
-  tap_y=$((screen_height * 47 / 100))
-  # Send two taps with a short gap: first-run dialogs can animate before
-  # accepting input, while repeated taps are harmless after dismissal.
+screen_width="\${screen_size%x*}"
+screen_height="\${screen_size#*x}"
+fallback_x=$((screen_width * 71 / 100))
+fallback_y=$((screen_height * 59 / 100))
+dialog_dismissed=false
+for attempt in $(seq 1 4); do
+  adb shell uiautomator dump /sdcard/mahdia-window.xml >/dev/null 2>&1 || true
+  adb pull /sdcard/mahdia-window.xml build/mahdia-window.xml >/dev/null 2>&1 || true
+  button_bounds="$(python3 - <<'PY'
+import re
+from pathlib import Path
+p = Path("build/mahdia-window.xml")
+if p.exists():
+    xml = p.read_text(errors="ignore")
+    match = re.search(r'text="Got it"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', xml)
+    if match:
+        x1, y1, x2, y2 = map(int, match.groups())
+        print(f"{(x1+x2)//2},{(y1+y2)//2}")
+PY
+)"
+  if [[ -n "$button_bounds" ]]; then
+    IFS=, read -r tap_x tap_y <<< "$button_bounds"
+    echo "Immersive dialog found; tapping accessibility target at $tap_x,$tap_y."
+  else
+    tap_x="$fallback_x"
+    tap_y="$fallback_y"
+    echo "Accessibility target unavailable; tapping verified fallback at $tap_x,$tap_y."
+  fi
   adb shell input tap "$tap_x" "$tap_y" >/dev/null 2>&1 || true
-  sleep 0.5
-  adb shell input tap "$tap_x" "$tap_y" >/dev/null 2>&1 || true
+  sleep 1
+  adb shell uiautomator dump /sdcard/mahdia-window.xml >/dev/null 2>&1 || true
+  adb pull /sdcard/mahdia-window.xml build/mahdia-window.xml >/dev/null 2>&1 || true
+  if ! grep -q 'Got it' build/mahdia-window.xml 2>/dev/null; then
+    dialog_dismissed=true
+    echo "Immersive confirmation is no longer exposed by the Android UI."
+    break
+  fi
+done
+if [[ "$dialog_dismissed" != "true" ]]; then
+  echo "WARNING: immersive dialog could not be verified as dismissed; capture will still be checked."
 fi
-sleep 1
 
 # Allow a few rendered frames after scene initialization before inspecting pixels.
 sleep 3
