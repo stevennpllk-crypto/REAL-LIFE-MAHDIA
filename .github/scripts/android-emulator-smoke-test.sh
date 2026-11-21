@@ -60,20 +60,18 @@ if [[ "$player_ready" != "true" ]]; then
   exit 1
 fi
 
-# Accept either the verified imported player rig or the intentional procedural fallback.
-# The fallback is the current default while the imported rig's shoulder pose is under repair.
-if ! grep -Eq 'MAHDIA_PLAYER_VISUAL=(PROCEDURAL|IMPORTED)' "$LIVE_LOG"; then
-  echo "No supported player visual was confirmed in the Android runtime."
+# The playable Android build must use the textured, rigged human GLB.
+# Do not silently accept the geometric procedural mannequin as a successful player model.
+if ! grep -q 'MAHDIA_PLAYER_VISUAL=IMPORTED' "$LIVE_LOG"; then
+  echo "Expected the imported realistic player model, but it was not activated."
   grep "MAHDIA_PLAYER_" "$LIVE_LOG" | tail -n 40 || true
   exit 1
 fi
-if grep -q 'MAHDIA_PLAYER_VISUAL=IMPORTED' "$LIVE_LOG" && ! grep -q 'MAHDIA_PLAYER_IMPORTED=1' "$LIVE_LOG"; then
+if ! grep -q 'MAHDIA_PLAYER_IMPORTED=1' "$LIVE_LOG"; then
   echo "Imported player visual did not report its rig diagnostics."
   exit 1
 fi
-if grep -q 'MAHDIA_PLAYER_VISUAL=PROCEDURAL' "$LIVE_LOG"; then
-  echo "Procedural player visual confirmed; imported rig is intentionally deferred."
-fi
+echo "Imported textured player model confirmed in the Android runtime."
 
 # Reject a rig only when the runtime diagnostic positively identifies it as inverted.
 # Some GLB exporters store bone rest offsets in a way that cannot be reconstructed
