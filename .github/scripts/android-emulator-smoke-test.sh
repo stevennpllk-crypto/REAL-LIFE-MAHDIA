@@ -155,8 +155,8 @@ fi
 # Prefer the actual accessibility bounds for "Got it"; use a verified
 # landscape fallback (the button center is around x=71%, y=59%).
 screen_size="$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -n 1 | tr -d '\r')"
-screen_width="\${screen_size%x*}"
-screen_height="\${screen_size#*x}"
+screen_width="${screen_size%x*}"
+screen_height="${screen_size#*x}"
 fallback_x=$((screen_width * 71 / 100))
 fallback_y=$((screen_height * 59 / 100))
 dialog_dismissed=false
