@@ -264,7 +264,7 @@ func _on_ai_thought(resident: Node3D, thought: String, decision: Dictionary, suc
 				ai_state = "seeking_food"
 				target_position = station.global_position + Vector3(0, 0, 2.7)
 		"socialize":
-			var partner := _nearest_resident(12.0)
+			var partner := _best_social_partner(12.0)
 			if is_instance_valid(partner) and partner.is_inside_tree() and not partner.is_queued_for_deletion():
 				ai_state = "socializing"
 				target_position = partner.global_position + Vector3(1.2, 0, 0.8)
@@ -678,7 +678,7 @@ func _choose_daily_goal(hour: float) -> void:
 	elif best_score == social_score:
 		current_goal = "التواصل"
 		ai_state = "socializing"
-		var known_resident := _nearest_resident(10.0)
+		var known_resident := _best_social_partner(10.0)
 		if is_instance_valid(known_resident) and known_resident.is_inside_tree() and not known_resident.is_queued_for_deletion():
 			target_position = known_resident.global_position + Vector3(1.2, 0, 0.8)
 		else:
@@ -770,8 +770,30 @@ func _nearest_resident(max_distance: float) -> MahdiaNPC:
 			nearest = candidate as MahdiaNPC
 	return nearest
 
+# Prefer residents the NPC already knows, while keeping distance as the main factor.
+# A full familiarity score offsets at most three metres, preventing distant
+# acquaintances from being selected over nearby residents.
+func _best_social_partner(max_distance: float) -> MahdiaNPC:
+	var best_partner: MahdiaNPC
+	var best_score := max_distance
+	for candidate in get_tree().get_nodes_in_group("mahdia_residents"):
+		if candidate == self or not is_instance_valid(candidate) or not candidate.is_inside_tree() or candidate.is_queued_for_deletion():
+			continue
+		var distance := global_position.distance_to(candidate.global_position)
+		if distance > max_distance:
+			continue
+		var candidate_id := str(candidate.get("memory_id"))
+		if candidate_id.is_empty():
+			candidate_id = str(candidate.get("display_name"))
+		var familiarity := clampf(float(resident_relationships.get(candidate_id, 0.0)), 0.0, 1.0)
+		var score := distance - familiarity * 3.0
+		if score < best_score:
+			best_score = score
+			best_partner = candidate as MahdiaNPC
+	return best_partner
+
 func _update_social_awareness() -> void:
-	var other := _nearest_resident(7.0)
+	var other := _best_social_partner(7.0)
 	if not is_instance_valid(other):
 		return
 	var other_id := str(other.get("memory_id"))
