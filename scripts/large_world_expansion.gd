@@ -91,7 +91,7 @@ func _build_district(district_name: String, center: Vector2, wall_color: Color, 
 			var height := 5.5 + float((x_index * 7 + z_index * 3 + style) % 5) * 1.15
 			var width := 8.5 + float((x_index + style) % 3)
 			var depth := 8.0 + float((z_index + style) % 3)
-			var facade := palette[(x_index + z_index + style) % palette.size()]
+			var facade: Color = palette[(x_index + z_index + style) % palette.size()]
 			_box(lot, Vector3(width, height, depth), Vector3(0, height * 0.5, 0), facade, true, "plastered_wall")
 			_box(lot, Vector3(width + 0.35, 0.22, depth + 0.35), Vector3(0, height + 0.11, 0), Color(0.67, 0.63, 0.56))
 			# Recessed-looking windows, entrance and parapet; all share cached materials.
