@@ -967,7 +967,7 @@ func _avoid_obstacle(direction: Vector3, delta: float) -> Vector3:
 	obstacle_check_elapsed += delta
 	if obstacle_check_elapsed < 0.25:
 		return obstacle_steering if obstacle_steering.length_squared() > 0.01 else direction
-	obstacle_check_elapsed = 0.0
+	obstacle_check_elapsed -= 0.25
 	var origin := global_position + Vector3.UP * 0.8
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction.normalized() * 1.6)
 	query.exclude = [get_rid()]
@@ -987,7 +987,7 @@ func _avoid_resident_crowding(direction: Vector3) -> Vector3:
 	var scan_interval := 0.30 + float(posmod(personal_seed, 6)) * 0.035
 	if crowd_check_elapsed < scan_interval:
 		return direction
-	crowd_check_elapsed = 0.0
+	crowd_check_elapsed -= scan_interval
 	var separation := Vector3.ZERO
 	var nearby_count := 0
 	for resident in get_tree().get_nodes_in_group("mahdia_residents"):
@@ -1012,11 +1012,11 @@ func _update_autonomous_decisions(delta: float) -> void:
 	# actually reach destinations before selecting a new daily goal.
 	player_scan_elapsed += delta
 	if player_scan_elapsed >= 0.75:
-		player_scan_elapsed = 0.0
+		player_scan_elapsed -= 0.75
 		_player_decision()
 	goal_refresh_elapsed += delta
 	if goal_refresh_elapsed >= 30.0:
-		goal_refresh_elapsed = 0.0
+		goal_refresh_elapsed -= 30.0
 		var player_nearby := is_instance_valid(player) and not player.is_queued_for_deletion() and global_position.distance_to(player.global_position) <= 8.0
 		if not player_nearby:
 			_choose_daily_goal(_current_hour())
@@ -1052,24 +1052,24 @@ func _simulate_resident(delta: float) -> void:
 		velocity.y -= 9.8 * delta
 	need_update_elapsed += delta
 	if need_update_elapsed >= 1.0:
-		_update_needs(need_update_elapsed)
-		need_update_elapsed = 0.0
+		need_update_elapsed -= 1.0
+		_update_needs(1.0)
 	social_scan_elapsed += delta
 	if social_scan_elapsed >= 2.0:
-		social_scan_elapsed = 0.0
+		social_scan_elapsed -= 2.0
 		_update_social_awareness()
 	ai_think_elapsed += delta
 	ai_request_cooldown = maxf(0.0, ai_request_cooldown - delta)
 	if ai_think_elapsed >= ai_think_interval:
-		ai_think_elapsed = 0.0
+		ai_think_elapsed -= ai_think_interval
 		_request_ai_thought()
 	reflection_elapsed += delta
 	memory_save_elapsed += delta
 	if reflection_elapsed >= 15.0:
-		reflection_elapsed = 0.0
+		reflection_elapsed -= 15.0
 		_reflect_on_experiences()
 	if memory_save_elapsed >= 45.0:
-		memory_save_elapsed = 0.0
+		memory_save_elapsed -= 45.0
 		if memory_dirty:
 			_save_memory()
 	_update_autonomous_decisions(delta)
