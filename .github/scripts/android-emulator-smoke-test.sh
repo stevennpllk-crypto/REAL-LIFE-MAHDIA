@@ -152,13 +152,17 @@ if ! grep -q 'com.jassim.reallifemahdia' <<< "$activity_state"; then
 fi
 
 # Dismiss Android's one-time immersive-mode confirmation using screen-relative coordinates.
-# The confirmation button sits around 64% of width and 34% of height in landscape.
+# On the Pixel 6 landscape dialog, "Got it" is centered near 55% width / 36% height.
 screen_size="$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -n 1 | tr -d '\r')"
 if [[ -n "$screen_size" ]]; then
   screen_width="${screen_size%x*}"
   screen_height="${screen_size#*x}"
-  tap_x=$((screen_width * 64 / 100))
-  tap_y=$((screen_height * 34 / 100))
+  tap_x=$((screen_width * 55 / 100))
+  tap_y=$((screen_height * 36 / 100))
+  # Send two taps with a short gap: first-run dialogs can animate before
+  # accepting input, while repeated taps are harmless after dismissal.
+  adb shell input tap "$tap_x" "$tap_y" >/dev/null 2>&1 || true
+  sleep 0.5
   adb shell input tap "$tap_x" "$tap_y" >/dev/null 2>&1 || true
 fi
 sleep 1
