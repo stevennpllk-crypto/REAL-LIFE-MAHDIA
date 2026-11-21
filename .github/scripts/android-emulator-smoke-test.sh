@@ -155,8 +155,8 @@ fi
 screen_size="$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -n 1 | tr -d '\r')"
 screen_width="${screen_size%x*}"
 screen_height="${screen_size#*x}"
-fallback_x=$((screen_width * 71 / 100))
-fallback_y=$((screen_height * 59 / 100))
+fallback_x=$((screen_width * 68 / 100))
+fallback_y=$((screen_height * 36 / 100))
 dialog_dismissed=false
 for attempt in $(seq 1 4); do
   adb shell uiautomator dump /sdcard/mahdia-window.xml >/dev/null 2>&1 || true
