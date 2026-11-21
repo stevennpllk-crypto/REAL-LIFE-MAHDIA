@@ -838,7 +838,7 @@ func _choose_target() -> void:
 func on_player_interacted() -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	# Ignore repeated interaction callbacks from a held/tapped button.
-	if now - last_player_interaction < 2.5:
+	if last_player_interaction > 0.0 and now - last_player_interaction < 2.5:
 		return
 	last_player_interaction = now
 	_record_experience("player", "التقيت باللاعب وتحدثت معه", 0.10)
