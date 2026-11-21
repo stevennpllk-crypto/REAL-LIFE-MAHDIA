@@ -225,6 +225,25 @@ func _run_tests() -> void:
 	_check(is_equal_approx(fit_model.scale.y, 1.72 / 2.2), "imported resident height is normalized to 1.72 metres")
 	_check(is_equal_approx(fit_model.position.y, 1.4 * (1.72 / 2.2)), "imported resident feet are aligned with the ground plane")
 	fit_model.queue_free()
+	# When CI has downloaded the licensed GLBs, validate the actual imported
+	# skeleton path as well as the procedural fallback tested above.
+	if ResourceLoader.exists("res://assets/characters/male-adult-01.glb"):
+		var imported_resident := CharacterBody3D.new()
+		imported_resident.set_script(load("res://scripts/npc.gd"))
+		imported_resident.set("build_visuals", true)
+		imported_resident.set("occupation", "resident")
+		imported_resident.call("set_ai_context", player, null, Vector3(10, 0, 0), 21, saver)
+		root.add_child(imported_resident)
+		await process_frame
+		_check(bool(imported_resident.get("imported_model_loaded")), "licensed resident GLB loads as an imported character")
+		_check(is_instance_valid(imported_resident.get("imported_skeleton")), "imported resident contains a live Skeleton3D")
+		var mapped_bones: Dictionary = imported_resident.get("imported_bones")
+		_check(mapped_bones.has("left_arm") and mapped_bones.has("right_arm") and mapped_bones.has("left_leg") and mapped_bones.has("right_leg"), "imported resident maps both arm and leg chains")
+		_check(imported_resident.get("visual_root").scale.is_equal_approx(Vector3.ONE), "imported resident uses normalized root scale after mesh fitting")
+		imported_resident.call("_animate", 0.5, true, 1.15)
+		_check(bool(imported_resident.get("imported_gait_verified")), "imported resident advances its rig-aware walking gait")
+		imported_resident.queue_free()
+		await process_frame
 	visual_resident.set("ai_state", "socializing")
 	var gesture_before := float(visual_resident.get("conversation_gesture_side"))
 	visual_resident.call("_animate", 1.5, false)
