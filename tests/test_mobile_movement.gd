@@ -275,6 +275,7 @@ func _run_tests() -> void:
 	_check(int(resident.get("memory_meetings")) == 1, "NPC remembers an individual player meeting")
 	_check(float(resident.get("trust")) > 0.0 and float(resident.get("social_need")) < 0.45, "resident relationship and social need react to conversation")
 	_check(str(resident.call("get_relationship_status")) == "وجه مألوف", "NPC exposes a readable relationship tier after the first meeting")
+	_check(str(resident.call("get_dialogue")).contains("أراك مألوفاً"), "NPC greeting reflects remembered familiarity after meeting the player")
 	var meeting_count_after_first_talk := int(resident.get("memory_meetings"))
 	resident.call("on_player_interacted")
 	_check(int(resident.get("memory_meetings")) == meeting_count_after_first_talk, "rapid repeated interaction callbacks are throttled")
