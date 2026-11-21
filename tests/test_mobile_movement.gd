@@ -201,6 +201,7 @@ func _run_tests() -> void:
 	# Beachgoers intentionally use the procedural rig, keeping this test
 	# focused on articulated fallback anatomy even when imported GLBs exist.
 	visual_resident.set("occupation", "beachgoer")
+	visual_resident.set("gender", "female")
 	visual_resident.set("is_adult", true)
 	visual_resident.call("set_ai_context", player, null, Vector3(8, 0, 0), 12, saver)
 	root.add_child(visual_resident)
@@ -209,6 +210,8 @@ func _run_tests() -> void:
 	_check(is_instance_valid(visual_resident.get("left_knee")) and is_instance_valid(visual_resident.get("right_knee")), "resident legs contain independent knee joints")
 	_check(is_instance_valid(visual_resident.get("eye_white_left")) and is_instance_valid(visual_resident.get("mouth_visual")), "resident face contains layered eyes and an animated mouth")
 	_check(is_instance_valid(visual_resident.get("brow_left")) and is_instance_valid(visual_resident.get("head_visual")), "resident face supports expressive brows and independent head motion")
+	_check(visual_resident.get("gender") == "female", "beach resident keeps an explicit female identity")
+	_check(visual_resident.get_node_or_null("ResidentVisual/HeadPivot/FemaleHair") != null, "female beach resident builds its distinct long hairstyle")
 	_check(float(visual_resident.get("conversation_gesture_elapsed")) >= 0.0, "resident has an independent conversation gesture clock")
 	# Exercise imported-character fitting independently of external GLB assets.
 	var fit_model := Node3D.new()
