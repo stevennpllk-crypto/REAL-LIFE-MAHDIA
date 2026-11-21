@@ -3,6 +3,8 @@ name: Android APK build
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 # Keep only the newest build for main; stale runs waste emulator minutes.
@@ -153,6 +155,14 @@ jobs:
           set -euxo pipefail
           timeout 90s godot --headless --path . --script res://tests/test_mobile_movement.gd
           echo "Gameplay regression suite completed successfully."
+
+      - name: Inspect imported player GLB rig and mesh transforms
+        run: |
+          set -euxo pipefail
+          timeout 45s godot --headless --path . --script res://tests/inspect_player_glb.gd | tee build-player-asset-diagnostic.log
+          grep -q "PLAYER_ASSET_DIAGNOSTIC_COMPLETE" build-player-asset-diagnostic.log
+          grep -q "PLAYER_ASSET_HEAD" build-player-asset-diagnostic.log
+          grep -q "PLAYER_ASSET_PELVIS" build-player-asset-diagnostic.log
 
       - name: Set monotonically increasing Android version code
         run: |

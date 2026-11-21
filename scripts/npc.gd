@@ -9,6 +9,7 @@ class_name MahdiaNPC
 @export_enum("male", "female") var gender := "male"
 var is_adult := false
 @export var build_visuals := true
+@export var use_imported_character := true
 
 var player: CharacterBody3D
 var world_clock: Node
@@ -311,11 +312,10 @@ func _mat(color: Color) -> StandardMaterial3D:
 	return material
 
 func _build_character() -> void:
-	# Prefer textured, rigged human GLBs when the Android build pipeline has
-	# supplied them. Keep the procedural resident as a safe offline fallback.
-	# Beach residents use the procedural rig so their swimwear is visible;
-	# imported street outfits remain unchanged for other residents.
-	if occupation != "beachgoer" and occupation != "swimmer" and _build_imported_character():
+	# Prefer textured, rigged human GLBs for every resident, including the
+	# waterfront population. Use the procedural mesh only if all licensed
+	# character assets are unavailable or fail skeleton/bounds validation.
+	if use_imported_character and _build_imported_character():
 		return
 	visual_root = Node3D.new()
 	visual_root.name = "ResidentVisual"
