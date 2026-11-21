@@ -85,17 +85,28 @@ func _build_imported_character() -> bool:
 		var model_instance := packed_model.instantiate()
 		model_instance.name = "ImportedHuman"
 		visual_root.add_child(model_instance)
-		# The source characters are authored at approximately human height.
-		visual_root.scale = Vector3.ONE * 0.94
-		var animation_nodes := model_instance.find_children("*", "AnimationPlayer", true, false)
-		if not animation_nodes.is_empty():
-			imported_animation_player = animation_nodes[0] as AnimationPlayer
 		var skeleton_nodes := model_instance.find_children("*", "Skeleton3D", true, false)
-		if not skeleton_nodes.is_empty():
-			imported_skeleton = skeleton_nodes[0] as Skeleton3D
-			_cache_imported_bones()
-			_correct_imported_model_orientation(model_instance)
-		imported_model_loaded = true
+		if skeleton_nodes.is_empty():
+			push_warning("Resident model has no Skeleton3D; trying the next character asset: " + model_path)
+			visual_root.queue_free()
+			visual_root = null
+			continue
+		imported_skeleton = skeleton_nodes[0] as Skeleton3D
+		_cache_imported_bones()
+		_correct_imported_model_orientation(model_instance)
+		# The resident GLBs use +Z as authored forward; the game uses -Z.
+		# Rotate only the visual instance so AI movement and collision stay unchanged.
+		model_instance.rotation.y += PI
+		# Fit each imported character to the same 1.72 m resident capsule and
+		# ground its feet. The four source files have different origins/scales.
+		if not _fit_imported_character_model(model_instance):
+			push_warning("Resident model has invalid mesh bounds; trying the next asset: " + model_path)
+			visual_root.queue_free()
+			visual_root = null
+			imported_skeleton = null
+			imported_bones.clear()
+			continue
+		visual_root.scale = Vector3.ONE
 		var animation_names: Array[String] = []
 		if is_instance_valid(imported_animation_player):
 			for animation_name in imported_animation_player.get_animation_list():
@@ -1147,6 +1158,42 @@ func _cache_imported_bones() -> void:
 			imported_bones["neck"] = bone_index
 		elif bone_name.ends_with("head"):
 			imported_bones["head"] = bone_index
+
+
+func _fit_imported_character_model(model_instance: Node3D) -> bool:
+	# Measure every mesh in model-local space so nested GLB transforms,
+	# root rotation and non-zero authoring origins are included.
+	var mesh_nodes := model_instance.find_children("*", "MeshInstance3D", true, false)
+	var model_bounds := AABB()
+	var has_bounds := false
+	var inverse_root := model_instance.global_transform.affine_inverse()
+	for node in mesh_nodes:
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+		var local_bounds := mesh_instance.get_aabb()
+		if local_bounds.size.length_squared() < 0.0001:
+			continue
+		var relative_transform := inverse_root * mesh_instance.global_transform
+		for corner_index in range(8):
+			var corner := local_bounds.position + Vector3(
+				local_bounds.size.x if (corner_index & 1) != 0 else 0.0,
+				local_bounds.size.y if (corner_index & 2) != 0 else 0.0,
+				local_bounds.size.z if (corner_index & 4) != 0 else 0.0
+			)
+			var point_in_model := relative_transform * corner
+			if not has_bounds:
+				model_bounds = AABB(point_in_model, Vector3.ZERO)
+				has_bounds = true
+			else:
+				model_bounds = model_bounds.expand(point_in_model)
+	if not has_bounds or model_bounds.size.y < 0.25:
+		return false
+	var fit_scale := 1.72 / model_bounds.size.y
+	model_instance.scale = model_instance.scale * fit_scale
+	model_instance.position.y -= model_bounds.position.y * fit_scale
+	print("MAHDIA_RESIDENT_FIT height=", snappedf(model_bounds.size.y, 0.01), " scale=", snappedf(fit_scale, 0.001), " floor_offset=", snappedf(model_instance.position.y, 0.01))
+	return true
 
 
 func _correct_imported_model_orientation(model_instance: Node3D) -> void:
