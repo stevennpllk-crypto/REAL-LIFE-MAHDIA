@@ -341,34 +341,22 @@ func _build_character() -> void:
 	torso.height = 0.92
 	torso.radial_segments = 24
 	torso.rings = 16
-	body_visual = _part(torso, Vector3(0, 1.18, 0), skin if is_beachgoer else shirt)
+	# Beach residents wear a fully opaque short-sleeve rash guard.
+	# The same low-poly body remains lightweight for entry-level Android devices.
+	body_visual = _part(torso, Vector3(0, 1.18, 0), shirt if is_beachgoer else shirt)
 	body_visual.scale = Vector3(body_width, 1.0, 0.76)
-	# Rounded shoulder line and layered fabric give the torso a less primitive silhouette.
 	var shoulders := _sphere(0.285, 0.30)
-	var shoulder_mesh := _part(shoulders, Vector3(0, 1.48, 0), skin if is_beachgoer else shirt)
+	var shoulder_mesh := _part(shoulders, Vector3(0, 1.48, 0), shirt)
 	shoulder_mesh.scale = Vector3(1.22, 0.78, 0.92)
-	# Add continuous anatomical transitions instead of a single primitive torso:
-	# chest, waist and abdomen volumes are smooth and remain beneath clothing.
 	if is_beachgoer:
-		var upper_chest := _part(_sphere(0.255, 0.34), Vector3(0, 1.36, 0), skin)
-		upper_chest.scale = Vector3(1.12, 0.68, 0.82)
-		var abdomen := _part(_sphere(0.205, 0.40), Vector3(0, 1.08, 0.008), skin)
-		abdomen.scale = Vector3(0.86, 0.92, 0.78)
-		var waist := _part(_sphere(0.185, 0.29), Vector3(0, 0.91, 0.012), skin)
-		waist.scale = Vector3(0.94, 0.78, 0.82)
-		# Rounded deltoids blend the shoulders into the upper arms.
-		var left_deltoid := _part(_sphere(0.105, 0.22), Vector3(-0.285, 1.43, 0), skin)
-		left_deltoid.scale = Vector3(0.94, 1.12, 0.92)
-		var right_deltoid := _part(_sphere(0.105, 0.22), Vector3(0.285, 1.43, 0), skin)
-		right_deltoid.scale = Vector3(0.94, 1.12, 0.92)
-	if is_beachgoer:
-		# Adult beach set: smaller opaque two-piece swimwear, with secure coverage.
-		# No nudity, transparency, or exposure of intimate areas.
-		var left_cup := _part(_sphere(0.105, 0.13), Vector3(-0.105, 1.405, -0.222), shirt)
-		left_cup.scale = Vector3(0.92, 0.62, 0.34)
-		var right_cup := _part(_sphere(0.105, 0.13), Vector3(0.105, 1.405, -0.222), shirt)
-		right_cup.scale = Vector3(0.92, 0.62, 0.34)
-		_part(_capsule(0.012, 0.22), Vector3(0, 1.49, -0.205), shirt.darkened(0.08))
+		# Opaque swim top covers the torso from shoulders to waist.
+		var rash_guard := _part(_sphere(0.285, 0.62), Vector3(0, 1.30, 0), shirt)
+		rash_guard.scale = Vector3(1.12, 0.92, 0.90)
+		# Short sleeves provide a practical, beach-ready silhouette.
+		var left_sleeve := _part(_capsule(0.085, 0.25), Vector3(-0.315, 1.40, 0), shirt.darkened(0.04))
+		left_sleeve.rotation.z = -0.30
+		var right_sleeve := _part(_capsule(0.085, 0.25), Vector3(0.315, 1.40, 0), shirt.darkened(0.04))
+		right_sleeve.rotation.z = 0.30
 		# Smooth adult lower-torso volume under the swimwear: hips and upper-pelvis
 		# are modeled as a single neutral anatomical mass, fully hidden by opaque fabric.
 		var concealed_pelvis := _part(_sphere(0.205, 0.30), Vector3(0, 0.84, 0), skin)
