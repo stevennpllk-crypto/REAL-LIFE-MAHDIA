@@ -193,6 +193,28 @@ func _run_tests() -> void:
 	root.add_child(resident)
 	await process_frame
 	_check(not str(resident.get("ai_state")).is_empty(), "NPC starts with an autonomous AI state")
+	# Familiarity should gently influence social choices without overriding distance completely.
+	var known_partner := CharacterBody3D.new()
+	known_partner.set_script(load("res://scripts/npc.gd"))
+	known_partner.set("build_visuals", false)
+	known_partner.call("set_ai_context", player, null, Vector3(5, 0, 0), 31, saver)
+	root.add_child(known_partner)
+	var nearby_stranger := CharacterBody3D.new()
+	nearby_stranger.set_script(load("res://scripts/npc.gd"))
+	nearby_stranger.set("build_visuals", false)
+	nearby_stranger.call("set_ai_context", player, null, Vector3(5, 0, 0), 32, saver)
+	root.add_child(nearby_stranger)
+	await process_frame
+	resident.global_position = Vector3.ZERO
+	known_partner.global_position = Vector3(4.0, 0.0, 0.0)
+	nearby_stranger.global_position = Vector3(2.0, 0.0, 0.0)
+	resident.set("resident_relationships", {str(known_partner.get("memory_id")): 0.9})
+	_check(resident.call("_best_social_partner", 10.0) == known_partner, "NPC prefers a familiar neighbor over a slightly closer stranger")
+	resident.set("resident_relationships", {})
+	_check(resident.call("_best_social_partner", 10.0) == nearby_stranger, "NPC still prefers the closest resident when familiarity is equal")
+	known_partner.queue_free()
+	nearby_stranger.queue_free()
+	await process_frame
 	# Verify distance-based NPC simulation quality tiers without advancing gameplay.
 	player.global_position = Vector3(5.0, 0.0, 0.0)
 	resident.call("_physics_process", 0.001)
