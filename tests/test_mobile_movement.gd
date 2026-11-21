@@ -304,9 +304,11 @@ func _run_tests() -> void:
 	var relationships: Dictionary = resident.get("resident_relationships")
 	_check(relationships.has("resident_08"), "NPC recognizes a nearby resident and creates a relationship")
 	_check(float(resident.get("social_need")) < 0.8, "nearby conversation reduces social need")
+	# Pin both actors to known positions so physics-frame timing cannot make this steering assertion flaky.
+	resident.global_position = Vector3.ZERO
+	nearby_resident.global_position = Vector3(0.8, 0, 0.8)
 	resident.set("crowd_check_elapsed", 1.0)
 	var crowd_direction: Vector3 = resident.call("_avoid_resident_crowding", Vector3(1, 0, 0))
-	print("MAHDIA_CROWD_DIAGNOSTIC resident=", resident.global_position, " nearby=", nearby_resident.global_position, " group_count=", root.get_tree().get_nodes_in_group("mahdia_residents").size(), " direction=", crowd_direction)
 	_check(crowd_direction.x < 0.99 and crowd_direction.z < -0.1 and crowd_direction.length() > 0.9, "pedestrians steer away from nearby residents instead of overlapping")
 	var live_observation: Dictionary = resident.call("get_world_observation")
 	_check(live_observation.has("weather") and live_observation.has("time_hour") and live_observation.has("nearby_residents"), "resident builds a live observation of weather, time and nearby people")
