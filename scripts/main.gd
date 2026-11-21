@@ -1335,8 +1335,11 @@ func _restore_world_progress() -> void:
 		var car: Array = world.vehicle_position
 		restored_vehicle_position = START_VEHICLE_POSITION if migrate_legacy_start else Vector3(float(car[0]), float(car[1]), float(car[2]))
 	restore_vehicle_driver = bool(world.get("was_driving", false))
-	quality_level = 2
-	print("MAHDIA_WORLD_PROGRESS_RESTORED")
+	# Restore the user's saved quality, but never let an old desktop/high
+	# setting override the conservative mobile profile on entry-level phones.
+	var saved_quality := clampi(int(world.get("graphics_quality", quality_level)), 0, 2)
+	quality_level = mini(saved_quality, 1) if OS.has_feature("mobile") else saved_quality
+	print("MAHDIA_WORLD_PROGRESS_RESTORED quality=", quality_level)
 
 func _save_world_progress() -> void:
 	if not is_instance_valid(save_manager) or not is_instance_valid(player):
