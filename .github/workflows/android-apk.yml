@@ -148,6 +148,12 @@ jobs:
           "$ANDROID_HOME/platform-tools/adb" version
           godot --headless --editor --path . --quit
 
+      - name: Run deterministic gameplay regression tests
+        run: |
+          set -euxo pipefail
+          timeout 90s godot --headless --path . --script res://tests/test_mobile_movement.gd
+          echo "Gameplay regression suite completed successfully."
+
       - name: Set monotonically increasing Android version code
         run: |
           set -euxo pipefail
