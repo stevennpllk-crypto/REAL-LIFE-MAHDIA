@@ -193,6 +193,16 @@ func _run_tests() -> void:
 	root.add_child(resident)
 	await process_frame
 	_check(not str(resident.get("ai_state")).is_empty(), "NPC starts with an autonomous AI state")
+	# Verify distance-based NPC simulation quality tiers without advancing gameplay.
+	player.global_position = Vector3(5.0, 0.0, 0.0)
+	resident.call("_physics_process", 0.001)
+	_check(is_equal_approx(float(resident.get("simulation_interval")), 0.033), "nearby residents use the 30 Hz simulation tier")
+	player.global_position = Vector3(30.0, 0.0, 0.0)
+	resident.call("_physics_process", 0.001)
+	_check(is_equal_approx(float(resident.get("simulation_interval")), 0.066), "mid-distance residents use the 15 Hz simulation tier")
+	player.global_position = Vector3(60.0, 0.0, 0.0)
+	resident.call("_physics_process", 0.001)
+	_check(is_equal_approx(float(resident.get("simulation_interval")), 0.10), "distant residents use the 10 Hz simulation tier")
 	_stage("إنشاء شخصية مرئية وفحص مفاصلها")
 	# Build one rendered resident to verify the new articulated skeleton is present.
 	var visual_resident := CharacterBody3D.new()
