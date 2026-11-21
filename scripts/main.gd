@@ -1363,18 +1363,33 @@ func _notification(what: int) -> void:
 		_save_world_progress()
 
 func _select_device_profile() -> void:
-	# The world uses one shared visual and simulation configuration everywhere.
-	quality_level = 2
+	# Entry-level Android devices need a conservative default before the world
+	# is built. Desktop keeps the high-quality profile; players can still opt
+	# into higher settings later if a quality selector is added.
+	quality_level = 1 if OS.has_feature("mobile") else 2
+	print("MAHDIA_DEVICE_PROFILE=", "MOBILE_BALANCED" if quality_level == 1 else "DESKTOP_HIGH")
 
 func _apply_graphics_quality() -> void:
-	Engine.max_fps = 60
+	# Keep physics deterministic at 60 Hz while limiting mobile rendering cost.
+	# A 0.82 3D scale and disabled real-time shadows reduce GPU fill/bandwidth
+	# pressure on devices with entry-level GPUs and limited shared memory.
+	var mobile_device := OS.has_feature("mobile")
+	if quality_level <= 0:
+		Engine.max_fps = 30
+		get_viewport().scaling_3d_scale = 0.72
+	elif quality_level == 1 or mobile_device:
+		Engine.max_fps = 30
+		get_viewport().scaling_3d_scale = 0.82
+	else:
+		Engine.max_fps = 60
+		get_viewport().scaling_3d_scale = 1.0
 	Engine.physics_ticks_per_second = 60
-	get_viewport().scaling_3d_scale = 1.0
 	if is_instance_valid(sun):
 		sun.visible = true
-		sun.shadow_enabled = true
+		sun.shadow_enabled = quality_level >= 2 and not mobile_device
 	if is_instance_valid(world_environment):
-		world_environment.ambient_light_energy = 0.94
+		world_environment.ambient_light_energy = 1.0 if mobile_device else 0.94
+	print("MAHDIA_GRAPHICS_PROFILE=level:", quality_level, " fps:", Engine.max_fps, " scale:", get_viewport().scaling_3d_scale, " shadows:", is_instance_valid(sun) and sun.shadow_enabled)
 
 
 func _surface_texture(kind: String) -> ImageTexture:
