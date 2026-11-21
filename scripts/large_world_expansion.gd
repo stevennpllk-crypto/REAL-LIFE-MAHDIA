@@ -5,8 +5,8 @@ class_name MahdiaLargeWorldExpansion
 # Geometry is generated locally: no network access, paid assets, or fake file padding.
 # Mobile uses a strict object budget; desktop can build the full district set.
 
-const MOBILE_BUILDING_BUDGET := 36
-const DESKTOP_BUILDING_BUDGET := 90
+const MOBILE_BUILDING_BUDGET := 60
+const DESKTOP_BUILDING_BUDGET := 75
 const LOT_SPACING := 24.0
 
 var _materials: Dictionary = {}
