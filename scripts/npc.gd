@@ -6,6 +6,7 @@ class_name MahdiaNPC
 @export var wander_radius := 7.0
 @export var personality := "friendly"
 @export var occupation := "resident"
+@export_enum("male", "female") var gender := "male"
 var is_adult := false
 @export var build_visuals := true
 
@@ -423,6 +424,22 @@ func _build_character() -> void:
 	elif posmod(personal_seed, 4) == 3:
 		var side_part := _head_part(_sphere(0.10, 0.16), Vector3(0.10, 0.10, 0.015), hair)
 		side_part.scale = Vector3(0.8, 0.65, 1.0)
+	if gender == "female":
+		# Distinct, low-cost long hairstyle so the beach resident reads clearly as a woman.
+		var female_hair := Node3D.new()
+		female_hair.name = "FemaleHair"
+		head_visual.add_child(female_hair)
+		var back_hair := MeshInstance3D.new()
+		back_hair.mesh = _capsule(0.075, 0.38)
+		back_hair.position = Vector3(0, -0.105, 0.045)
+		back_hair.material_override = _mat(hair)
+		female_hair.add_child(back_hair)
+		for side in [-1.0, 1.0]:
+			var side_lock := MeshInstance3D.new()
+			side_lock.mesh = _capsule(0.038, 0.30)
+			side_lock.position = Vector3(side * 0.145, -0.055, -0.005)
+			side_lock.material_override = _mat(hair)
+			female_hair.add_child(side_lock)
 	_head_part(_sphere(0.055, 0.16), Vector3(-0.174, 0, 0), hair)
 	_head_part(_sphere(0.055, 0.16), Vector3(0.174, 0, 0), hair)
 	_head_part(_sphere(0.035, 0.055), Vector3(-0.184, -0.02, 0), skin)
@@ -442,10 +459,10 @@ func _build_character() -> void:
 	mouth_visual = _head_part(_capsule(0.008, 0.052), Vector3(0, -0.105, -0.174), Color(0.22, 0.075, 0.065))
 	mouth_visual.rotation.z = deg_to_rad(90.0)
 	# Some adult residents have subtle moustaches or short beards for identity variety.
-	if posmod(personal_seed * 7, 5) == 0:
+	if gender == "male" and posmod(personal_seed * 7, 5) == 0:
 		var moustache := _head_part(_capsule(0.012, 0.085), Vector3(0, -0.065, -0.188), hair)
 		moustache.rotation.z = deg_to_rad(90.0)
-	elif posmod(personal_seed * 7, 5) == 1:
+	elif gender == "male" and posmod(personal_seed * 7, 5) == 1:
 		var beard := _head_part(_sphere(0.105, 0.13), Vector3(0, -0.145, -0.075), hair)
 		beard.scale = Vector3(1.0, 0.72, 0.62)
 	_head_part(_sphere(0.026, 0.018), Vector3(-0.115, -0.055, -0.15), skin.darkened(0.04))
