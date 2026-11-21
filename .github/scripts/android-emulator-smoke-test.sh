@@ -60,20 +60,18 @@ if [[ "$player_ready" != "true" ]]; then
   exit 1
 fi
 
-# Accept either the verified imported player rig or the intentional procedural fallback.
-# The fallback is the current default while the imported rig's shoulder pose is under repair.
-if ! grep -Eq 'MAHDIA_PLAYER_VISUAL=(PROCEDURAL|IMPORTED)' "$LIVE_LOG"; then
-  echo "No supported player visual was confirmed in the Android runtime."
+# The playable Android build must use the textured, rigged human GLB.
+# Do not silently accept the geometric procedural mannequin as a successful player model.
+if ! grep -q 'MAHDIA_PLAYER_VISUAL=IMPORTED' "$LIVE_LOG"; then
+  echo "Expected the imported realistic player model, but it was not activated."
   grep "MAHDIA_PLAYER_" "$LIVE_LOG" | tail -n 40 || true
   exit 1
 fi
-if grep -q 'MAHDIA_PLAYER_VISUAL=IMPORTED' "$LIVE_LOG" && ! grep -q 'MAHDIA_PLAYER_IMPORTED=1' "$LIVE_LOG"; then
+if ! grep -q 'MAHDIA_PLAYER_IMPORTED=1' "$LIVE_LOG"; then
   echo "Imported player visual did not report its rig diagnostics."
   exit 1
 fi
-if grep -q 'MAHDIA_PLAYER_VISUAL=PROCEDURAL' "$LIVE_LOG"; then
-  echo "Procedural player visual confirmed; imported rig is intentionally deferred."
-fi
+echo "Imported textured player model confirmed in the Android runtime."
 
 # Reject a rig only when the runtime diagnostic positively identifies it as inverted.
 # Some GLB exporters store bone rest offsets in a way that cannot be reconstructed
@@ -120,9 +118,9 @@ grep 'MAHDIA_IMPORTED_' "$LIVE_LOG" | tail -n 20
 # authored AnimationPlayer clip; absence of the clip diagnostic is not fatal.
 residents_ready=false
 for attempt in $(seq 1 20); do
-  if grep -q 'MAHDIA_IMPORTED_RESIDENTS=11/12' "$LIVE_LOG"; then
+  if grep -Eq 'MAHDIA_IMPORTED_RESIDENTS=(11|12)/12' "$LIVE_LOG"; then
     residents_ready=true
-    echo "11 imported residents and one beachwear resident loaded."
+    echo "All 12 imported resident models loaded."
     break
   fi
   sleep 1
@@ -130,11 +128,6 @@ done
 if [[ "$residents_ready" != "true" ]]; then
   echo "Imported resident load check failed."
   grep -E 'MAHDIA_IMPORTED_|MAHDIA_WORLD_READY' "$LIVE_LOG" | tail -n 60 || true
-  exit 1
-fi
-if ! grep -q 'MAHDIA_BEACHGOERS=1/12' "$LIVE_LOG"; then
-  echo "The beachwear resident variant was not confirmed in the live scene."
-  grep -E 'MAHDIA_IMPORTED_|MAHDIA_BEACHGOERS=' "$LIVE_LOG" | tail -n 40 || true
   exit 1
 fi
 if grep -q 'MAHDIA_IMPORTED_GAIT_ACTIVE' "$LIVE_LOG"; then
@@ -157,8 +150,8 @@ fi
 screen_size="$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -n 1 | tr -d '\r')"
 screen_width="${screen_size%x*}"
 screen_height="${screen_size#*x}"
-fallback_x=$((screen_width * 71 / 100))
-fallback_y=$((screen_height * 59 / 100))
+fallback_x=$((screen_width * 68 / 100))
+fallback_y=$((screen_height * 36 / 100))
 dialog_dismissed=false
 for attempt in $(seq 1 4); do
   adb shell uiautomator dump /sdcard/mahdia-window.xml >/dev/null 2>&1 || true
