@@ -75,10 +75,12 @@ func _ready() -> void:
 	# Reference-image framing: a close, centered third-person follow camera.
 	# The slightly narrower lens keeps the player prominent without extreme
 	# perspective distortion on a tall mobile display.
-	camera.position = Vector3(0.10, 0.30, 1.55)
-	camera.rotation_degrees.x = -8.5
+	# Keep the full character and enough surrounding street visible on phones.
+	# A 1.55 m offset produced an excessively tight back-of-player close-up.
+	camera.position = Vector3(0.10, 0.55, 3.6)
+	camera.rotation_degrees.x = -9.5
 	camera.current = true
-	camera.fov = 51.0
+	camera.fov = 58.0
 	camera.near = 0.08
 	camera_pivot.add_child(camera)
 	if not OS.has_feature("mobile"):
