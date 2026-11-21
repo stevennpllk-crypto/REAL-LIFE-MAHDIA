@@ -23,24 +23,36 @@ func build_world() -> void:
 func _budget() -> int:
 	return MOBILE_BUILDING_BUDGET if OS.has_feature("mobile") else DESKTOP_BUILDING_BUDGET
 
-func _material(color: Color) -> StandardMaterial3D:
-	var key := color.to_html()
+func _material(color: Color, surface: String = "plastered_wall") -> StandardMaterial3D:
+	var key := color.to_html() + "_" + surface
 	if _materials.has(key):
 		return _materials[key]
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
-	material.roughness = 0.92
+	material.roughness = 0.94
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	var diff_path := "res://assets/textures/%s_diff_1k.jpg" % surface
+	var normal_path := "res://assets/textures/%s_nor_gl_1k.png" % surface
+	var rough_path := "res://assets/textures/%s_rough_1k.jpg" % surface
+	if ResourceLoader.exists(diff_path):
+		material.albedo_texture = load(diff_path) as Texture2D
+	if ResourceLoader.exists(normal_path):
+		material.normal_enabled = true
+		material.normal_texture = load(normal_path) as Texture2D
+		material.normal_scale = 0.42
+	if ResourceLoader.exists(rough_path):
+		material.roughness_texture = load(rough_path) as Texture2D
 	_materials[key] = material
 	return material
 
-func _box(parent: Node3D, size: Vector3, at: Vector3, color: Color, collision := false) -> Node3D:
+func _box(parent: Node3D, size: Vector3, at: Vector3, color: Color, collision := false, surface: String = "plastered_wall") -> Node3D:
 	var mesh_instance := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	mesh_instance.mesh = mesh
 	mesh_instance.position = at
-	mesh_instance.material_override = _material(color)
+	mesh_instance.material_override = _material(color, surface)
 	parent.add_child(mesh_instance)
 	if collision:
 		var body := StaticBody3D.new()
@@ -61,9 +73,9 @@ func _build_district(district_name: String, center: Vector2, wall_color: Color, 
 	# Four streets and sidewalks form a walkable 5x5 block grid.
 	for lane in range(6):
 		var offset := (float(lane) - 2.5) * LOT_SPACING
-		_box(district, Vector3(7.0, 0.12, 144.0), Vector3(offset, 0.02, 0.0), Color(0.17, 0.18, 0.18))
+		_box(district, Vector3(7.0, 0.12, 144.0), Vector3(offset, 0.02, 0.0), Color(0.17, 0.18, 0.18), false, "cobblestone_pavement")
 		_box(district, Vector3(144.0, 0.12, 7.0), Vector3(0.0, 0.025, offset), Color(0.17, 0.18, 0.18))
-		_box(district, Vector3(0.22, 0.16, 144.0), Vector3(offset - 3.65, 0.08, 0.0), Color(0.74, 0.71, 0.64))
+		_box(district, Vector3(0.22, 0.16, 144.0), Vector3(offset - 3.65, 0.08, 0.0), Color(0.74, 0.71, 0.64), false, "cobblestone_pavement")
 		_box(district, Vector3(144.0, 0.16, 0.22), Vector3(0.0, 0.08, offset - 3.65), Color(0.74, 0.71, 0.64))
 	var palette := [wall_color, wall_color.darkened(0.06), wall_color.lightened(0.035), Color(0.78, 0.77, 0.71)]
 	for z_index in range(5):
@@ -80,7 +92,7 @@ func _build_district(district_name: String, center: Vector2, wall_color: Color, 
 			var width := 8.5 + float((x_index + style) % 3)
 			var depth := 8.0 + float((z_index + style) % 3)
 			var facade := palette[(x_index + z_index + style) % palette.size()]
-			_box(lot, Vector3(width, height, depth), Vector3(0, height * 0.5, 0), facade, true)
+			_box(lot, Vector3(width, height, depth), Vector3(0, height * 0.5, 0), facade, true, "plastered_wall")
 			_box(lot, Vector3(width + 0.35, 0.22, depth + 0.35), Vector3(0, height + 0.11, 0), Color(0.67, 0.63, 0.56))
 			# Recessed-looking windows, entrance and parapet; all share cached materials.
 			var glass := Color(0.12, 0.25, 0.31)
