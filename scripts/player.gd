@@ -12,7 +12,7 @@ class_name MahdiaPlayer
 @export var mouse_sensitivity := 0.0020
 @export var build_visuals := true
 # Keep the player on the verified upright procedural rig until the imported Bip01 GLB orientation is corrected and visually revalidated.
-@export var use_imported_player_character := false
+@export var use_imported_player_character := true
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var move_vector := Vector2.ZERO
 var running := false
@@ -135,19 +135,11 @@ func _log_imported_player_orientation() -> void:
 	if head_index < 0 or hips_index < 0:
 		print("MAHDIA_PLAYER_ORIENTATION=UNVERIFIED head_bone=", head_index, " hips_bone=", hips_index)
 		return
-	# Some imported GLB skeletons expose zeroed global-rest origins even
-	# though their local rest transforms contain the actual hierarchy offsets.
-	# Reconstruct each bone's skeleton-space rest transform from its parents.
-	var head_rest := Transform3D.IDENTITY
-	var parent_index := head_index
-	while parent_index >= 0:
-		head_rest = imported_player_skeleton.get_bone_rest(parent_index) * head_rest
-		parent_index = imported_player_skeleton.get_bone_parent(parent_index)
-	var hips_rest := Transform3D.IDENTITY
-	parent_index = hips_index
-	while parent_index >= 0:
-		hips_rest = imported_player_skeleton.get_bone_rest(parent_index) * hips_rest
-		parent_index = imported_player_skeleton.get_bone_parent(parent_index)
+	# Use Godot's evaluated skeleton-space rest transforms. Rebuilding the
+	# hierarchy manually can apply the imported axis-conversion basis in the
+	# wrong order and falsely report a valid rig as unverified.
+	var head_rest := imported_player_skeleton.get_bone_global_rest(head_index)
+	var hips_rest := imported_player_skeleton.get_bone_global_rest(hips_index)
 	var head_y := head_rest.origin.y
 	var hips_y := hips_rest.origin.y
 	var difference := head_y - hips_y
