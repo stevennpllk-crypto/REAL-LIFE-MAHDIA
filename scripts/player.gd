@@ -11,8 +11,8 @@ class_name MahdiaPlayer
 @export var jump_velocity := 4.5
 @export var mouse_sensitivity := 0.0020
 @export var build_visuals := true
-# Prefer the licensed, textured rigged human GLB. The procedural mannequin is only a last-resort fallback.
-@export var use_imported_player_character := true
+# Keep the player on the verified upright procedural rig until the imported Bip01 GLB orientation is corrected and visually revalidated.
+@export var use_imported_player_character := false
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var move_vector := Vector2.ZERO
 var running := false
