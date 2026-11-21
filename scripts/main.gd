@@ -12,6 +12,7 @@ const LIFE_SCRIPT = preload("res://scripts/life_manager.gd")
 const AI_SERVICE_SCRIPT = preload("res://scripts/ai_service.gd")
 const PLANET_NAV_SCRIPT = preload("res://scripts/planet_navigation.gd")
 const TERRAIN_STREAMER_SCRIPT = preload("res://scripts/terrain_streamer.gd")
+const LARGE_WORLD_EXPANSION_SCRIPT = preload("res://scripts/large_world_expansion.gd")
 
 var player: CharacterBody3D
 var mobile_controls: Node
@@ -71,6 +72,11 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await _build_town()
 	print("MAHDIA_TOWN_READY")
+	var large_world := Node3D.new()
+	large_world.name = "MahdiaLargeWorldExpansion"
+	large_world.set_script(LARGE_WORLD_EXPANSION_SCRIPT)
+	add_child(large_world)
+	await large_world.call("build_world")
 	_spawn_residents()
 	_spawn_vehicle()
 	_spawn_traffic()
