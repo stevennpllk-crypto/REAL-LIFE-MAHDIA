@@ -34,6 +34,8 @@ func _run_tests() -> void:
 	player.set("build_visuals", false)
 	root.add_child(player)
 	await process_frame
+	var follow_camera: Camera3D = player.get("camera")
+	_check(is_instance_valid(follow_camera) and follow_camera.position.z >= 3.0, "third-person camera keeps the player and nearby world in frame")
 
 	player.call("set_mobile_move", Vector2(0.05, 0.0))
 	_check(Vector2(player.get("move_vector")).length() == 0.0, "deadzone ignores tiny joystick drift")
