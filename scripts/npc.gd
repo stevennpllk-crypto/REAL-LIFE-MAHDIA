@@ -923,9 +923,16 @@ func get_ai_context() -> Dictionary:
 	}
 
 func get_dialogue() -> String:
-	var remembered := "أهلاً، تذكرتك!" if memory_meetings > 1 else "أهلاً بك."
-	if trust >= 0.55:
-		remembered = "سعيد برؤيتك مجدداً، أصبحتَ مألوفاً لدي."
+	var remembered := "أهلاً بك، لا أظن أننا التقينا من قبل."
+	match get_relationship_status():
+		"وجه مألوف":
+			remembered = "أهلاً بعودتك، أراك مألوفاً وأتذكر لقاءنا."
+		"معروف":
+			remembered = "سعيد برؤيتك مجدداً، أتذكر لقاءاتنا السابقة."
+		"صديق":
+			remembered = "أهلاً بصديقي، يسعدني أن نلتقي من جديد."
+		"صديق مقرّب":
+			remembered = "يا لها من مفاجأة جميلة! من الرائع رؤيتك مجدداً."
 	var hour := _current_hour()
 	var greeting := "صباح الخير" if hour >= 5.0 and hour < 12.0 else "مساء الخير" if hour >= 17.0 else "أهلاً بك"
 	if energy < 0.2:
