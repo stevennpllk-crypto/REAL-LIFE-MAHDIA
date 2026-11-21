@@ -108,6 +108,9 @@ func _build_imported_character() -> bool:
 			imported_bones.clear()
 			continue
 		visual_root.scale = Vector3.ONE
+		# Mark the imported rig active only after its skeleton and mesh bounds pass validation.
+		# _animate() uses this flag to route updates to the imported Skeleton3D gait.
+		imported_model_loaded = true
 		var animation_names: Array[String] = []
 		if is_instance_valid(imported_animation_player):
 			for animation_name in imported_animation_player.get_animation_list():
