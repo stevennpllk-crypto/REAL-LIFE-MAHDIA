@@ -43,12 +43,25 @@ func _inspect_player_asset() -> void:
 
 	print("PLAYER_ASSET_DIAGNOSTIC bone_count=", skeleton.get_bone_count(),
 		" head_index=", head_index, " pelvis_index=", pelvis_index)
+	var head_world := Vector3.ZERO
+	var pelvis_world := Vector3.ZERO
 	if head_index >= 0:
+		var head_rest := skeleton.get_bone_global_rest(head_index)
+		head_world = skeleton.to_global(head_rest.origin)
 		print("PLAYER_ASSET_HEAD local_rest=", skeleton.get_bone_rest(head_index),
-			" global_rest=", skeleton.get_bone_global_rest(head_index))
+			" skeleton_rest=", head_rest, " world_position=", head_world)
 	if pelvis_index >= 0:
+		var pelvis_rest := skeleton.get_bone_global_rest(pelvis_index)
+		pelvis_world = skeleton.to_global(pelvis_rest.origin)
 		print("PLAYER_ASSET_PELVIS local_rest=", skeleton.get_bone_rest(pelvis_index),
-			" global_rest=", skeleton.get_bone_global_rest(pelvis_index))
+			" skeleton_rest=", pelvis_rest, " world_position=", pelvis_world)
+	if head_index >= 0 and pelvis_index >= 0:
+		var vertical_delta := head_world.y - pelvis_world.y
+		var orientation := "UPRIGHT" if vertical_delta > 0.05 else "INVERTED" if vertical_delta < -0.05 else "UNVERIFIED"
+		print("PLAYER_ASSET_ORIENTATION=", orientation,
+			" head_world_y=", snappedf(head_world.y, 0.001),
+			" pelvis_world_y=", snappedf(pelvis_world.y, 0.001),
+			" vertical_delta=", snappedf(vertical_delta, 0.001))
 
 	for node in meshes:
 		var mesh_instance := node as MeshInstance3D
