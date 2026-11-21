@@ -12,7 +12,7 @@ class_name MahdiaPlayer
 @export var mouse_sensitivity := 0.0020
 @export var build_visuals := true
 # Keep the player on the verified upright procedural rig until the imported Bip01 GLB orientation is corrected and visually revalidated.
-@export var use_imported_player_character := true
+@export var use_imported_player_character := false
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var move_vector := Vector2.ZERO
 var running := false
