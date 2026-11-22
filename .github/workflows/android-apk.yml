@@ -215,17 +215,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Select Vulkan APK for emulator smoke test
+      - name: Select GLES Compatibility APK for emulator smoke test
         run: |
           set -euxo pipefail
-          test -s build/REAL_LIFE_MAHDIA-mobile.apk
-          file build/REAL_LIFE_MAHDIA-mobile.apk
-          unzip -t build/REAL_LIFE_MAHDIA-mobile.apk >/dev/null
-          cp build/REAL_LIFE_MAHDIA-mobile.apk build/REAL_LIFE_MAHDIA-debug.apk
+          test -s build/REAL_LIFE_MAHDIA-debug.apk
           file build/REAL_LIFE_MAHDIA-debug.apk
           unzip -t build/REAL_LIFE_MAHDIA-debug.apk >/dev/null
-          # SwiftShader GLES on hosted runners can fail to link Godot's scene
-          # shader; validate the Vulkan Mobile build on the emulator instead.
+          # Keep Vulkan as a separately downloadable build. The hosted emulator
+          # uses SwiftShader GLES, so smoke-test the Compatibility APK here.
 
       - name: Prepare KVM and ADB for emulator
         run: |
