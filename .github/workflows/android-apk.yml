@@ -250,7 +250,16 @@ jobs:
             find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -name sdkmanager -type f -print >&2 || true
             exit 1
           fi
+          # sdkmanager may close stdin after accepting all licenses; with pipefail,
+          # that makes the upstream `yes` exit via SIGPIPE (141) despite success.
+          set +o pipefail
           yes | "$SDKMANAGER" --licenses >/dev/null
+          license_status=${PIPESTATUS[1]}
+          set -o pipefail
+          if [ "$license_status" -ne 0 ]; then
+            echo "sdkmanager --licenses failed with exit code $license_status" >&2
+            exit "$license_status"
+          fi
           for attempt in 1 2 3; do
             echo "Installing emulator image (attempt $attempt/3)"
             if "$SDKMANAGER" --install "$IMAGE"; then
