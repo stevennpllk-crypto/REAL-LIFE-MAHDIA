@@ -243,11 +243,19 @@ jobs:
       - name: Preinstall emulator system image with retry
         run: |
           set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           IMAGE='system-images;android-35;google_apis;x86_64'
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "sdkmanager not found at $SDKMANAGER" >&2
+            find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -name sdkmanager -type f -print >&2 || true
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null
           for attempt in 1 2 3; do
             echo "Installing emulator image (attempt $attempt/3)"
-            if yes | sdkmanager --licenses >/dev/null && sdkmanager --install "$IMAGE"; then
+            if "$SDKMANAGER" --install "$IMAGE"; then
               test -d "$ANDROID_HOME/system-images/android-35/google_apis/x86_64"
+              echo "Android emulator image installed successfully."
               break
             fi
             rm -rf "$ANDROID_HOME/system-images/android-35/google_apis/x86_64"
