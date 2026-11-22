@@ -240,6 +240,25 @@ jobs:
           "$ANDROID_HOME/platform-tools/adb" version
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
 
+      - name: Preinstall emulator system image with retry
+        run: |
+          set -euo pipefail
+          IMAGE='system-images;android-35;google_apis;x86_64'
+          for attempt in 1 2 3; do
+            echo "Installing emulator image (attempt $attempt/3)"
+            if yes | sdkmanager --licenses >/dev/null && sdkmanager --install "$IMAGE"; then
+              test -d "$ANDROID_HOME/system-images/android-35/google_apis/x86_64"
+              break
+            fi
+            rm -rf "$ANDROID_HOME/system-images/android-35/google_apis/x86_64"
+            rm -rf "$HOME/.android/cache"/* 2>/dev/null || true
+            if [ "$attempt" -eq 3 ]; then
+              echo "Android emulator system image download failed after three attempts" >&2
+              exit 1
+            fi
+            sleep 8
+          done
+
       - name: Test APK on cloud Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
