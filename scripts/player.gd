@@ -79,10 +79,13 @@ func _ready() -> void:
 	# A 1.55 m offset produced an excessively tight back-of-player close-up.
 	camera.position = Vector3(0.10, 0.55, 3.6)
 	camera.rotation_degrees.x = -9.5
-	camera.current = true
 	camera.fov = 58.0
 	camera.near = 0.08
 	camera_pivot.add_child(camera)
+	# Activate only after entering the SceneTree; setting current before
+	# add_child can leave the Android viewport without an active 3D camera.
+	camera.make_current()
+	print("MAHDIA_CAMERA_ACTIVE current=", camera.is_current(), " position=", camera.global_position)
 	if not OS.has_feature("mobile"):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
