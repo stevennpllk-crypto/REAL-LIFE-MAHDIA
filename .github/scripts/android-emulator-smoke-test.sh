@@ -8,11 +8,18 @@ LOGCAT_PID=""
 
 capture_emulator_evidence() {
   if [[ -n "$LOGCAT_PID" ]]; then kill "$LOGCAT_PID" >/dev/null 2>&1 || true; fi
-  adb logcat -d -t 3000 > build/emulator-logcat.txt 2>&1 || true
+  if [[ -f "$LIVE_LOG" ]]; then cp "$LIVE_LOG" build/emulator-logcat.txt; fi
+  adb logcat -d -t 3000 > build/android-system-logcat.txt 2>&1 || true
   adb shell screencap -p /sdcard/mahdia-emulator.png >/dev/null 2>&1 || true
   adb pull /sdcard/mahdia-emulator.png build/mahdia-emulator.png >/dev/null 2>&1 || true
 }
 trap capture_emulator_evidence EXIT
+
+capture_stage_screenshot() {
+  local stage="$1"
+  adb shell screencap -p "/sdcard/mahdia-${stage}.png" >/dev/null 2>&1 || return 0
+  adb pull "/sdcard/mahdia-${stage}.png" "build/mahdia-${stage}.png" >/dev/null 2>&1 || true
+}
 
 echo "Waiting for ADB device..."
 adb wait-for-device
@@ -50,6 +57,8 @@ for attempt in $(seq 1 40); do
   if grep -q "MAHDIA_PLAYER_READY" "$LIVE_LOG"; then
     player_ready=true
     echo "Playable player/camera/HUD initialized on attempt $attempt."
+    sleep 1
+    capture_stage_screenshot "player-ready"
     break
   fi
   sleep 0.5
@@ -69,6 +78,12 @@ if ! grep -q 'MAHDIA_PLAYER_VISUAL=PROCEDURAL' "$LIVE_LOG"; then
   exit 1
 fi
 echo "Verified procedural player fallback confirmed in Android runtime."
+if ! grep -q 'MAHDIA_CAMERA_ACTIVE current=true' "$LIVE_LOG"; then
+  echo "Runtime camera activation was not confirmed by the Android process."
+  grep 'MAHDIA_CAMERA_' "$LIVE_LOG" | tail -n 20 || true
+  exit 1
+fi
+grep 'MAHDIA_CAMERA_ACTIVE' "$LIVE_LOG" | tail -n 4
 
 
 scene_ready=false
@@ -76,6 +91,8 @@ for attempt in $(seq 1 120); do
   if grep -q "MAHDIA_WORLD_READY" "$LIVE_LOG"; then
     scene_ready=true
     echo "Main world scene reported ready on attempt $attempt."
+    sleep 1
+    capture_stage_screenshot "world-ready"
     break
   fi
   sleep 0.5
