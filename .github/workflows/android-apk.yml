@@ -296,6 +296,9 @@ jobs:
           name: REAL-LIFE-MAHDIA-Emulator-Evidence
           path: |
             build/mahdia-emulator.png
+            build/mahdia-player-ready.png
+            build/mahdia-world-ready.png
             build/emulator-logcat.txt
+            build/android-system-logcat.txt
           if-no-files-found: warn
           retention-days: 7
