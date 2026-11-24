@@ -90,7 +90,7 @@ func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
 	mat.albedo_color = color
 	mat.roughness = roughness
 	# Physically based lighting gives surfaces real form; the low tier disables shadows instead.
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material_cache[key] = mat
 	return mat
 
@@ -209,7 +209,7 @@ func _plaster_material(color: Color) -> StandardMaterial3D:
 		material.albedo_texture = plaster_texture
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	material.roughness = 0.96
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return material
 
 func _plaster_box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInstance3D:
@@ -236,10 +236,10 @@ func _build_environment() -> void:
 	sun.rotation_degrees = Vector3(-48, -32, 0)
 	sun.light_energy = 1.28
 	# One directional sun provides real surface shading and shadows.
-	sun.shadow_enabled = true
+	sun.shadow_enabled = false
 	sun.directional_shadow_max_distance = 48.0
 	sun.shadow_opacity = 0.62
-	sun.visible = true
+	sun.visible = false
 	add_child(sun)
 	# Explicitly disable costly environment passes for broad GLES3 compatibility.
 	world_environment.glow_enabled = false
@@ -274,7 +274,7 @@ func _build_environment() -> void:
 	var sea_material := _material(Color(0.025, 0.29, 0.50), 0.24)
 	sea_material.metallic = 0.12
 	sea_material.roughness = 0.24
-	sea_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	sea_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	sea.material_override = sea_material
 	_textured_box(self, Vector3(180, 0.18, 5.5), Vector3(0, 0.04, -57), Color(0.88, 0.84, 0.75), "stone", Vector3(1.0, 42.0, 1.0))
 	_create_coastal_scenery()
@@ -1433,7 +1433,7 @@ func _textured_box(parent: Node3D, size: Vector3, pos: Vector3, tint: Color, tex
 	material.uv1_scale = uv_scale
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	material.roughness = 0.96
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	item.material_override = material
 	parent.add_child(item)
 	return item
@@ -1492,7 +1492,7 @@ func _create_realistic_street_layer() -> void:
 	# Utility poles and subtly sagging overhead cables; no physics or dynamic lights.
 	var cable_material := StandardMaterial3D.new()
 	cable_material.albedo_color = Color(0.12, 0.13, 0.14)
-	cable_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	cable_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	for pole_index in range(4):
 		var px := -45.0 + float(pole_index) * 30.0
 		var pole := MeshInstance3D.new()
