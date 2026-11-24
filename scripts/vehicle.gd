@@ -85,7 +85,7 @@ func _mat(color: Color, metallic := 0.0) -> StandardMaterial3D:
 	material.albedo_color = color
 	material.metallic = metallic
 	material.roughness = 0.38
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return material
 
 func _box(size: Vector3, pos: Vector3, color: Color, metallic := 0.0) -> MeshInstance3D:
