@@ -33,7 +33,6 @@ func _material(color: Color, surface: String = "plastered_wall") -> StandardMate
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	var diff_path := "res://assets/textures/%s_diff_1k.jpg" % surface
-	var normal_path := "res://assets/textures/%s_nor_gl_1k.png" % surface
 	var rough_path := "res://assets/textures/%s_rough_1k.jpg" % surface
 	if ResourceLoader.exists(diff_path):
 		material.albedo_texture = load(diff_path) as Texture2D
