@@ -81,6 +81,8 @@ func _ready() -> void:
 	_spawn_vehicle()
 	_spawn_traffic()
 	print("MAHDIA_WORLD_READY")
+	await get_tree().process_frame
+	_log_render_diagnostics()
 
 func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
 	var key := color.to_html() + str(roughness)
@@ -178,12 +180,10 @@ func _pbr_texture(asset: String, map_name: String) -> Texture2D:
 
 
 func _apply_pbr_maps(material: StandardMaterial3D, asset: String) -> void:
-	var normal_map := _pbr_texture(asset, "nor_gl")
+	# Unshaded GLES compatibility path: avoid unused normal-map shader features.
+	material.normal_enabled = false
+	material.normal_texture = null
 	var rough_map := _pbr_texture(asset, "rough")
-	if normal_map != null:
-		material.normal_enabled = true
-		material.normal_texture = normal_map
-		material.normal_scale = 0.48
 	if rough_map != null:
 		material.roughness_texture = rough_map
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -229,7 +229,7 @@ func _build_environment() -> void:
 	world_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	world_environment.ambient_light_color = Color(0.78, 0.82, 0.90)
 	world_environment.ambient_light_energy = 0.72
-	world_environment.tonemap_mode = Environment.TONE_MAPPER_ACES
+	world_environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	world_env.environment = world_environment
 	add_child(world_env)
 	sun = DirectionalLight3D.new()
@@ -1371,6 +1371,36 @@ func _save_world_progress() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
 		_save_world_progress()
+
+func _log_render_diagnostics() -> void:
+	var active_camera: Camera3D = player.camera if is_instance_valid(player) else null
+	print("MAHDIA_RENDER_DIAG world_3d=", get_viewport().world_3d != null,
+		" viewport_camera_matches=", get_viewport().get_camera_3d() == active_camera,
+		" camera_valid=", is_instance_valid(active_camera))
+	if is_instance_valid(active_camera):
+		print("MAHDIA_CAMERA_DIAG current=", active_camera.is_current(),
+			" global_transform=", active_camera.global_transform,
+			" camera_transform=", active_camera.get_camera_transform(),
+			" cull_mask=", active_camera.cull_mask,
+			" near=", active_camera.near, " far=", active_camera.far,
+			" pivot_rotation=", player.camera_pivot.rotation,
+			" player_position=", player.global_position)
+	var mesh_count := 0
+	var valid_mesh_count := 0
+	for node in find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance == null:
+			continue
+		mesh_count += 1
+		if mesh_instance.mesh != null:
+			valid_mesh_count += 1
+			if valid_mesh_count <= 8:
+				print("MAHDIA_MESH_DIAG name=", mesh_instance.get_path(),
+					" visible=", mesh_instance.is_visible_in_tree(),
+					" position=", mesh_instance.global_position,
+					" aabb=", mesh_instance.get_aabb(),
+					" material_override=", mesh_instance.material_override)
+	print("MAHDIA_MESH_TOTAL count=", mesh_count, " valid=", valid_mesh_count)
 
 func _select_device_profile() -> void:
 	# Entry-level Android devices need a conservative default before the world
