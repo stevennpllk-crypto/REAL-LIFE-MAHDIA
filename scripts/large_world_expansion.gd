@@ -37,10 +37,9 @@ func _material(color: Color, surface: String = "plastered_wall") -> StandardMate
 	var rough_path := "res://assets/textures/%s_rough_1k.jpg" % surface
 	if ResourceLoader.exists(diff_path):
 		material.albedo_texture = load(diff_path) as Texture2D
-	if ResourceLoader.exists(normal_path):
-		material.normal_enabled = true
-		material.normal_texture = load(normal_path) as Texture2D
-		material.normal_scale = 0.42
+	# Unshaded GLES compatibility path: do not compile unused normal-map features.
+	material.normal_enabled = false
+	material.normal_texture = null
 	if ResourceLoader.exists(rough_path):
 		material.roughness_texture = load(rough_path) as Texture2D
 	_materials[key] = material
