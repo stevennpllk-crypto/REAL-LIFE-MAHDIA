@@ -230,8 +230,9 @@ func _run_tests() -> void:
 	var visual_resident := CharacterBody3D.new()
 	visual_resident.set_script(load("res://scripts/npc.gd"))
 	visual_resident.set("build_visuals", true)
-	# Beachgoers intentionally use the procedural rig, keeping this test
-	# focused on articulated fallback anatomy even when imported GLBs exist.
+	visual_resident.set("use_imported_character", false)
+	# Force the procedural fallback here so its anatomy/face/gesture regression
+	# remains covered independently of the imported GLB path tested below.
 	visual_resident.set("occupation", "beachgoer")
 	visual_resident.set("gender", "female")
 	visual_resident.set("is_adult", true)

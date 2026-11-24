@@ -12,6 +12,7 @@ const LIFE_SCRIPT = preload("res://scripts/life_manager.gd")
 const AI_SERVICE_SCRIPT = preload("res://scripts/ai_service.gd")
 const PLANET_NAV_SCRIPT = preload("res://scripts/planet_navigation.gd")
 const TERRAIN_STREAMER_SCRIPT = preload("res://scripts/terrain_streamer.gd")
+const LARGE_WORLD_EXPANSION_SCRIPT = preload("res://scripts/large_world_expansion.gd")
 
 var player: CharacterBody3D
 var mobile_controls: Node
@@ -71,10 +72,17 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await _build_town()
 	print("MAHDIA_TOWN_READY")
+	var large_world := Node3D.new()
+	large_world.name = "MahdiaLargeWorldExpansion"
+	large_world.set_script(LARGE_WORLD_EXPANSION_SCRIPT)
+	add_child(large_world)
+	await large_world.call("build_world")
 	_spawn_residents()
 	_spawn_vehicle()
 	_spawn_traffic()
 	print("MAHDIA_WORLD_READY")
+	await get_tree().process_frame
+	_log_render_diagnostics()
 
 func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
 	var key := color.to_html() + str(roughness)
@@ -84,7 +92,7 @@ func _material(color: Color, roughness := 0.88) -> StandardMaterial3D:
 	mat.albedo_color = color
 	mat.roughness = roughness
 	# Physically based lighting gives surfaces real form; the low tier disables shadows instead.
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material_cache[key] = mat
 	return mat
 
@@ -172,12 +180,10 @@ func _pbr_texture(asset: String, map_name: String) -> Texture2D:
 
 
 func _apply_pbr_maps(material: StandardMaterial3D, asset: String) -> void:
-	var normal_map := _pbr_texture(asset, "nor_gl")
+	# Unshaded GLES compatibility path: avoid unused normal-map shader features.
+	material.normal_enabled = false
+	material.normal_texture = null
 	var rough_map := _pbr_texture(asset, "rough")
-	if normal_map != null:
-		material.normal_enabled = true
-		material.normal_texture = normal_map
-		material.normal_scale = 0.48
 	if rough_map != null:
 		material.roughness_texture = rough_map
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -203,7 +209,7 @@ func _plaster_material(color: Color) -> StandardMaterial3D:
 		material.albedo_texture = plaster_texture
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	material.roughness = 0.96
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return material
 
 func _plaster_box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInstance3D:
@@ -223,17 +229,17 @@ func _build_environment() -> void:
 	world_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	world_environment.ambient_light_color = Color(0.78, 0.82, 0.90)
 	world_environment.ambient_light_energy = 0.72
-	world_environment.tonemap_mode = Environment.TONE_MAPPER_ACES
+	world_environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	world_env.environment = world_environment
 	add_child(world_env)
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48, -32, 0)
 	sun.light_energy = 1.28
 	# One directional sun provides real surface shading and shadows.
-	sun.shadow_enabled = true
+	sun.shadow_enabled = false
 	sun.directional_shadow_max_distance = 48.0
 	sun.shadow_opacity = 0.62
-	sun.visible = true
+	sun.visible = false
 	add_child(sun)
 	# Explicitly disable costly environment passes for broad GLES3 compatibility.
 	world_environment.glow_enabled = false
@@ -268,7 +274,7 @@ func _build_environment() -> void:
 	var sea_material := _material(Color(0.025, 0.29, 0.50), 0.24)
 	sea_material.metallic = 0.12
 	sea_material.roughness = 0.24
-	sea_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	sea_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	sea.material_override = sea_material
 	_textured_box(self, Vector3(180, 0.18, 5.5), Vector3(0, 0.04, -57), Color(0.88, 0.84, 0.75), "stone", Vector3(1.0, 42.0, 1.0))
 	_create_coastal_scenery()
@@ -420,6 +426,7 @@ func _create_borj_el_kebir_landmark() -> void:
 	var stone := Color(0.69, 0.62, 0.49)
 	var pale := Color(0.82, 0.75, 0.62)
 	var fortress_material := StandardMaterial3D.new()
+	fortress_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	fortress_material.albedo_color = stone
 	var fortress_diffuse := _pbr_texture("cobblestone_pavement", "diff")
 	if fortress_diffuse != null:
@@ -1335,8 +1342,11 @@ func _restore_world_progress() -> void:
 		var car: Array = world.vehicle_position
 		restored_vehicle_position = START_VEHICLE_POSITION if migrate_legacy_start else Vector3(float(car[0]), float(car[1]), float(car[2]))
 	restore_vehicle_driver = bool(world.get("was_driving", false))
-	quality_level = 2
-	print("MAHDIA_WORLD_PROGRESS_RESTORED")
+	# Restore the user's saved quality, but never let an old desktop/high
+	# setting override the conservative mobile profile on entry-level phones.
+	var saved_quality := clampi(int(world.get("graphics_quality", quality_level)), 0, 2)
+	quality_level = mini(saved_quality, 1) if OS.has_feature("mobile") else saved_quality
+	print("MAHDIA_WORLD_PROGRESS_RESTORED quality=", quality_level)
 
 func _save_world_progress() -> void:
 	if not is_instance_valid(save_manager) or not is_instance_valid(player):
@@ -1362,19 +1372,64 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
 		_save_world_progress()
 
+func _log_render_diagnostics() -> void:
+	var active_camera: Camera3D = player.get("camera") as Camera3D if is_instance_valid(player) else null
+	print("MAHDIA_RENDER_DIAG world_3d=", get_viewport().world_3d != null,
+		" viewport_camera_matches=", get_viewport().get_camera_3d() == active_camera,
+		" camera_valid=", is_instance_valid(active_camera))
+	if is_instance_valid(active_camera):
+		print("MAHDIA_CAMERA_DIAG current=", active_camera.is_current(),
+			" global_transform=", active_camera.global_transform,
+			" camera_transform=", active_camera.get_camera_transform(),
+			" cull_mask=", active_camera.cull_mask,
+			" near=", active_camera.near, " far=", active_camera.far,
+			" pivot_rotation=", (player.get("camera_pivot") as Node3D).rotation,
+			" player_position=", player.global_position)
+	var mesh_count := 0
+	var valid_mesh_count := 0
+	for node in find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance == null:
+			continue
+		mesh_count += 1
+		if mesh_instance.mesh != null:
+			valid_mesh_count += 1
+			if valid_mesh_count <= 8:
+				print("MAHDIA_MESH_DIAG name=", mesh_instance.get_path(),
+					" visible=", mesh_instance.is_visible_in_tree(),
+					" position=", mesh_instance.global_position,
+					" aabb=", mesh_instance.get_aabb(),
+					" material_override=", mesh_instance.material_override)
+	print("MAHDIA_MESH_TOTAL count=", mesh_count, " valid=", valid_mesh_count)
+
 func _select_device_profile() -> void:
-	# The world uses one shared visual and simulation configuration everywhere.
-	quality_level = 2
+	# Entry-level Android devices need a conservative default before the world
+	# is built. Desktop keeps the high-quality profile; players can still opt
+	# into higher settings later if a quality selector is added.
+	quality_level = 1 if OS.has_feature("mobile") else 2
+	print("MAHDIA_DEVICE_PROFILE=", "MOBILE_BALANCED" if quality_level == 1 else "DESKTOP_HIGH")
 
 func _apply_graphics_quality() -> void:
-	Engine.max_fps = 60
+	# Keep physics deterministic at 60 Hz while limiting mobile rendering cost.
+	# A 0.82 3D scale and disabled real-time shadows reduce GPU fill/bandwidth
+	# pressure on devices with entry-level GPUs and limited shared memory.
+	var mobile_device := OS.has_feature("mobile")
+	if quality_level <= 0:
+		Engine.max_fps = 30
+		get_viewport().scaling_3d_scale = 0.72
+	elif quality_level == 1 or mobile_device:
+		Engine.max_fps = 30
+		get_viewport().scaling_3d_scale = 0.82
+	else:
+		Engine.max_fps = 60
+		get_viewport().scaling_3d_scale = 1.0
 	Engine.physics_ticks_per_second = 60
-	get_viewport().scaling_3d_scale = 1.0
 	if is_instance_valid(sun):
 		sun.visible = true
-		sun.shadow_enabled = true
+		sun.shadow_enabled = quality_level >= 2 and not mobile_device
 	if is_instance_valid(world_environment):
-		world_environment.ambient_light_energy = 0.94
+		world_environment.ambient_light_energy = 1.0 if mobile_device else 0.94
+	print("MAHDIA_GRAPHICS_PROFILE=level:", quality_level, " fps:", Engine.max_fps, " scale:", get_viewport().scaling_3d_scale, " shadows:", is_instance_valid(sun) and sun.shadow_enabled)
 
 
 func _surface_texture(kind: String) -> ImageTexture:
@@ -1409,7 +1464,7 @@ func _textured_box(parent: Node3D, size: Vector3, pos: Vector3, tint: Color, tex
 	material.uv1_scale = uv_scale
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	material.roughness = 0.96
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	item.material_override = material
 	parent.add_child(item)
 	return item
@@ -1468,7 +1523,7 @@ func _create_realistic_street_layer() -> void:
 	# Utility poles and subtly sagging overhead cables; no physics or dynamic lights.
 	var cable_material := StandardMaterial3D.new()
 	cable_material.albedo_color = Color(0.12, 0.13, 0.14)
-	cable_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	cable_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	for pole_index in range(4):
 		var px := -45.0 + float(pole_index) * 30.0
 		var pole := MeshInstance3D.new()

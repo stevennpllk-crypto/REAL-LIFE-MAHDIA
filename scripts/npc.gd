@@ -9,6 +9,7 @@ class_name MahdiaNPC
 @export_enum("male", "female") var gender := "male"
 var is_adult := false
 @export var build_visuals := true
+@export var use_imported_character := true
 
 var player: CharacterBody3D
 var world_clock: Node
@@ -64,6 +65,24 @@ var imported_model_loaded := false
 var imported_animation_key := ""
 var imported_gait_verified := false
 
+func _force_unshaded_materials(root: Node) -> void:
+	for node in root.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+		for surface_index in range(mesh_instance.mesh.get_surface_count()):
+			var source_material := mesh_instance.get_active_material(surface_index)
+			if source_material is BaseMaterial3D:
+				var mobile_material := (source_material as BaseMaterial3D).duplicate() as BaseMaterial3D
+				mobile_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				mobile_material.normal_enabled = false
+				mesh_instance.set_surface_override_material(surface_index, mobile_material)
+		if mesh_instance.material_override is BaseMaterial3D:
+			var override_material := (mesh_instance.material_override as BaseMaterial3D).duplicate() as BaseMaterial3D
+			override_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			override_material.normal_enabled = false
+			mesh_instance.material_override = override_material
+
 func _build_imported_character() -> bool:
 	var model_paths := [
 		"res://assets/characters/male-adult-01.glb",
@@ -86,6 +105,7 @@ func _build_imported_character() -> bool:
 		var model_instance := packed_model.instantiate()
 		model_instance.name = "ImportedHuman"
 		visual_root.add_child(model_instance)
+		_force_unshaded_materials(model_instance)
 		var skeleton_nodes := model_instance.find_children("*", "Skeleton3D", true, false)
 		if skeleton_nodes.is_empty():
 			push_warning("Resident model has no Skeleton3D; trying the next character asset: " + model_path)
@@ -307,15 +327,14 @@ func _mat(color: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
 	material.roughness = 0.86
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return material
 
 func _build_character() -> void:
-	# Prefer textured, rigged human GLBs when the Android build pipeline has
-	# supplied them. Keep the procedural resident as a safe offline fallback.
-	# Beach residents use the procedural rig so their swimwear is visible;
-	# imported street outfits remain unchanged for other residents.
-	if occupation != "beachgoer" and occupation != "swimmer" and _build_imported_character():
+	# Prefer textured, rigged human GLBs for every resident, including the
+	# waterfront population. Use the procedural mesh only if all licensed
+	# character assets are unavailable or fail skeleton/bounds validation.
+	if use_imported_character and _build_imported_character():
 		return
 	visual_root = Node3D.new()
 	visual_root.name = "ResidentVisual"

@@ -11,7 +11,7 @@ class_name MahdiaPlayer
 @export var jump_velocity := 4.5
 @export var mouse_sensitivity := 0.0020
 @export var build_visuals := true
-# Keep the imported player rig disabled until its shoulder rest pose is verified on-device.
+# Keep the player on the verified upright procedural rig until the imported Bip01 GLB orientation is corrected and visually revalidated.
 @export var use_imported_player_character := false
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var move_vector := Vector2.ZERO
@@ -79,10 +79,13 @@ func _ready() -> void:
 	# A 1.55 m offset produced an excessively tight back-of-player close-up.
 	camera.position = Vector3(0.10, 0.55, 3.6)
 	camera.rotation_degrees.x = -9.5
-	camera.current = true
 	camera.fov = 58.0
 	camera.near = 0.08
 	camera_pivot.add_child(camera)
+	# Activate only after entering the SceneTree; setting current before
+	# add_child can leave the Android viewport without an active 3D camera.
+	camera.make_current()
+	print("MAHDIA_CAMERA_ACTIVE current=", camera.is_current(), " position=", camera.global_position)
 	if not OS.has_feature("mobile"):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -135,19 +138,11 @@ func _log_imported_player_orientation() -> void:
 	if head_index < 0 or hips_index < 0:
 		print("MAHDIA_PLAYER_ORIENTATION=UNVERIFIED head_bone=", head_index, " hips_bone=", hips_index)
 		return
-	# Some imported GLB skeletons expose zeroed global-rest origins even
-	# though their local rest transforms contain the actual hierarchy offsets.
-	# Reconstruct each bone's skeleton-space rest transform from its parents.
-	var head_rest := Transform3D.IDENTITY
-	var parent_index := head_index
-	while parent_index >= 0:
-		head_rest = imported_player_skeleton.get_bone_rest(parent_index) * head_rest
-		parent_index = imported_player_skeleton.get_bone_parent(parent_index)
-	var hips_rest := Transform3D.IDENTITY
-	parent_index = hips_index
-	while parent_index >= 0:
-		hips_rest = imported_player_skeleton.get_bone_rest(parent_index) * hips_rest
-		parent_index = imported_player_skeleton.get_bone_parent(parent_index)
+	# Use Godot's evaluated skeleton-space rest transforms. Rebuilding the
+	# hierarchy manually can apply the imported axis-conversion basis in the
+	# wrong order and falsely report a valid rig as unverified.
+	var head_rest := imported_player_skeleton.get_bone_global_rest(head_index)
+	var hips_rest := imported_player_skeleton.get_bone_global_rest(hips_index)
 	var head_y := head_rest.origin.y
 	var hips_y := hips_rest.origin.y
 	var difference := head_y - hips_y
@@ -278,7 +273,7 @@ func _mat(color: Color, roughness := 0.82) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
 	m.roughness = roughness
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return m
 
 func _part(parent: Node3D, mesh: Mesh, pos: Vector3, color: Color) -> MeshInstance3D:

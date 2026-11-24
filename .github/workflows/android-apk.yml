@@ -2,6 +2,8 @@ name: Android APK build
 
 on:
   push:
+    branches: [ main, feature/expanded-mahdia-world ]
+  pull_request:
     branches: [ main ]
   workflow_dispatch:
 
@@ -154,6 +156,14 @@ jobs:
           timeout 90s godot --headless --path . --script res://tests/test_mobile_movement.gd
           echo "Gameplay regression suite completed successfully."
 
+      - name: Inspect imported player GLB rig and mesh transforms
+        run: |
+          set -euxo pipefail
+          timeout 45s godot --headless --path . --script res://tests/inspect_player_glb.gd | tee build-player-asset-diagnostic.log
+          grep -q "PLAYER_ASSET_DIAGNOSTIC_COMPLETE" build-player-asset-diagnostic.log
+          grep -q "PLAYER_ASSET_HEAD" build-player-asset-diagnostic.log
+          grep -q "PLAYER_ASSET_PELVIS" build-player-asset-diagnostic.log
+
       - name: Set monotonically increasing Android version code
         run: |
           set -euxo pipefail
@@ -205,17 +215,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Select Vulkan APK for emulator smoke test
+      - name: Select GLES Compatibility APK for emulator smoke test
         run: |
           set -euxo pipefail
-          test -s build/REAL_LIFE_MAHDIA-mobile.apk
-          file build/REAL_LIFE_MAHDIA-mobile.apk
-          unzip -t build/REAL_LIFE_MAHDIA-mobile.apk >/dev/null
-          cp build/REAL_LIFE_MAHDIA-mobile.apk build/REAL_LIFE_MAHDIA-debug.apk
+          test -s build/REAL_LIFE_MAHDIA-debug.apk
           file build/REAL_LIFE_MAHDIA-debug.apk
           unzip -t build/REAL_LIFE_MAHDIA-debug.apk >/dev/null
-          # SwiftShader GLES on hosted runners can fail to link Godot's scene
-          # shader; validate the Vulkan Mobile build on the emulator instead.
+          # Keep Vulkan as a separately downloadable build. The hosted emulator
+          # uses SwiftShader GLES, so smoke-test the Compatibility APK here.
 
       - name: Prepare KVM and ADB for emulator
         run: |
@@ -229,6 +236,42 @@ jobs:
           "$ANDROID_HOME/platform-tools/adb" start-server
           "$ANDROID_HOME/platform-tools/adb" version
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+
+      - name: Preinstall emulator system image with retry
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          IMAGE='system-images;android-35;google_apis;x86_64'
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "sdkmanager not found at $SDKMANAGER" >&2
+            find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -name sdkmanager -type f -print >&2 || true
+            exit 1
+          fi
+          # sdkmanager may close stdin after accepting all licenses; with pipefail,
+          # that makes the upstream `yes` exit via SIGPIPE (141) despite success.
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses >/dev/null
+          license_status=${PIPESTATUS[1]}
+          set -o pipefail
+          if [ "$license_status" -ne 0 ]; then
+            echo "sdkmanager --licenses failed with exit code $license_status" >&2
+            exit "$license_status"
+          fi
+          for attempt in 1 2 3; do
+            echo "Installing emulator image (attempt $attempt/3)"
+            if "$SDKMANAGER" --install "$IMAGE"; then
+              test -d "$ANDROID_HOME/system-images/android-35/google_apis/x86_64"
+              echo "Android emulator image installed successfully."
+              break
+            fi
+            rm -rf "$ANDROID_HOME/system-images/android-35/google_apis/x86_64"
+            rm -rf "$HOME/.android/cache"/* 2>/dev/null || true
+            if [ "$attempt" -eq 3 ]; then
+              echo "Android emulator system image download failed after three attempts" >&2
+              exit 1
+            fi
+            sleep 8
+          done
 
       - name: Test APK on cloud Android emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -253,6 +296,9 @@ jobs:
           name: REAL-LIFE-MAHDIA-Emulator-Evidence
           path: |
             build/mahdia-emulator.png
+            build/mahdia-player-ready.png
+            build/mahdia-world-ready.png
             build/emulator-logcat.txt
+            build/android-system-logcat.txt
           if-no-files-found: warn
           retention-days: 7
