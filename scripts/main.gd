@@ -1373,7 +1373,7 @@ func _notification(what: int) -> void:
 		_save_world_progress()
 
 func _log_render_diagnostics() -> void:
-	var active_camera: Camera3D = player.camera if is_instance_valid(player) else null
+	var active_camera: Camera3D = player.get("camera") as Camera3D if is_instance_valid(player) else null
 	print("MAHDIA_RENDER_DIAG world_3d=", get_viewport().world_3d != null,
 		" viewport_camera_matches=", get_viewport().get_camera_3d() == active_camera,
 		" camera_valid=", is_instance_valid(active_camera))
@@ -1383,7 +1383,7 @@ func _log_render_diagnostics() -> void:
 			" camera_transform=", active_camera.get_camera_transform(),
 			" cull_mask=", active_camera.cull_mask,
 			" near=", active_camera.near, " far=", active_camera.far,
-			" pivot_rotation=", player.camera_pivot.rotation,
+			" pivot_rotation=", (player.get("camera_pivot") as Node3D).rotation,
 			" player_position=", player.global_position)
 	var mesh_count := 0
 	var valid_mesh_count := 0
