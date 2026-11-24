@@ -426,6 +426,7 @@ func _create_borj_el_kebir_landmark() -> void:
 	var stone := Color(0.69, 0.62, 0.49)
 	var pale := Color(0.82, 0.75, 0.62)
 	var fortress_material := StandardMaterial3D.new()
+	fortress_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	fortress_material.albedo_color = stone
 	var fortress_diffuse := _pbr_texture("cobblestone_pavement", "diff")
 	if fortress_diffuse != null:
